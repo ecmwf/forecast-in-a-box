@@ -23,6 +23,7 @@ import {
   Panel,
   ReactFlow,
   ReactFlowProvider,
+  useNodesState,
   useReactFlow,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
@@ -34,6 +35,11 @@ import type {
   FableBuilderV1,
 } from '@/api/types/fable.types'
 import type { JobStatus } from '@/api/types/job.types'
+import type { NodeDimensions } from '@/features/fable-builder/utils/layout-blocks'
+import { useFableValidation } from '@/api/hooks/useFable'
+import { useMedia } from '@/hooks/useMedia'
+import { CanvasMiniMap } from '@/components/common/CanvasMiniMap'
+import { withMeasured } from '@/components/common/canvas-measured'
 import {
   fableToEdges,
   fableToNodes,
@@ -53,13 +59,24 @@ export function useShowConfig() {
 
 /** As-run values keyed by block, then option; empty until they resolve. */
 const ResolvedConfigContext = createContext<
-  Record<string, Record<string, string>>
+  Record<string, Record<string, string | null>>
 >({})
 
 export function useResolvedConfigFor(
   blockId: string,
-): Record<string, string> | undefined {
+): Record<string, string | null> | undefined {
   return useContext(ResolvedConfigContext)[blockId]
+}
+
+const ValueTypesContext = createContext<Record<string, Record<string, string>>>(
+  {},
+)
+
+/** Option types narrowed by validation. */
+export function useValueTypesFor(
+  blockId: string,
+): Record<string, string> | undefined {
+  return useContext(ValueTypesContext)[blockId]
 }
 
 export interface BlockProgressInfo {
@@ -89,7 +106,7 @@ interface RunCanvasProps {
   completedBlockIds?: ReadonlyArray<BlockInstanceId> | null
   plannedBlockIds?: ReadonlyArray<BlockInstanceId> | null
   /** As-run values by block then option; absent while loading or unrecorded. */
-  resolvedConfig?: Record<string, Record<string, string>>
+  resolvedConfig?: Record<string, Record<string, string | null>>
 }
 
 /** Fit never zooms past 1:1 — a tiny graph stays natural-sized, not blown up. */
@@ -97,6 +114,8 @@ const FIT_MAX_ZOOM = 1
 
 /** Stable identity so an absent map does not remount every consumer. */
 const EMPTY_RESOLVED: Record<string, Record<string, string>> = {}
+
+const EMPTY_TYPES: Record<string, Record<string, string>> = {}
 
 const nodeTypes: Record<string, typeof RunNode> = {
   sourceBlock: RunNode,
@@ -128,6 +147,10 @@ function RunCanvasInner({
   const { t } = useTranslation('executions')
   const [showConfig, setShowConfig] = useState(true)
   const [maximized, setMaximized] = useState(false)
+  const isDesktop = useMedia('(min-width: 1024px)')
+  const isPhone = useMedia('(max-width: 639px)')
+  // Inline needs desktop room; maximized has room on anything but a phone.
+  const showMiniMap = maximized ? !isPhone : isDesktop
   const { fitView } = useReactFlow()
   const containerRef = useRef<HTMLDivElement>(null)
   const isInitialRender = useRef(true)
@@ -187,17 +210,25 @@ function RunCanvasInner({
     return { completedSet, plannedSet, runningSet }
   }, [completedBlockIds, plannedBlockIds, isRunning])
 
+  // Measured node sizes; the layout redoes itself once they are known.
+  const [nodeSizes, setNodeSizes] = useState<NodeDimensions>()
+
   const { layoutedNodes, edges, canvasHeight } = useMemo(() => {
     const nodes = fableToNodes(fable, catalogue)
     const edgeList = fableToEdges(fable, catalogue)
     // 200/130 = RunNode's real size (the 280 default padded gaps); 48s apart.
-    const laid = layoutNodes(nodes, edgeList, {
-      direction: 'LR',
-      nodeWidth: 200,
-      nodeHeight: 130,
-      nodeSpacingX: 48,
-      nodeSpacingY: 48,
-    })
+    const laid = layoutNodes(
+      nodes,
+      edgeList,
+      {
+        direction: 'LR',
+        nodeWidth: 200,
+        nodeHeight: 130,
+        nodeSpacingX: 48,
+        nodeSpacingY: 48,
+      },
+      nodeSizes,
+    )
     const hasPlanInfo = blockProgress.plannedSet.size > 0
     const remapped = edgeList.map((e) => {
       // Running → every edge gets the ambient beam (track + drifting dots);
@@ -218,7 +249,21 @@ function RunCanvasInner({
       edges: remapped,
       canvasHeight: computeCanvasHeight(laid),
     }
-  }, [fable, catalogue, isRunning, blockProgress])
+  }, [fable, catalogue, isRunning, blockProgress, nodeSizes])
+  // React Flow owns the node state so its measurements stick across rebuilds.
+  const [nodes, setNodes, onNodesChange] = useNodesState(layoutedNodes)
+  useEffect(() => {
+    setNodes((prev) => withMeasured(layoutedNodes, prev))
+  }, [layoutedNodes, setNodes])
+  useEffect(() => {
+    const sizes: NodeDimensions = {}
+    for (const node of nodes) {
+      const { width, height } = node.measured ?? {}
+      if (!width || !height) return
+      sizes[node.id] = { width: Math.round(width), height: Math.round(height) }
+    }
+    setNodeSizes((prev) => (sameSizes(prev, sizes) ? prev : sizes))
+  }, [nodes])
 
   return (
     <ShowConfigContext value={showConfig}>
@@ -241,7 +286,8 @@ function RunCanvasInner({
             )}
           >
             <ReactFlow
-              nodes={layoutedNodes}
+              nodes={nodes}
+              onNodesChange={onNodesChange}
               edges={edges}
               nodeTypes={nodeTypes}
               edgeTypes={edgeTypes}
@@ -254,7 +300,6 @@ function RunCanvasInner({
               fitViewOptions={{ padding: 0.15, maxZoom: FIT_MAX_ZOOM }}
               // Default 0.5 floor can't fit a wide pipeline into a phone container.
               minZoom={0.1}
-              proOptions={{ hideAttribution: true }}
               onNodeClick={(_event, node) => {
                 // Toggle: click the already-selected block to clear.
                 setSelectedBlockId(selectedBlockId === node.id ? null : node.id)
@@ -275,6 +320,7 @@ function RunCanvasInner({
                 position="bottom-left"
                 className="bottom-2! left-2!"
               />
+              {showMiniMap && <CanvasMiniMap />}
               <Panel position="top-left" className="top-2! left-2!">
                 <Button
                   variant="outline"
@@ -321,9 +367,14 @@ function RunCanvasInner({
 }
 
 export function RunCanvas(props: RunCanvasProps) {
+  const { data: validation } = useFableValidation(props.fable)
   return (
     <ReactFlowProvider>
-      <RunCanvasInner {...props} />
+      <ValueTypesContext
+        value={validation?.configuration_restrictions ?? EMPTY_TYPES}
+      >
+        <RunCanvasInner {...props} />
+      </ValueTypesContext>
     </ReactFlowProvider>
   )
 }
@@ -339,6 +390,14 @@ interface PositionedNode {
   measured?: { width?: number; height?: number }
   width?: number
   height?: number
+}
+
+function sameSizes(a: NodeDimensions | undefined, b: NodeDimensions): boolean {
+  if (!a || Object.keys(a).length !== Object.keys(b).length) return false
+  return Object.entries(b).every(([id, size]) => {
+    const was = a[id] as NodeDimensions[string] | undefined
+    return was?.width === size.width && was.height === size.height
+  })
 }
 
 /**

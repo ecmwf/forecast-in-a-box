@@ -29,6 +29,14 @@ def _reset_plugin_state() -> Generator[None, None, None]:
     PluginManager.plugins = pmap()
 
 
+@pytest.fixture(autouse=True)
+def _stores_ready() -> Generator[None, None, None]:
+    # NOTE status_brief() defers to stores_ready() first -- these tests exercise the
+    # PluginManager-driven branches, so pretend the stores are already initialized.
+    with patch("forecastbox.domain.plugin.status.stores_ready", return_value=True):
+        yield
+
+
 def test_status_brief_ok() -> None:
     with patch("forecastbox.domain.plugin.status.PluginManager") as mock_pm:
         mock_pm.updater_error = None
@@ -50,6 +58,11 @@ def test_status_brief_failure() -> None:
         result = status_brief()
         assert result.startswith("failure:")
         assert "some error" in result
+
+
+def test_status_brief_initializing_when_stores_not_ready() -> None:
+    with patch("forecastbox.domain.plugin.status.stores_ready", return_value=False):
+        assert status_brief() == "initializing"
 
 
 def test_plugins_ready_true_when_ok() -> None:

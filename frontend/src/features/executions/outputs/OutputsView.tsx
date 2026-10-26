@@ -11,22 +11,45 @@
 /** Outputs grid with MIME filter, group-by toggle, skeletons for pending
  * items, and a lazy viewer for the active selection. */
 
-import { AlertTriangle, Package } from 'lucide-react'
-import { Suspense, useCallback, useMemo, useState } from 'react'
+import { AlertTriangle, CloudOff, Package } from 'lucide-react'
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
+import { useQueryClient } from '@tanstack/react-query'
 import { useHotkey } from '@tanstack/react-hotkeys'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { registerFirstPartyAdapters } from './adapters'
-import { GRIB_DIR_MIME } from './adapters/grib'
+import { isGribDirMime } from './adapters/grib'
+import {
+  compareDimValues,
+  compareDims,
+  dimLine,
+  dimNeighbor,
+  dimValue,
+  dimValueCounts,
+  matchesDimFilter,
+  orderDims,
+  outputTitle,
+  parseDimFilter,
+  segmentKey,
+  serializeDimFilter,
+  stepGrid,
+} from './dims'
+import { DimFilterMenu } from './DimFilterMenu'
 import { MimeFilterChips } from './MimeFilterChips'
 import { OutputCard } from './OutputCard'
 import { resolveAdapter } from './registry'
 import { SkeletonOutputCard } from './SkeletonOutputCard'
-import { LostOutputCard } from './LostOutputCard'
+import { StepGridMenu } from './StepGridMenu'
+import { DimNavigator } from './viewers/DimNavigator'
+import { Filmstrip } from './viewers/Filmstrip'
+import { useDimFormat } from './useDimFormat'
+import { prefetchJobResultBlob } from './useJobResult'
 import { needsSniff, useResolvedMimes } from './useResolvedMimes'
 import { classifyOutput } from './availability'
 import type { LostTaskIds } from './availability'
+import type { DimFilter } from './dims'
+import type { DimFormat } from './useDimFormat'
 import type { JobStatus, RunOutputs } from '@/api/types/job.types'
 import type { OutputAdapter, OutputItem } from './types'
 import { isTerminalStatus } from '@/api/types/job.types'
@@ -39,6 +62,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { groupByKey } from '@/lib/group-by'
 import { cn } from '@/lib/utils'
+import { useUiStore } from '@/stores/uiStore'
 import {
   Select,
   SelectContent,
@@ -53,7 +77,12 @@ registerFirstPartyAdapters()
 // Single source of truth for the group-by enum: derive the type from the array
 // so adding an option only requires touching this list and the i18n key map.
 const GROUP_BY_OPTIONS = ['none', 'block', 'mime', 'block-and-mime'] as const
-export type GroupBy = (typeof GROUP_BY_OPTIONS)[number]
+/** Grouping by a split coordinate is `dim:<key>`, e.g. `dim:param`. */
+const DIM_PREFIX = 'dim:'
+export type GroupBy = (typeof GROUP_BY_OPTIONS)[number] | `dim:${string}`
+
+/** Delay between frames while playing through a coordinate. */
+const PLAY_INTERVAL_MS = 700
 
 /** Responsive card track — shared by the output grid and the loading
  * skeletons so both reflow identically. */
@@ -69,6 +98,8 @@ interface OutputsViewProps {
   completedBlockIds?: ReadonlyArray<string> | null
   /** Surfaces block-level skeletons before any outputs payload arrives. */
   plannedBlockIds?: ReadonlyArray<string> | null
+  /** Display name per block id, from the run's workflow. */
+  blockNames?: Readonly<Record<string, string>>
   /** Portal target for the toolbar; falls back to inline. */
   toolbarSlot?: HTMLElement | null
   /** Switches to the Logs tab from the failed-run notice. */
@@ -82,6 +113,7 @@ export function OutputsView({
   lostTaskIds = {},
   completedBlockIds,
   plannedBlockIds,
+  blockNames,
   toolbarSlot,
   onViewLogs,
 }: OutputsViewProps) {
@@ -93,40 +125,54 @@ export function OutputsView({
     adapter: OutputAdapter
   } | null>(null)
 
-  /** Default order: by block (alphabetic), available before pending within
-   * the same block, taskId for stable tiebreak. Keeps items from the same
-   * block adjacent in the flat grid, and preserved as section/item order in
-   * the grouped views. */
+  const dimFormat = useDimFormat(outputs)
+
+  /** Block, coordinates (time last), taskId; pending items hold their slot. */
   const items = useMemo<Array<OutputItem>>(() => {
     if (!outputs) return []
     const list = Object.entries(outputs)
       // GRIB markers show in the Stored outputs card, not the grid.
-      .filter(([, meta]) => meta.mime_type !== GRIB_DIR_MIME)
+      .filter(([, meta]) => !isGribDirMime(meta.mime_type))
       .map(([taskId, meta]) => {
         const availability = classifyOutput(
           meta.is_available,
           taskId,
           lostTaskIds,
         )
+        const dims = meta.dimension_kvs ?? undefined
+        const split = dims !== undefined && dims.length > 0
+        // Plugin label only for outputs without coordinates.
+        const label =
+          meta.dimension_kvs == null
+            ? (meta.display_name ?? undefined)
+            : undefined
         return {
           jobId,
           taskId,
           mimeType: meta.mime_type,
           originalBlock: meta.original_block,
+          blockName: blockNames?.[meta.original_block] ?? meta.original_block,
+          dims,
+          subtitle: split ? dimFormat.dims(dims, 'compact') : label,
+          subtitleFull: split ? dimFormat.dims(dims, 'full') : label,
           isAvailable: meta.is_available,
           lostReason:
             availability.state === 'lost' ? availability.reason : undefined,
         }
       })
     list.sort((a, b) => {
+      if (a.blockName !== b.blockName) {
+        return a.blockName.localeCompare(b.blockName)
+      }
       if (a.originalBlock !== b.originalBlock) {
         return a.originalBlock < b.originalBlock ? -1 : 1
       }
-      if (a.isAvailable !== b.isAvailable) return a.isAvailable ? -1 : 1
+      const byDims = compareDims(a, b)
+      if (byDims !== 0) return byDims
       return a.taskId < b.taskId ? -1 : 1
     })
     return list
-  }, [jobId, outputs, lostTaskIds])
+  }, [jobId, outputs, lostTaskIds, blockNames, dimFormat])
 
   /** GRIB markers aren't grid cards, but still count toward the header tally
    * and block count. */
@@ -136,7 +182,7 @@ export function OutputsView({
     let lost = 0
     const blocks = new Set<string>()
     for (const [taskId, meta] of Object.entries(outputs ?? {})) {
-      if (meta.mime_type !== GRIB_DIR_MIME) continue
+      if (!isGribDirMime(meta.mime_type)) continue
       blocks.add(meta.original_block)
       switch (classifyOutput(meta.is_available, taskId, lostTaskIds).state) {
         case 'available':
@@ -186,7 +232,63 @@ export function OutputsView({
   }, [items, effectiveMime])
 
   const activeMimes = useMemo(() => parseMimes(search.mimes), [search.mimes])
-  const groupBy: GroupBy = search.groupBy ?? 'none'
+
+  /** Varying coordinates with their values, outer to inner. */
+  const splitDims = useMemo(
+    () =>
+      [...dimValueCounts(items)]
+        .map(([key, counts]) => [key, counts.map(([value]) => value)] as const)
+        .filter(([, values]) => values.length > 1),
+    [items],
+  )
+  const splitKeys = useMemo(() => splitDims.map(([key]) => key), [splitDims])
+
+  /** Day x hour grid for multi-day steps. */
+  const stepLayout = useMemo(() => {
+    const steps = splitDims.find(([key]) => key === 'step')?.[1].map(Number)
+    const grid = steps ? stepGrid(steps) : null
+    return steps && grid ? { steps, grid } : null
+  }, [splitDims])
+
+  /** URL coordinate filter, limited to coordinates that vary. */
+  const dimFilter = useMemo<DimFilter>(
+    () =>
+      Object.fromEntries(
+        Object.entries(parseDimFilter(search.dims)).filter(([key]) =>
+          splitKeys.includes(key),
+        ),
+      ),
+    [search.dims, splitKeys],
+  )
+
+  /** Per-step counts under the other filters, and produced steps. */
+  const stepStats = useMemo(() => {
+    const counts = new Map<number, number>()
+    const produced = new Set<number>()
+    const { step: _, ...others } = dimFilter
+    for (const item of items) {
+      const raw = dimValue(item, 'step')
+      if (raw === undefined || !matchesDimFilter(item, others)) continue
+      if (
+        activeMimes.length > 0 &&
+        !activeMimes.includes(effectiveMime(item))
+      ) {
+        continue
+      }
+      const step = Number(raw)
+      counts.set(step, (counts.get(step) ?? 0) + 1)
+      if (item.isAvailable) produced.add(step)
+    }
+    return { counts, produced }
+  }, [items, dimFilter, activeMimes, effectiveMime])
+
+  const requestedGroupBy: GroupBy = search.groupBy ?? 'none'
+  // Unknown coordinate: flat grid.
+  const groupBy: GroupBy =
+    requestedGroupBy.startsWith(DIM_PREFIX) &&
+    !splitKeys.includes(requestedGroupBy.slice(DIM_PREFIX.length))
+      ? 'none'
+      : requestedGroupBy
 
   const setActiveMimes = (next: ReadonlyArray<string>): void => {
     void navigate({
@@ -195,6 +297,25 @@ export function OutputsView({
       search: (prev) => ({
         ...prev,
         mimes: next.length > 0 ? next.join(',') : undefined,
+      }),
+      replace: true,
+    })
+  }
+
+  /** `null` clears the coordinate's filter; `[]` keeps none of its values. */
+  const setDimValues = (
+    key: string,
+    values: ReadonlyArray<string> | null,
+  ): void => {
+    const others = Object.entries(dimFilter).filter(([k]) => k !== key)
+    void navigate({
+      to: '/execute/$jobId',
+      params: { jobId },
+      search: (prev) => ({
+        ...prev,
+        dims: serializeDimFilter(
+          Object.fromEntries(values ? [...others, [key, values]] : others),
+        ),
       }),
       replace: true,
     })
@@ -226,11 +347,12 @@ export function OutputsView({
           jobId,
           taskId: `__planned__:${blockId}`,
           mimeType: 'application/octet-stream',
+          blockName: blockNames?.[blockId] ?? blockId,
           originalBlock: blockId,
           isAvailable: false,
         }))
     )
-  }, [items.length, plannedBlockIds, jobId, status, storedStats])
+  }, [items.length, plannedBlockIds, jobId, status, storedStats, blockNames])
 
   /** Distinct source blocks in the run. The group-by control only earns its
    * place — and is only shown — when there's more than one. */
@@ -240,6 +362,15 @@ export function OutputsView({
     for (const block of storedStats.blocks) blocks.add(block)
     return blocks.size
   }, [items, blockSkeletons, storedStats])
+
+  /** Block groupings need several blocks; coordinate ones need a split. */
+  const groupByOptions = useMemo<Array<GroupBy>>(
+    () => [
+      ...(distinctBlockCount > 1 ? GROUP_BY_OPTIONS : (['none'] as const)),
+      ...splitKeys.map((key): GroupBy => `${DIM_PREFIX}${key}`),
+    ],
+    [distinctBlockCount, splitKeys],
+  )
 
   /** Available items still awaiting a sniff. A `?mimes=` filter can't decide
    * them yet, so they stand in as skeletons rather than a premature empty
@@ -279,9 +410,14 @@ export function OutputsView({
       ) {
         continue
       }
+      if (!matchesDimFilter(item, dimFilter)) continue
+      // Unretained outputs are summarised in one notice, not shown as cards.
+      if (item.lostReason !== undefined) {
+        lost += 1
+        continue
+      }
       visible.push(item)
       if (item.isAvailable) available += 1
-      else if (item.lostReason !== undefined) lost += 1
       else pending += 1
     }
     return {
@@ -290,7 +426,31 @@ export function OutputsView({
       visiblePendingCount: pending,
       visibleLostCount: lost,
     }
-  }, [items, blockSkeletons, activeMimes, effectiveMime, status])
+  }, [items, blockSkeletons, activeMimes, dimFilter, effectiveMime, status])
+
+  const groups = useMemo(
+    () => groupOutputs(visibleItems, groupBy, effectiveMime),
+    [visibleItems, groupBy, effectiveMime],
+  )
+
+  /** Viewer order follows the rendered sections. */
+  const { navItems, sectionOf } = useMemo(() => {
+    if (!groups) return { navItems: visibleItems, sectionOf: segmentKey }
+    const sections = new Map<string, string>()
+    const ordered: Array<OutputItem> = []
+    for (const group of groups) {
+      for (const section of group.children ?? [group]) {
+        for (const item of section.items) {
+          sections.set(item.taskId, `${group.key}\n${section.key}`)
+          ordered.push(item)
+        }
+      }
+    }
+    return {
+      navItems: ordered,
+      sectionOf: (item: OutputItem) => sections.get(item.taskId) ?? '',
+    }
+  }, [groups, visibleItems])
 
   const isRunning = !isTerminalStatus(status)
   const failed = status === 'failed'
@@ -309,15 +469,17 @@ export function OutputsView({
   const ActiveViewer = activeViewer?.adapter.Viewer ?? null
 
   /** True empty: no outputs payload AND no planned blocks. */
+  /** Distinct lost-output reasons; hook stays above the early return. */
+  const lostReasons = useMemo(
+    () => Array.from(new Set(Object.values(lostTaskIds))),
+    [lostTaskIds],
+  )
+
   if (items.length === 0 && blockSkeletons.length === 0) {
     // GRIB-only run — the Stored outputs card covers it; render nothing.
     if (hasStoredOutputs) return null
     return (
-      <Card
-        variant="flat"
-        shadow="none"
-        className="gap-0 overflow-hidden bg-transparent py-0"
-      >
+      <Card className="gap-0 overflow-hidden border-0 bg-transparent bg-none py-0">
         <div className="flex flex-col items-center justify-center gap-2 px-3 py-10 text-center">
           <Package className="h-10 w-10 text-muted-foreground" />
           <P className="font-medium text-muted-foreground">
@@ -338,26 +500,23 @@ export function OutputsView({
     )
   }
 
-  // Fold stored markers into the tally so it spans the whole run.
-  const shownAvailable = visibleAvailableCount + storedStats.available
-  const totalAvailable = availableCount + storedStats.available
-  const shownPending = visiblePendingCount + storedStats.pending
-  const shownLost = visibleLostCount + storedStats.lost
-
+  // Stored markers count only while unfiltered.
+  const filtered = activeMimes.length > 0 || Object.keys(dimFilter).length > 0
+  const stored = filtered ? { available: 0, pending: 0, lost: 0 } : storedStats
+  const shownAvailable = visibleAvailableCount + stored.available
+  const totalAvailable = availableCount + stored.available
+  const shownPending = visiblePendingCount + stored.pending
+  const shownLost = visibleLostCount + stored.lost
   const toolbar = (
     <div className="flex w-full flex-wrap items-center justify-between gap-3">
-      <P className="text-muted-foreground">
+      {/* Min width keeps the toolbar wrap stable. */}
+      <P className="min-w-64 text-muted-foreground">
         {t('outputs.generated')}: {shownAvailable}
         {shownAvailable !== totalAvailable && ` / ${totalAvailable}`}
         {shownPending > 0 && (
           <span className="ml-2">
             · {t(failed ? 'outputs.notProduced' : 'outputs.pending')}:{' '}
             {shownPending}
-          </span>
-        )}
-        {shownLost > 0 && (
-          <span className="ml-2">
-            · {t('outputs.lost')}: {shownLost}
           </span>
         )}
       </P>
@@ -371,8 +530,41 @@ export function OutputsView({
             onChange={setActiveMimes}
           />
         )}
-        {distinctBlockCount > 1 && (
-          <GroupBySelect value={groupBy} onChange={setGroupBy} />
+        {splitDims.map(([key, values]) =>
+          key === 'step' && stepLayout ? (
+            <StepGridMenu
+              key={key}
+              name={dimFormat.key(key)}
+              grid={stepLayout.grid}
+              steps={stepLayout.steps}
+              counts={stepStats.counts}
+              produced={stepStats.produced}
+              selected={'step' in dimFilter ? dimFilter.step.map(Number) : null}
+              onChange={(next) =>
+                setDimValues('step', next && next.map(String))
+              }
+            />
+          ) : (
+            <DimFilterMenu
+              key={key}
+              name={dimFormat.key(key)}
+              values={values}
+              selected={dimFilter[key] ?? []}
+              shortLabel={(value) => dimFormat.short(key, value)}
+              fullLabel={(value) => dimFormat.value(key, value, 'full')}
+              onChange={(next) =>
+                setDimValues(key, next.length > 0 ? next : null)
+              }
+            />
+          ),
+        )}
+        {groupByOptions.length > 1 && (
+          <GroupBySelect
+            value={groupBy}
+            options={groupByOptions}
+            format={dimFormat}
+            onChange={setGroupBy}
+          />
         )}
       </div>
     </div>
@@ -380,18 +572,27 @@ export function OutputsView({
 
   return (
     <Card
-      variant="flat"
-      shadow="none"
       // overflow-visible: the Card base would clip the first row's outer corners.
-      className="gap-0 overflow-visible bg-transparent py-0"
+      className="gap-0 overflow-visible border-0 bg-transparent bg-none py-0"
     >
       {toolbarSlot ? createPortal(toolbar, toolbarSlot) : null}
       {/* No top padding — the parent's space-y-4 sets the gap above the grid. */}
       <div className="space-y-3 pb-3">
         {!toolbarSlot && toolbar}
 
+        {shownLost > 0 && (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-sm text-muted-foreground">
+            <CloudOff className="h-4 w-4 shrink-0" />
+            <span>{t('outputs.lostNotice', { count: shownLost })}</span>
+            {lostReasons.length > 0 && (
+              <span className="italic">— {lostReasons.join(' · ')}</span>
+            )}
+          </div>
+        )}
+
         {visibleItems.length === 0 ? (
-          failed && shownPending > 0 ? (
+          shownLost > 0 && shownPending === 0 ? null : failed &&
+            shownPending > 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 px-3 py-10 text-center">
               <AlertTriangle className="h-10 w-10 text-muted-foreground" />
               <P className="font-medium text-muted-foreground">
@@ -414,7 +615,7 @@ export function OutputsView({
               {pendingSniffItems.map((item) => (
                 <SkeletonOutputCard
                   key={item.taskId}
-                  originalBlock={item.originalBlock}
+                  label={outputTitle(item)}
                 />
               ))}
             </div>
@@ -427,8 +628,10 @@ export function OutputsView({
           <>
             <GroupedGrid
               groupBy={groupBy}
+              groups={groups}
               items={visibleItems}
               runningBlockSet={runningBlockSet}
+              dimFormat={dimFormat}
               effectiveMime={effectiveMime}
               onOpenViewer={(item, adapter) =>
                 setActiveViewer({ item, adapter })
@@ -458,7 +661,9 @@ export function OutputsView({
         <ActiveViewerHost
           ActiveViewer={ActiveViewer}
           activeViewer={activeViewer}
-          visibleItems={visibleItems}
+          navItems={navItems}
+          sectionOf={sectionOf}
+          dimFormat={dimFormat}
           effectiveMime={effectiveMime}
           setActiveViewer={setActiveViewer}
         />
@@ -470,37 +675,76 @@ export function OutputsView({
 interface ActiveViewerHostProps {
   ActiveViewer: NonNullable<OutputAdapter['Viewer']>
   activeViewer: { item: OutputItem; adapter: OutputAdapter }
-  visibleItems: ReadonlyArray<OutputItem>
+  /** Visible outputs in rendered order. */
+  navItems: ReadonlyArray<OutputItem>
+  sectionOf: (item: OutputItem) => string
+  dimFormat: DimFormat
   effectiveMime: (item: OutputItem) => string
   setActiveViewer: (
     next: { item: OutputItem; adapter: OutputAdapter } | null,
   ) => void
 }
 
-/** Wires prev/next/hotkeys; mounts only while a viewer is open. */
+/** Navigation, hotkeys, playback and filmstrip; mounts only while open. */
 function ActiveViewerHost({
   ActiveViewer,
   activeViewer,
-  visibleItems,
+  navItems,
+  sectionOf,
+  dimFormat,
   effectiveMime,
   setActiveViewer,
 }: ActiveViewerHostProps) {
-  const activeIndex = visibleItems.findIndex(
+  const queryClient = useQueryClient()
+  const showFilmstrip = useUiStore((state) => state.outputFilmstrip)
+  const setShowFilmstrip = useUiStore((state) => state.setOutputFilmstrip)
+  const adapterFor = useCallback(
+    (item: OutputItem) => resolveAdapter(effectiveMime(item)),
+    [effectiveMime],
+  )
+  // Pending outputs and ones without a viewer (GRIB) would close it.
+  const viewable = useMemo(
+    () => navItems.filter((it) => it.isAvailable && adapterFor(it).Viewer),
+    [navItems, adapterFor],
+  )
+  const activeIndex = viewable.findIndex(
     (it) => it.taskId === activeViewer.item.taskId,
   )
-  const prevItem = activeIndex > 0 ? visibleItems[activeIndex - 1] : null
+  // Latest copy of the opened item.
+  const item = activeIndex >= 0 ? viewable[activeIndex] : activeViewer.item
+  const prevItem = activeIndex > 0 ? viewable[activeIndex - 1] : null
   const nextItem =
-    activeIndex >= 0 && activeIndex < visibleItems.length - 1
-      ? visibleItems[activeIndex + 1]
+    activeIndex >= 0 && activeIndex < viewable.length - 1
+      ? viewable[activeIndex + 1]
       : null
 
+  // Play steps the innermost coordinate, up/down the next.
+  const orderedDims = orderDims(item.dims ?? [])
+  const fastKey = orderedDims.at(-1)?.[0]
+  const slowKey = orderedDims.at(-2)?.[0]
+  const upItem = slowKey ? dimNeighbor(viewable, item, slowKey, -1) : null
+  const downItem = slowKey ? dimNeighbor(viewable, item, slowKey, 1) : null
+  const playNext = fastKey
+    ? dimNeighbor(viewable, item, fastKey, 1, true)
+    : null
+  const [playing, setPlaying] = useState(false)
+  const isPlaying = playing && playNext !== null
+
+  // Series along the innermost coordinate.
+  const line = fastKey ? dimLine(viewable, item, fastKey) : []
+  const series = line.map(([, it]) => it)
+  const firstItem = series.length > 1 ? series[0] : null
+  const lastItem = series.length > 1 ? (series.at(-1) ?? null) : null
+  // Shift+arrows: +-24 h.
+  const step = fastKey === 'step' ? Number(dimValue(item, 'step')) : NaN
+  const nextDay = line.find(([v]) => Number(v) >= step + 24)?.[1] ?? null
+  const prevDay =
+    line.filter(([v]) => Number(v) <= step - 24).at(-1)?.[1] ?? null
+
   const stepTo = useCallback(
-    (item: OutputItem) =>
-      setActiveViewer({
-        item,
-        adapter: resolveAdapter(effectiveMime(item)),
-      }),
-    [setActiveViewer, effectiveMime],
+    (next: OutputItem) =>
+      setActiveViewer({ item: next, adapter: adapterFor(next) }),
+    [setActiveViewer, adapterFor],
   )
 
   const goPrev = useCallback(() => {
@@ -509,19 +753,80 @@ function ActiveViewerHost({
   const goNext = useCallback(() => {
     if (nextItem) stepTo(nextItem)
   }, [nextItem, stepTo])
+  const goUp = useCallback(() => {
+    if (upItem) stepTo(upItem)
+  }, [upItem, stepTo])
+  const goDown = useCallback(() => {
+    if (downItem) stepTo(downItem)
+  }, [downItem, stepTo])
+  const togglePlay = useCallback(() => setPlaying((p) => !p), [])
+  const goTo = (target: OutputItem | null) => () => {
+    if (target && target.taskId !== item.taskId) stepTo(target)
+  }
+
+  useEffect(() => {
+    if (!isPlaying || !fastKey) return
+    // Prefetch the next two frames.
+    const after = dimNeighbor(viewable, playNext, fastKey, 1, true)
+    for (const frame of [playNext, after]) {
+      if (frame) {
+        void prefetchJobResultBlob(queryClient, frame.jobId, frame.taskId)
+      }
+    }
+    const timer = window.setTimeout(() => stepTo(playNext), PLAY_INTERVAL_MS)
+    return () => window.clearTimeout(timer)
+  }, [isPlaying, playNext, fastKey, viewable, queryClient, stepTo])
+
+  // Keep Space from also clicking a focused button.
+  const canPlay = playNext !== null
+  useEffect(() => {
+    if (!canPlay) return
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && e.target instanceof Element) {
+        if (e.target.closest('button')) e.preventDefault()
+      }
+    }
+    window.addEventListener('keyup', onKeyUp, true)
+    return () => window.removeEventListener('keyup', onKeyUp, true)
+  }, [canPlay])
 
   // Arrow + vi-style output nav (PDF page nav stays on header buttons).
   useHotkey('ArrowLeft', goPrev, { enabled: !!prevItem, ignoreInputs: true })
   useHotkey('K', goPrev, { enabled: !!prevItem, ignoreInputs: true })
   useHotkey('ArrowRight', goNext, { enabled: !!nextItem, ignoreInputs: true })
   useHotkey('J', goNext, { enabled: !!nextItem, ignoreInputs: true })
+  useHotkey('ArrowUp', goUp, { enabled: !!upItem, ignoreInputs: true })
+  useHotkey('ArrowDown', goDown, { enabled: !!downItem, ignoreInputs: true })
+  useHotkey('Space', togglePlay, { enabled: !!playNext, ignoreInputs: true })
+  useHotkey('Shift+ArrowLeft', goTo(prevDay), {
+    enabled: !!prevDay,
+    ignoreInputs: true,
+  })
+  useHotkey('Shift+ArrowRight', goTo(nextDay), {
+    enabled: !!nextDay,
+    ignoreInputs: true,
+  })
+  useHotkey('Home', goTo(firstItem), {
+    enabled: !!firstItem,
+    ignoreInputs: true,
+  })
+  useHotkey('End', goTo(lastItem), { enabled: !!lastItem, ignoreInputs: true })
+  useHotkey('T', () => setShowFilmstrip(!showFilmstrip), {
+    enabled: viewable.length > 1,
+    ignoreInputs: true,
+  })
+
+  const hasDims = orderedDims.length > 0
+  // Split outputs show their series, others all.
+  const filmstripItems = series.length > 1 ? series : viewable
+  const hasFilmstrip = showFilmstrip && filmstripItems.length > 1
 
   return (
     <Suspense fallback={null}>
       <ActiveViewer
-        // Fresh mount per item resets pan/zoom/page.
-        key={activeViewer.item.taskId}
-        item={activeViewer.item}
+        // Keyed by type, so the viewer stays up across items.
+        key={activeViewer.adapter.id}
+        item={item}
         adapter={activeViewer.adapter}
         onClose={() => {
           setActiveViewer(null)
@@ -530,117 +835,173 @@ function ActiveViewerHost({
         onNext={nextItem ? goNext : undefined}
         navIndex={
           activeIndex >= 0
-            ? { current: activeIndex + 1, total: visibleItems.length }
+            ? { current: activeIndex + 1, total: viewable.length }
             : undefined
+        }
+        footer={
+          hasDims || hasFilmstrip ? (
+            <>
+              {hasDims && (
+                <DimNavigator
+                  item={item}
+                  items={viewable}
+                  format={dimFormat}
+                  fastKey={fastKey}
+                  slowKey={slowKey}
+                  playing={isPlaying}
+                  canPlay={playNext !== null}
+                  onTogglePlay={togglePlay}
+                  onSelect={stepTo}
+                />
+              )}
+              {hasFilmstrip && (
+                <Filmstrip
+                  items={filmstripItems}
+                  activeTaskId={item.taskId}
+                  adapterFor={adapterFor}
+                  onSelect={stepTo}
+                  sectionOf={series.length > 1 ? undefined : sectionOf}
+                  badgeOf={
+                    series.length > 1 && fastKey
+                      ? (it) =>
+                          dimFormat.value(
+                            fastKey,
+                            dimValue(it, fastKey) ?? '',
+                            'compact',
+                          )
+                      : undefined
+                  }
+                />
+              )}
+            </>
+          ) : undefined
         }
       />
     </Suspense>
   )
 }
 
+type GroupKind = 'block' | 'mime' | 'dim'
+
+interface OutputGroup {
+  kind: GroupKind
+  /** Block id, mime, or coordinate value ('' for outputs without one). */
+  key: string
+  items: ReadonlyArray<OutputItem>
+  /** Content-type sections inside a block section. */
+  children?: ReadonlyArray<OutputGroup>
+}
+
+/** Sections in render order; null renders one flat grid. */
+function groupOutputs(
+  items: ReadonlyArray<OutputItem>,
+  groupBy: GroupBy,
+  effectiveMime: (item: OutputItem) => string,
+): Array<OutputGroup> | null {
+  const byMime = (list: ReadonlyArray<OutputItem>): Array<OutputGroup> =>
+    groupByKey(list, effectiveMime).map(([key, mimeItems]) => ({
+      kind: 'mime',
+      key,
+      items: mimeItems,
+    }))
+  switch (groupBy) {
+    case 'none':
+      return null
+    case 'mime':
+      return byMime(items)
+    case 'block':
+    case 'block-and-mime':
+      return groupByKey(items, (i) => i.originalBlock).map(
+        ([key, blockItems]) => ({
+          kind: 'block',
+          key,
+          items: blockItems,
+          children:
+            groupBy === 'block-and-mime' ? byMime(blockItems) : undefined,
+        }),
+      )
+    default: {
+      const dim = groupBy.slice(DIM_PREFIX.length)
+      return groupByKey(items, (i) => dimValue(i, dim) ?? '')
+        .sort(([a], [b]) =>
+          a === '' || b === ''
+            ? Number(a === '') - Number(b === '')
+            : compareDimValues(a, b),
+        )
+        .map(([key, dimItems]) => ({ kind: 'dim', key, items: dimItems }))
+    }
+  }
+}
+
 interface GroupedGridProps {
   groupBy: GroupBy
+  groups: ReadonlyArray<OutputGroup> | null
   items: ReadonlyArray<OutputItem>
   runningBlockSet: ReadonlySet<string>
+  dimFormat: DimFormat
   effectiveMime: (item: OutputItem) => string
   onOpenViewer: (item: OutputItem, adapter: OutputAdapter) => void
 }
 
 function GroupedGrid({
   groupBy,
+  groups,
   items,
   runningBlockSet,
+  dimFormat,
   effectiveMime,
   onOpenViewer,
 }: GroupedGridProps) {
-  if (groupBy === 'none') {
-    return (
-      <FlexGrid
-        items={items}
-        runningBlockSet={runningBlockSet}
-        effectiveMime={effectiveMime}
-        onOpenViewer={onOpenViewer}
-      />
-    )
+  const { t } = useTranslation('executions')
+  const grid = (gridItems: ReadonlyArray<OutputItem>) => (
+    <FlexGrid
+      items={gridItems}
+      runningBlockSet={runningBlockSet}
+      effectiveMime={effectiveMime}
+      onOpenViewer={onOpenViewer}
+    />
+  )
+  if (!groups) return grid(items)
+
+  const title = (group: OutputGroup): React.ReactNode => {
+    switch (group.kind) {
+      case 'block':
+        return group.items[0].blockName
+      case 'mime':
+        return <MimeSectionLabel mime={group.key} />
+      case 'dim':
+        return group.key === ''
+          ? t('outputs.sections.otherOutputs')
+          : dimFormat.value(groupBy.slice(DIM_PREFIX.length), group.key, 'full')
+    }
   }
 
-  if (groupBy === 'block') {
-    const groups = groupByKey(items, (i) => i.originalBlock)
-    return (
-      <div className="space-y-5">
-        {groups.map(([block, groupItems]) => (
-          <Section
-            key={block}
-            title={block}
-            count={groupItems.length}
-            blockId={block}
-          >
-            <FlexGrid
-              items={groupItems}
-              runningBlockSet={runningBlockSet}
-              effectiveMime={effectiveMime}
-              onOpenViewer={onOpenViewer}
-            />
-          </Section>
-        ))}
-      </div>
-    )
-  }
-
-  if (groupBy === 'mime') {
-    const groups = groupByKey(items, effectiveMime)
-    return (
-      <div className="space-y-5">
-        {groups.map(([mime, groupItems]) => (
-          <Section
-            key={mime}
-            title={<MimeSectionLabel mime={mime} />}
-            count={groupItems.length}
-          >
-            <FlexGrid
-              items={groupItems}
-              runningBlockSet={runningBlockSet}
-              effectiveMime={effectiveMime}
-              onOpenViewer={onOpenViewer}
-            />
-          </Section>
-        ))}
-      </div>
-    )
-  }
-
-  // 'block-and-mime': outer = block, inner = mime
-  const byBlock = groupByKey(items, (i) => i.originalBlock)
   return (
-    <div className="space-y-6">
-      {byBlock.map(([block, blockItems]) => {
-        const byMime = groupByKey(blockItems, effectiveMime)
-        return (
-          <Section
-            key={block}
-            title={block}
-            count={blockItems.length}
-            blockId={block}
-          >
+    <div className={groupBy === 'block-and-mime' ? 'space-y-6' : 'space-y-5'}>
+      {groups.map((group) => (
+        <Section
+          key={group.key}
+          title={title(group)}
+          count={group.items.length}
+          blockId={group.kind === 'block' ? group.key : undefined}
+        >
+          {group.children ? (
             <div className="space-y-4">
-              {byMime.map(([mime, mimeItems]) => (
+              {group.children.map((child) => (
                 <Subsection
-                  key={mime}
-                  title={<MimeSectionLabel mime={mime} />}
-                  count={mimeItems.length}
+                  key={child.key}
+                  title={title(child)}
+                  count={child.items.length}
                 >
-                  <FlexGrid
-                    items={mimeItems}
-                    runningBlockSet={runningBlockSet}
-                    effectiveMime={effectiveMime}
-                    onOpenViewer={onOpenViewer}
-                  />
+                  {grid(child.items)}
                 </Subsection>
               ))}
             </div>
-          </Section>
-        )
-      })}
+          ) : (
+            grid(group.items)
+          )}
+        </Section>
+      ))}
     </div>
   )
 }
@@ -701,16 +1062,8 @@ function FlexGridItem({
           adapter={resolveAdapter(effectiveMime(item))}
           onOpenViewer={onOpenViewer}
         />
-      ) : item.lostReason !== undefined ? (
-        <LostOutputCard
-          originalBlock={item.originalBlock}
-          reason={item.lostReason}
-        />
       ) : (
-        <SkeletonOutputCard
-          originalBlock={item.originalBlock}
-          isRunning={isRunning}
-        />
+        <SkeletonOutputCard label={outputTitle(item)} isRunning={isRunning} />
       )}
     </div>
   )
@@ -775,12 +1128,20 @@ function MimeSectionLabel({ mime }: { mime: string }) {
 
 function GroupBySelect({
   value,
+  options,
+  format,
   onChange,
 }: {
   value: GroupBy
+  options: ReadonlyArray<GroupBy>
+  format: DimFormat
   onChange: (next: GroupBy) => void
 }) {
   const { t } = useTranslation('executions')
+  const label = (option: GroupBy): string =>
+    isStaticGroupBy(option)
+      ? t(groupByI18nKey(option))
+      : format.key(option.slice(DIM_PREFIX.length))
   return (
     <div className="flex items-center gap-2">
       <span className="text-sm text-muted-foreground">
@@ -788,12 +1149,12 @@ function GroupBySelect({
       </span>
       <Select value={value} onValueChange={(v) => onChange(v as GroupBy)}>
         <SelectTrigger className="h-8 w-44 text-sm">
-          <SelectValue />
+          <SelectValue>{label(value)}</SelectValue>
         </SelectTrigger>
         <SelectContent>
-          {GROUP_BY_OPTIONS.map((option) => (
+          {options.map((option) => (
             <SelectItem key={option} value={option}>
-              {t(groupByI18nKey(option))}
+              {label(option)}
             </SelectItem>
           ))}
         </SelectContent>
@@ -802,8 +1163,14 @@ function GroupBySelect({
   )
 }
 
-function groupByI18nKey(
+function isStaticGroupBy(
   option: GroupBy,
+): option is (typeof GROUP_BY_OPTIONS)[number] {
+  return (GROUP_BY_OPTIONS as ReadonlyArray<string>).includes(option)
+}
+
+function groupByI18nKey(
+  option: (typeof GROUP_BY_OPTIONS)[number],
 ):
   | 'outputs.groupBy.none'
   | 'outputs.groupBy.block'

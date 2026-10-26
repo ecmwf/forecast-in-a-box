@@ -3,7 +3,8 @@ import json
 import pathlib
 
 from cascade.low.func import Either
-from earthkit.workflows.fluent import Action, Payload, PayloadBuildingContext, from_source
+from earthkit.workflows.fluent import Action, NodeMetadataContext, create_task_instance, from_source
+from earthkit.workflows.metadata import Artifacts, BuilderMetadata, NodeMetadata, Requirements
 from fiab_core.artifacts import ArtifactsProvider, CompositeArtifactId
 from fiab_core.fable import (
     ActionLookup,
@@ -22,6 +23,7 @@ from fiab_core.fable import (
     ConfigurationOptionRestriction,
     NoOutput,
     RawOutput,
+    get_fetchable_mime,
 )
 from fiab_core.plugin import BlockValidation, Error, Plugin
 from fiab_core.types import ArtifactType, ClosedEnumType, FableType, FloatType, IntType, NoneType, StringType, UnionType, parse
@@ -31,6 +33,9 @@ DURATION = ConfigurationOptionId("duration")
 CHECKPOINT = ConfigurationOptionId("checkpoint")
 AMOUNT = ConfigurationOptionId("amount")
 FNAME = ConfigurationOptionId("fname")
+IMAGES = ConfigurationOptionId("images")
+PATH_ROOT = ConfigurationOptionId("path_root")
+DEPTH = ConfigurationOptionId("depth")
 
 
 def _get_checkpoint_enum_type() -> FableType:
@@ -101,15 +106,35 @@ catalogue = lambda: BlockFactoryCatalogue(
             configuration_options={FNAME: BlockConfigurationOption(title="", description="", value_type=StringType())},
             inputs=["data"],
         ),
+        BlockFactoryId("sink_filetree"): BlockFactory(
+            kind="sink",
+            title="File Tree",
+            description="Saves the input to a single file nested in `depth` directories below path_root",
+            configuration_options={
+                PATH_ROOT: BlockConfigurationOption(title="Path Root", description="", value_type=StringType()),
+                DEPTH: BlockConfigurationOption(title="Depth", description="", value_type=IntType()),
+            },
+            inputs=["data"],
+        ),
         BlockFactoryId("sink_image"): BlockFactory(
             kind="sink",
             title="Image",
-            description="Generates a png image, using the input number as the grayscale",
-            configuration_options={},
+            description="Generates png images, one per task, using the input number shifted by 10 * task index as the grayscale",
+            configuration_options={
+                IMAGES: BlockConfigurationOption(
+                    title="Images",
+                    description="How many images to generate, each as its own task",
+                    value_type=IntType(),
+                    default_value="1",
+                )
+            },
             inputs=["data"],
         ),
     }
 )
+
+
+_SINK_BUILDER_METADATA = BuilderMetadata(display_name="The Display Name", dimension_kvs=[("dimOne", "valOne")])
 
 
 def validator(factory_id: BlockFactoryId, instance: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> BlockValidation:
@@ -118,6 +143,8 @@ def validator(factory_id: BlockFactoryId, instance: BlockInstance, inputs: dict[
         restrictions = {AMOUNT: parse("enumClosed[int](1,2,3)")}
     if factory_id in ("sink_file",):
         return BlockValidation(Either.ok(RawOutput(type_fqn="bytes", mime_type="text/plain")), restrictions)
+    elif factory_id in ("sink_filetree",):
+        return BlockValidation(Either.ok(RawOutput(type_fqn="bytes", mime_type=get_fetchable_mime("gribdir"))), restrictions)
     elif factory_id in ("sink_image",):
         return BlockValidation(Either.ok(RawOutput(type_fqn="bytes", mime_type="image/png")), restrictions)
     elif factory_id in ("source_sleep", "source_text", "source_filesize"):
@@ -138,10 +165,14 @@ def expander(output: BlockInstanceOutput) -> list[BlockExpansion]:
                 ),
                 BlockExpansion(factory=BlockFactoryId("product_join")),
                 BlockExpansion(factory=BlockFactoryId("sink_file")),
+                BlockExpansion(factory=BlockFactoryId("sink_filetree")),
                 BlockExpansion(factory=BlockFactoryId("sink_image")),
             ]
         if output.type_fqn in ("str", "bytes"):
-            return [BlockExpansion(factory=BlockFactoryId("sink_file"))]
+            return [
+                BlockExpansion(factory=BlockFactoryId("sink_file")),
+                BlockExpansion(factory=BlockFactoryId("sink_filetree")),
+            ]
     return []
 
 
@@ -175,18 +206,25 @@ def _environment_spec() -> list[str]:
         return regular
 
 
+def _sink_image_task(data: Action, idx: int) -> Action:
+    """Maps the sink_image runtime with the given task index, labelling the resulting node by that index."""
+    payload = create_task_instance("fiab_plugin_test.runtime.sink_image", static_input_kw={"idx": idx})
+    builder = BuilderMetadata(display_name=f"Image #{idx}", dimension_kvs=[("idx", str(idx))])
+    return data.map(payload, node_metadata=NodeMetadata(builder=builder))
+
+
 def compiler(lookup: ActionLookup, factory_id: BlockFactoryId, instance: BlockInstance) -> Either[Action, Error]:  # ty:ignore[invalid-type-arguments] # semigroup
     spec = _environment_spec()
-    with PayloadBuildingContext(environment=spec):
-        # with PayloadBuildingContext(environment=["-e /home/dev/src/fiab-plugin-test"]): # TODO handle the ssh:// scenario intelligently
+    with NodeMetadataContext(requirements=Requirements(environment=spec)):
+        # with NodeMetadataContext(requirements=Requirements(environment=["-e /home/dev/src/fiab-plugin-test"])): # TODO handle the ssh:// scenario intelligently
         if factory_id == "source_42":
-            action = from_source(Payload("fiab_plugin_test.runtime.source_42"))
+            action = from_source(create_task_instance("fiab_plugin_test.runtime.source_42"))
         elif factory_id == "source_text":
             text = instance.configuration_values[TEXT]
             # NOTE an explicit null is a valid value here -- the default is imputed at runtime
             if text is not None and not isinstance(text, str):
                 return Either.error(f"Invalid type for {TEXT!r}: expected str or None, got {type(text).__name__}")
-            action = from_source(Payload("fiab_plugin_test.runtime.source_text", kwargs={"text": text}))
+            action = from_source(create_task_instance("fiab_plugin_test.runtime.source_text", static_input_kw={"text": text}))
         elif factory_id == "source_sleep":
             text = instance.configuration_values[TEXT]
             duration = instance.configuration_values[DURATION]
@@ -194,35 +232,58 @@ def compiler(lookup: ActionLookup, factory_id: BlockFactoryId, instance: BlockIn
                 return Either.error(f"Invalid type for {TEXT!r}: expected str, got {type(text).__name__}")
             if not isinstance(duration, float):
                 return Either.error(f"Invalid type for {DURATION!r}: expected float, got {type(duration).__name__}")
-            action = from_source(Payload("fiab_plugin_test.runtime.source_sleep", kwargs={"text": text, "duration": duration}))
+            action = from_source(
+                create_task_instance("fiab_plugin_test.runtime.source_sleep", static_input_kw={"text": text, "duration": duration})
+            )
         elif factory_id == "source_filesize":
             artifact_id = instance.configuration_values[CHECKPOINT]
             if not isinstance(artifact_id, CompositeArtifactId):
                 return Either.error(f"Invalid type for {CHECKPOINT!r}: expected artifact id, got {type(artifact_id).__name__}")
             local_path = ArtifactsProvider.get_artifact_local_path(artifact_id)
-            payload = Payload(
-                "fiab_plugin_test.runtime.source_filesize", kwargs={"path": str(local_path)}, metadata={"artifacts": [artifact_id]}
+            payload = create_task_instance(
+                "fiab_plugin_test.runtime.source_filesize",
+                static_input_kw={"path": str(local_path)},
             )
-            action = from_source(payload)
+            with NodeMetadataContext(artifacts=Artifacts(artifact_urls={CompositeArtifactId.to_str(artifact_id): ""})):
+                action = from_source(payload)
         elif factory_id == "transform_increment":
             a = lookup[instance.input_ids["a"]]
             amount = instance.configuration_values[AMOUNT]
             if not isinstance(amount, int):
                 return Either.error(f"Invalid type for {AMOUNT!r}: expected int, got {type(amount).__name__}")
-            action = a.map(Payload("fiab_plugin_test.runtime.transform_increment", kwargs={"amount": amount}))
+            action = a.map(create_task_instance("fiab_plugin_test.runtime.transform_increment", static_input_kw={"amount": amount}))
         elif factory_id == "product_join":
             a = lookup[instance.input_ids["a"]]
             b = lookup[instance.input_ids["b"]]
-            action = a.join(b, dim="inputs").reduce(Payload("fiab_plugin_test.runtime.product_join"))
+            action = a.join(b, dim="inputs").reduce(create_task_instance("fiab_plugin_test.runtime.product_join"))
         elif factory_id == "sink_file":
             data = lookup[instance.input_ids["data"]]
             fname = instance.configuration_values[FNAME]
             if not isinstance(fname, str):
                 return Either.error(f"Invalid type for {FNAME!r}: expected str, got {type(fname).__name__}")
-            action = data.map(Payload("fiab_plugin_test.runtime.sink_file", kwargs={"fname": fname}))
+            with NodeMetadataContext(builder=_SINK_BUILDER_METADATA):
+                action = data.map(create_task_instance("fiab_plugin_test.runtime.sink_file", static_input_kw={"fname": fname}))
+        elif factory_id == "sink_filetree":
+            data = lookup[instance.input_ids["data"]]
+            path_root = instance.configuration_values[PATH_ROOT]
+            depth = instance.configuration_values[DEPTH]
+            if not isinstance(path_root, str):
+                return Either.error(f"Invalid type for {PATH_ROOT!r}: expected str, got {type(path_root).__name__}")
+            if not isinstance(depth, int):
+                return Either.error(f"Invalid type for {DEPTH!r}: expected int, got {type(depth).__name__}")
+            if depth < 0:
+                return Either.error(f"Invalid value for {DEPTH!r}: expected non-negative, got {depth}")
+            action = data.map(
+                create_task_instance("fiab_plugin_test.runtime.sink_filetree", static_input_kw={"path_root": path_root, "depth": depth})
+            )
         elif factory_id == "sink_image":
             data = lookup[instance.input_ids["data"]]
-            action = data.map(Payload("fiab_plugin_test.runtime.sink_image"))
+            images = instance.configuration_values[IMAGES]
+            if not isinstance(images, int):
+                return Either.error(f"Invalid type for {IMAGES!r}: expected int, got {type(images).__name__}")
+            if images < 1:
+                return Either.error(f"Invalid value for {IMAGES!r}: expected at least 1, got {images}")
+            action = data.transform(_sink_image_task, [(idx,) for idx in range(images)], dim="idx")
         else:
             raise TypeError(factory_id)
         return Either.ok(action)

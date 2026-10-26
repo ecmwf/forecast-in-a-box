@@ -47,12 +47,12 @@ URL handling -- the client's responsibility
   `/api/v1/lens/proxy/<id>/wms?...` reaches the lens as `/wms?...`.
 - Clients MUST address the lens using that prefix and MUST treat it as the base
   origin+path of the lens. Because the base has a non-root path, clients that consume
-  absolute URLs emitted by the lens (see below) must rebase those URLs onto this
-  prefix rather than using them verbatim.
+  absolute URLs emitted by the lens in case the lens is not honoring the X-Forwarded-*
+  (see below) must rebase those URLs onto this prefix rather than using them verbatim.
 - The proxy sets X-Forwarded-Proto / -Host / -Prefix and a Forwarded header describing
   the external mount point. A forwarded-header-aware lens SHOULD use these to emit
-  correct absolute self-URLs. skinnyWMS does not, hence the client-side rebasing
-  requirement below.
+  correct absolute self-URLs. skinnyWMS honors the X-Forwarded-*, but ignores
+  the Forwarded, which is sufficient.
 
 URL handling -- the lens's responsibility
 -----------------------------------------
@@ -60,10 +60,10 @@ URL handling -- the lens's responsibility
   (e.g. via a WSGI SCRIPT_NAME / ProxyFix equivalent) when constructing absolute
   self-URLs, so that clients receive URLs already pointing at the proxy path.
 - A lens that instead bakes its internal bind address (e.g. http://0.0.0.0:<port>/...)
-  into structured, machine-parseable responses (like a WMS GetCapabilities document)
-  is tolerable ONLY if clients can and do rebase those URLs onto the proxy prefix. A
-  lens that bakes absolute self-origin URLs into opaque payloads that clients cannot
-  rewrite is NOT proxyable by this mechanism.
+  into structured, machine-parseable responses is tolerable ONLY if clients can and
+  do rebase those URLs onto the proxy prefix. A lens that bakes absolute self-origin
+  URLs into opaque payloads that clients cannot rewrite is NOT proxyable by
+  this mechanism.
 - A lens MUST NOT rely on being reachable on its own port from outside the backend
   host; the only supported ingress is this proxy.
 
@@ -80,8 +80,9 @@ from fastapi.responses import StreamingResponse
 from starlette.datastructures import Headers
 
 from forecastbox.domain.lens.core import PREFIX as PREFIX_ROOT
-from forecastbox.domain.lens.exceptions import UnproxyableLens
+from forecastbox.domain.lens.exceptions import LensFailure, LensStarting, UnproxyableLens
 from forecastbox.domain.lens.manager import LensInstanceId, get_status
+from forecastbox.utility.http_pools import HttpProfile, get_async
 
 logger = logging.getLogger(__name__)
 
@@ -102,40 +103,21 @@ HOP_BY_HOP_HEADERS = {
     "content-length",
 }
 
-#: Timeout applied to the upstream connection. Generous read timeout because some
-#: lens responses (e.g. large tile renders) can take a while to produce.
-_TIMEOUT = httpx.Timeout(connect=5.0, read=120.0, write=120.0, pool=5.0)
-
-_client: httpx.AsyncClient | None = None
-
-
-def get_client() -> httpx.AsyncClient:
-    """Return the module-level `httpx.AsyncClient`, creating it lazily on first use."""
-    global _client
-    if _client is None:
-        _client = httpx.AsyncClient(timeout=_TIMEOUT)
-    return _client
-
-
-async def aclose_client() -> None:
-    """Close the module-level client, if one was created. Intended for use during
-    application shutdown."""
-    global _client
-    if _client is not None:
-        await _client.aclose()
-        _client = None
-
 
 def _resolve_port(lens_instance_id: LensInstanceId) -> int:
     """Resolve a lens_instance_id to its bound port.
 
-    Forwards NoLensFound if the instance is unknown, and raises UnproxyableRens if it
-    is known but not `running`, or if it has a number of ports other than exactly one
-    (an invariant violation for the currently supported lens types).
+    Forwards NoLensFound if the instance is unknown. Raises LensStarting if the
+    instance is still starting up (transient, caller should retry), LensFailure if
+    the instance has exited (terminated or failed, not transient), and
+    UnproxyableLens if the instance is running but exposes a number of ports other
+    than exactly one (an invariant violation for the currently supported lens types).
     """
     detail = get_status(lens_instance_id)
+    if detail.status == "starting":
+        raise LensStarting(f"Lens instance {lens_instance_id!r} is still starting")
     if detail.status != "running":
-        raise UnproxyableLens(f"Lens instance {lens_instance_id!r} is not running (status={detail.status!r})")
+        raise LensFailure(f"Lens instance {lens_instance_id!r} is not running (status={detail.status!r})")
     if len(detail.ports) != 1:
         logger.error(f"Lens instance {lens_instance_id!r} does not expose exactly one port: {detail.ports!r}")
         raise UnproxyableLens(f"Lens instance {lens_instance_id!r} does not expose exactly one port")
@@ -222,14 +204,14 @@ async def forward(lens_instance_id: LensInstanceId, upstream_path: str, request:
     """Forward `request` to the lens identified by `lens_instance_id`, streaming both
     the request body upstream and the response body back downstream.
 
-    Forwards exceptions such as NoLensFound or UnproxyableLens.
+    Forwards exceptions such as NoLensFound, LensStarting, LensFailure, or UnproxyableLens.
     Raises HTTP exceptions in case of upstream connection failure.
     """
     port = _resolve_port(lens_instance_id)
 
     url = _build_upstream_url(port, upstream_path, request.url.query)
     headers = _build_upstream_headers(request, port, lens_instance_id)
-    client = get_client()
+    client = get_async(HttpProfile.Proxy)
 
     upstream_request = client.build_request(
         request.method,

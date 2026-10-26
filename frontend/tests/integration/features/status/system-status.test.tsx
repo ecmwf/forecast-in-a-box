@@ -55,7 +55,7 @@ const anonymousAuth: AuthContextValue = {
   signOut: () => Promise.resolve(),
 }
 
-describe('System Status', () => {
+describe('System status', () => {
   beforeEach(() => {
     localStorage.clear()
     localStorage.setItem(STORAGE_KEYS.auth.anonymousId, 'test-anon-id')
@@ -70,7 +70,7 @@ describe('System Status', () => {
         </AuthContext.Provider>,
       )
 
-      await expect.element(screen.getByText('System Status')).toBeVisible()
+      await expect.element(screen.getByText('System status')).toBeVisible()
     })
 
     it('shows All OK when all systems are up', async () => {
@@ -99,8 +99,8 @@ describe('System Status', () => {
         </AuthContext.Provider>,
       )
 
-      // mockStatusPartialOutage has cascade: down => orange => "Partial Outage"
-      await expect.element(screen.getByText('Partial Outage')).toBeVisible()
+      // mockStatusPartialOutage has cascade: down => orange => "Partial outage"
+      await expect.element(screen.getByText('Partial outage')).toBeVisible()
       await expect
         .element(screen.getByText('Some services unavailable'))
         .toBeVisible()
@@ -119,8 +119,8 @@ describe('System Status', () => {
         </AuthContext.Provider>,
       )
 
-      // mockStatusAllDown has api: down, cascade: down, ecmwf: down => red => "System Down"
-      await expect.element(screen.getByText('System Down')).toBeVisible()
+      // mockStatusAllDown has api: down, cascade: down, ecmwf: down => red => "System down"
+      await expect.element(screen.getByText('System down')).toBeVisible()
       await expect.element(screen.getByText('Not operational')).toBeVisible()
     })
 
@@ -141,7 +141,7 @@ describe('System Status', () => {
       const heading = screen.getByRole('heading', { level: 2 })
       await expect.element(heading).toBeVisible()
       // System Status label should still render
-      await expect.element(screen.getByText('System Status')).toBeVisible()
+      await expect.element(screen.getByText('System status')).toBeVisible()
     })
   })
 
@@ -170,8 +170,8 @@ describe('System Status', () => {
         </AuthContext.Provider>,
       )
 
-      // StatusIndicator renders the "All Systems Normal" label for green status
-      await expect.element(screen.getByText('All Systems Normal')).toBeVisible()
+      // StatusIndicator renders the "All systems normal" label for green status
+      await expect.element(screen.getByText('All systems normal')).toBeVisible()
     })
 
     it('renders Partial Outage in footer when some services are down', async () => {
@@ -187,7 +187,7 @@ describe('System Status', () => {
         </AuthContext.Provider>,
       )
 
-      await expect.element(screen.getByText('Partial Outage')).toBeVisible()
+      await expect.element(screen.getByText('Partial outage')).toBeVisible()
     })
   })
 
@@ -206,9 +206,9 @@ describe('System Status', () => {
       await trigger.click()
 
       // Should show the component labels from StatusDetailsPopover
-      await expect.element(screen.getByText('API Server')).toBeVisible()
+      await expect.element(screen.getByText('API server')).toBeVisible()
       await expect.element(screen.getByText('Cascade')).toBeVisible()
-      await expect.element(screen.getByText('ECMWF Data')).toBeVisible()
+      await expect.element(screen.getByText('ECMWF data')).toBeVisible()
       await expect.element(screen.getByText('Scheduler')).toBeVisible()
       await expect.element(screen.getByText('Plugins')).toBeVisible()
     })
@@ -285,8 +285,8 @@ describe('System Status', () => {
       const trigger = screen.getByText('Open Status')
       await trigger.click()
 
-      // The popover title uses t('status.title') which is "System Status"
-      await expect.element(screen.getByText('System Status')).toBeVisible()
+      // The popover title uses t('status.title') which is "System status"
+      await expect.element(screen.getByText('System status')).toBeVisible()
     })
   })
 

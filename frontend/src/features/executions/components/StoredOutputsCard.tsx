@@ -18,17 +18,25 @@
  */
 
 import { useEffect, useMemo, useState } from 'react'
-import { Copy, Earth, FolderOpen, Loader2, Play, Square } from 'lucide-react'
+import {
+  AlertCircle,
+  Copy,
+  Earth,
+  FolderOpen,
+  Loader2,
+  Play,
+  Square,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from '@tanstack/react-router'
 import type {
   BlockFactoryCatalogue,
   FableBuilderV1,
 } from '@/api/types/fable.types'
-import type { RunOutputs } from '@/api/types/job.types'
+import type { JobStatus, RunOutputs } from '@/api/types/job.types'
 import type { LostTaskIds } from '@/features/executions/outputs/availability'
 import { classifyOutput } from '@/features/executions/outputs/availability'
-import { getFactory } from '@/api/types/fable.types'
+import { blockDisplayNames } from '@/features/fable-builder/utils/block-names'
 import {
   useLensStatus,
   useSkinnyWmsAvailable,
@@ -36,9 +44,15 @@ import {
   useStopLens,
 } from '@/api/hooks/useLens'
 import { buildAbsoluteWmsCapabilitiesUrl } from '@/api/endpoints/lens'
-import { useStoredDirPath } from '@/features/executions/outputs/stored-dir'
-import { GRIB_DIR_MIME } from '@/features/executions/outputs/adapters/grib'
+import {
+  isSinkComplete,
+  useStoredDirPath,
+} from '@/features/executions/outputs/stored-dir'
+import { isGribDirMime } from '@/features/executions/outputs/adapters/grib'
+import { isFetchableMime } from '@/features/executions/outputs/mime'
+import { OutputZipButton } from '@/features/executions/outputs/OutputZipButton'
 import { SLOT_B_OFF, entryRef } from '@/features/visualise/entry-ref'
+import { lensOwnerKey, setLensOwner } from '@/features/visualise/lens-owners'
 import { showToast } from '@/lib/toast'
 import { cn, copyToClipboard } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -63,6 +77,9 @@ function splitPath(path: string): { dir: string; name: string } {
 
 interface StoredOutputsCardProps {
   jobId: string
+  /** Run status and attempt: lens actions wait until a sink is complete. */
+  status: JobStatus
+  attempt: number
   outputs: RunOutputs | null
   /** Reasons for outputs that are no longer retrievable. */
   lostTaskIds?: LostTaskIds
@@ -83,10 +100,16 @@ interface StoredOutputRow {
   lostReason?: string
   /** Number of GRIB marker tasks the sink fanned out to. */
   count: number
+  /** Marker tasks already written. */
+  written: number
+  /** Backend can zip the folder. */
+  fetchable: boolean
 }
 
 export function StoredOutputsCard({
   jobId,
+  status,
+  attempt,
   outputs,
   lostTaskIds = {},
   fable,
@@ -98,10 +121,11 @@ export function StoredOutputsCard({
   // One row per sink block — a sink fans out to one marker task per cascade
   // branch (e.g. per ensemble member), all pointing at the same directory.
   const rows = useMemo<Array<StoredOutputRow>>(() => {
+    const names = fable ? blockDisplayNames(fable, catalogue) : {}
     if (!outputs) return []
     const byBlock = new Map<string, StoredOutputRow>()
     for (const [taskId, meta] of Object.entries(outputs)) {
-      if (meta.mime_type !== GRIB_DIR_MIME) continue
+      if (!isGribDirMime(meta.mime_type)) continue
       const availability = classifyOutput(
         meta.is_available,
         taskId,
@@ -110,6 +134,7 @@ export function StoredOutputsCard({
       const existing = byBlock.get(meta.original_block)
       if (existing) {
         existing.count += 1
+        if (meta.is_available) existing.written += 1
         // Prefer an available marker as the representative payload source.
         if (!existing.isAvailable && meta.is_available) {
           existing.taskId = taskId
@@ -124,19 +149,16 @@ export function StoredOutputsCard({
         }
         continue
       }
-      const blockInstance = fable?.blocks[meta.original_block]
-      const factory =
-        catalogue && blockInstance
-          ? getFactory(catalogue, blockInstance.factory_id)
-          : undefined
       byBlock.set(meta.original_block, {
         blockId: meta.original_block,
         taskId,
-        title: factory?.title ?? meta.original_block,
+        title: names[meta.original_block] ?? meta.original_block,
         isAvailable: meta.is_available,
         lostReason:
           availability.state === 'lost' ? availability.reason : undefined,
         count: 1,
+        written: meta.is_available ? 1 : 0,
+        fetchable: isFetchableMime(meta.mime_type),
       })
     }
     return Array.from(byBlock.values())
@@ -145,7 +167,7 @@ export function StoredOutputsCard({
   if (rows.length === 0) return null
 
   return (
-    <Card shadow="none" className="gap-3 p-4">
+    <Card className="gap-3 p-4">
       <div className="flex items-center gap-2">
         <FolderOpen className="h-4 w-4 text-muted-foreground" />
         <P className="font-medium">{t('storedOutputs.title')}</P>
@@ -156,6 +178,11 @@ export function StoredOutputsCard({
             key={row.blockId}
             jobId={jobId}
             row={row}
+            complete={isSinkComplete(
+              { written: row.written, total: row.count },
+              status,
+            )}
+            owner={lensOwnerKey(jobId, attempt)}
             runName={runName}
           />
         ))}
@@ -167,10 +194,16 @@ export function StoredOutputsCard({
 function StoredOutputRowItem({
   jobId,
   row,
+  complete,
+  owner,
   runName,
 }: {
   jobId: string
   row: StoredOutputRow
+  /** Sink finished writing; a lens scans its folder once. */
+  complete: boolean
+  /** Run attempt a started lens belongs to. */
+  owner: string
   runName?: string
 }) {
   const { t } = useTranslation('executions')
@@ -216,11 +249,14 @@ function StoredOutputRowItem({
 
   /** Start the SkinnyWMS lens on the resolved directory. */
   const startServer = () => {
-    if (lensId || !dirPath) return
+    if (lensId || !dirPath || !complete) return
     startMutation.mutate(
       { localPath: dirPath },
       {
-        onSuccess: (id) => setLensId(id),
+        onSuccess: (id) => {
+          setLensOwner(id, owner)
+          setLensId(id)
+        },
         onError: (err) => showToast.error(err.message),
       },
     )
@@ -260,28 +296,36 @@ function StoredOutputRowItem({
   }
 
   const isStarting = startMutation.isPending || (!!lensId && !running)
-  const startDisabled = wmsUnavailable || !dirPath || isStarting
+  const startDisabled = wmsUnavailable || !dirPath || !complete || isStarting
   const startTitle = wmsUnavailable
     ? t('storedOutputs.wmsUnavailable')
     : t('storedOutputs.startWms')
   const { dir, name } = dirPath ? splitPath(dirPath) : { dir: '', name: '' }
+  // A per-run folder carries the run ID.
+  const sharedFolder = !!dirPath && !dirPath.includes(jobId)
 
   return (
-    <li className="flex items-start gap-3 py-2.5">
+    <li className="flex flex-wrap items-start gap-3 py-2.5">
       <span
         className={cn(
-          'mt-0.5 shrink-0 rounded px-1.5 py-0.5 font-mono text-xs font-semibold',
+          'mt-0.5 shrink-0 rounded-md px-1.5 py-0.5 font-mono text-sm font-semibold',
           GRIB_CHIP_CLASS,
         )}
       >
         GRIB
       </span>
-      <div className="min-w-0 flex-1">
+      {/* Actions wrap below 12rem of text. */}
+      <div className="min-w-0 flex-1 basis-48">
         <div className="flex items-baseline gap-2">
           <P className="truncate text-sm font-medium">{row.title}</P>
           {row.count > 1 && (
-            <span className="shrink-0 text-xs text-muted-foreground">
-              {t('storedOutputs.fileCount', { n: row.count })}
+            <span className="shrink-0 text-sm text-muted-foreground">
+              {complete
+                ? t('storedOutputs.fileCount', { n: row.count })
+                : t('storedOutputs.fileCountWriting', {
+                    written: row.written,
+                    n: row.count,
+                  })}
             </span>
           )}
         </div>
@@ -289,7 +333,7 @@ function StoredOutputRowItem({
           <button
             type="button"
             onClick={() => copyPath(dirPath)}
-            className="group/path flex w-full min-w-0 items-center gap-1 text-left font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
+            className="group/path flex w-full min-w-0 items-center gap-1 text-left font-mono text-sm text-muted-foreground transition-colors hover:text-foreground"
             title={t('storedOutputs.copyPath')}
           >
             <span className="truncate">
@@ -299,28 +343,46 @@ function StoredOutputRowItem({
             <Copy className="h-3 w-3 shrink-0 opacity-0 transition-opacity group-hover/path:opacity-70" />
           </button>
         ) : row.isAvailable ? (
-          <P className="font-mono text-xs text-muted-foreground">…</P>
+          <P className="font-mono text-sm text-muted-foreground">…</P>
         ) : (
           <P
-            className="text-xs text-muted-foreground italic"
+            className="text-sm text-muted-foreground italic"
             title={row.lostReason}
           >
             {row.lostReason ?? t('storedOutputs.fileMissing')}
           </P>
         )}
+        {sharedFolder && (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <div className="flex w-fit items-center gap-1.5 text-sm text-muted-foreground" />
+              }
+            >
+              <AlertCircle className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+              {t('storedOutputs.sharedFolder')}
+            </TooltipTrigger>
+            <TooltipContent>
+              <P className="max-w-xs text-sm text-inherit">
+                {t('storedOutputs.sharedFolderHint')}
+              </P>
+            </TooltipContent>
+          </Tooltip>
+        )}
         {/* Inline note: disabled buttons can't surface a title/tooltip. */}
         {wmsUnavailable && (
-          <P className="text-xs text-muted-foreground italic">
+          <P className="text-sm text-muted-foreground italic">
             {t('storedOutputs.wmsUnavailable')}
           </P>
         )}
       </div>
-      <div className="flex shrink-0 items-center gap-1.5">
+      <div className="ml-auto flex flex-wrap items-center justify-end gap-1.5">
         {row.isAvailable && (
           <Button
             size="sm"
             variant="outline"
             onClick={visualise}
+            disabled={!complete}
             className="gap-1.5"
           >
             <Earth className="h-3.5 w-3.5" />
@@ -355,7 +417,7 @@ function StoredOutputRowItem({
                 {t('storedOutputs.copy')}
               </TooltipTrigger>
               <TooltipContent>
-                <P className="max-w-xs text-xs text-inherit">
+                <P className="max-w-xs text-sm text-inherit">
                   <span className="font-medium">
                     {t('storedOutputs.externalTitle')}
                   </span>
@@ -383,6 +445,15 @@ function StoredOutputRowItem({
               ? t('storedOutputs.startingWms')
               : t('storedOutputs.startWms')}
           </Button>
+        )}
+        {/* Last: stays put when WMS controls change. */}
+        {row.isAvailable && row.fetchable && (
+          <OutputZipButton
+            jobId={jobId}
+            taskId={row.taskId}
+            ready={complete}
+            sharedFolder={sharedFolder}
+          />
         )}
       </div>
     </li>

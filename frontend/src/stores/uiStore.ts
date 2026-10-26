@@ -20,10 +20,8 @@ import { devtools, persist } from 'zustand/middleware'
 import { STORAGE_KEYS, STORE_VERSIONS } from '@/lib/storage-keys'
 
 export type Theme = 'light' | 'dark' | 'system'
-export type LayoutMode = 'fluid' | 'boxed'
-export type DashboardVariant = 'default' | 'flat' | 'modern' | 'gradient'
-export type PanelShadow = 'none' | 'sm' | 'md' | 'lg'
 export type AdminViewMode = 'table' | 'card'
+export type CatalogueSortSetting = { key: string; dir: 'asc' | 'desc' }
 
 interface UiState {
   // Application state
@@ -37,14 +35,6 @@ interface UiState {
   setResolvedTheme: (theme: 'light' | 'dark') => void
   toggleTheme: () => void
 
-  // Dashboard layout state
-  layoutMode: LayoutMode
-  setLayoutMode: (mode: LayoutMode) => void
-  dashboardVariant: DashboardVariant
-  setDashboardVariant: (variant: DashboardVariant) => void
-  panelShadow: PanelShadow
-  setPanelShadow: (shadow: PanelShadow) => void
-
   // Admin view modes (table/card toggle on the plugins and artifacts pages)
   pluginsViewMode: AdminViewMode
   setPluginsViewMode: (mode: AdminViewMode) => void
@@ -52,6 +42,20 @@ interface UiState {
   setModelsViewMode: (mode: AdminViewMode) => void
   artifactsViewMode: AdminViewMode
   setArtifactsViewMode: (mode: AdminViewMode) => void
+  pluginsSort: CatalogueSortSetting
+  setPluginsSort: (sort: CatalogueSortSetting) => void
+  artifactsSort: CatalogueSortSetting
+  setArtifactsSort: (sort: CatalogueSortSetting) => void
+
+  // Filmstrip under the full-screen output viewers.
+  outputFilmstrip: boolean
+  setOutputFilmstrip: (value: boolean) => void
+
+  // Block palette: hide unusable blocks, one-line rows.
+  paletteUsableOnly: boolean
+  setPaletteUsableOnly: (value: boolean) => void
+  paletteCompact: boolean
+  setPaletteCompact: (value: boolean) => void
 
   // Application timezone (IANA id) — governs all date/time entry and display.
   timeZone: string
@@ -69,12 +73,14 @@ const initialState = {
   isInitialized: false,
   theme: 'system' as Theme,
   resolvedTheme: 'light' as 'light' | 'dark',
-  layoutMode: 'fluid' as LayoutMode,
-  dashboardVariant: 'gradient' as DashboardVariant,
-  panelShadow: 'none' as PanelShadow,
   pluginsViewMode: 'table' as AdminViewMode,
   modelsViewMode: 'table' as AdminViewMode,
   artifactsViewMode: 'table' as AdminViewMode,
+  pluginsSort: { key: 'name', dir: 'asc' } as CatalogueSortSetting,
+  artifactsSort: { key: 'name', dir: 'asc' } as CatalogueSortSetting,
+  outputFilmstrip: true,
+  paletteUsableOnly: false,
+  paletteCompact: false,
   timeZone: 'UTC',
   journalShowFlow: false,
 }
@@ -111,15 +117,15 @@ export const useUiStore = create<UiState>()(
             }
           }),
 
-        // Dashboard layout management
-        setLayoutMode: (layoutMode) => set({ layoutMode }),
-        setDashboardVariant: (dashboardVariant) => set({ dashboardVariant }),
-        setPanelShadow: (panelShadow) => set({ panelShadow }),
-
         // Admin view mode management
         setPluginsViewMode: (pluginsViewMode) => set({ pluginsViewMode }),
         setModelsViewMode: (modelsViewMode) => set({ modelsViewMode }),
         setArtifactsViewMode: (artifactsViewMode) => set({ artifactsViewMode }),
+        setPluginsSort: (pluginsSort) => set({ pluginsSort }),
+        setArtifactsSort: (artifactsSort) => set({ artifactsSort }),
+        setOutputFilmstrip: (outputFilmstrip) => set({ outputFilmstrip }),
+        setPaletteUsableOnly: (paletteUsableOnly) => set({ paletteUsableOnly }),
+        setPaletteCompact: (paletteCompact) => set({ paletteCompact }),
 
         // Application timezone management
         setTimeZone: (timeZone) => set({ timeZone }),
@@ -179,11 +185,15 @@ export const useUiStore = create<UiState>()(
             state.timeZone = 'UTC'
           }
 
+          // v7: one card style and one page width — the switches are gone.
+          if (version < 7) {
+            delete state.layoutMode
+            delete state.dashboardVariant
+            delete state.panelShadow
+          }
+
           return state as {
             theme: Theme
-            layoutMode: LayoutMode
-            dashboardVariant: DashboardVariant
-            panelShadow: PanelShadow
             pluginsViewMode: AdminViewMode
             modelsViewMode: AdminViewMode
             artifactsViewMode: AdminViewMode
@@ -192,12 +202,14 @@ export const useUiStore = create<UiState>()(
         },
         partialize: (state) => ({
           theme: state.theme,
-          layoutMode: state.layoutMode,
-          dashboardVariant: state.dashboardVariant,
-          panelShadow: state.panelShadow,
           pluginsViewMode: state.pluginsViewMode,
           modelsViewMode: state.modelsViewMode,
           artifactsViewMode: state.artifactsViewMode,
+          pluginsSort: state.pluginsSort,
+          artifactsSort: state.artifactsSort,
+          outputFilmstrip: state.outputFilmstrip,
+          paletteUsableOnly: state.paletteUsableOnly,
+          paletteCompact: state.paletteCompact,
           timeZone: state.timeZone,
         }),
       },

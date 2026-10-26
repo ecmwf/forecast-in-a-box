@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next'
 import type { PluginCompositeId, PluginInfo } from '@/api/types/plugins.types'
 import { Spinner } from '@/components/ui/spinner'
 import { Switch } from '@/components/ui/switch'
+import { cn } from '@/lib/utils'
 
 interface PluginToggleProps {
   plugin: PluginInfo
@@ -35,7 +36,11 @@ export function PluginToggle({
 
   return (
     <div className="flex items-center gap-2">
-      {isToggling && <Spinner className="text-muted-foreground" />}
+      {/* Always rendered so the switch never shifts. */}
+      <Spinner
+        className={cn('text-muted-foreground', !isToggling && 'invisible')}
+        aria-hidden={!isToggling}
+      />
       <Switch
         checked={isToggling ? pendingEnabled : plugin.isEnabled}
         disabled={isToggling}

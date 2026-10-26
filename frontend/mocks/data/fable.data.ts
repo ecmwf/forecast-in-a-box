@@ -100,11 +100,6 @@ export const mockCatalogue: BlockFactoryCatalogue = {
         title: 'Ensemble Statistics',
         description: 'Computes ensemble mean or standard deviation',
         configuration_options: {
-          param: {
-            title: 'Parameter',
-            description: "Parameter name like '2t'",
-            value_type: 'str',
-          },
           statistic: {
             title: 'Statistic',
             description: 'Statistic to compute over the ensemble',
@@ -183,6 +178,56 @@ export const mockCatalogue: BlockFactoryCatalogue = {
       },
     },
   },
+  // Second plugin whose titles clash with ecmwf-base.
+  ['demo/demo-plots']: {
+    factories: {
+      mapPlot: {
+        kind: 'sink',
+        title: 'Map Plot',
+        description: 'Quick-look map from the demo plugin',
+        configuration_options: {
+          param: {
+            title: 'Parameters',
+            description: "Parameters to plot (e.g. '2t')",
+            value_type: 'list[str]',
+          },
+        },
+        inputs: ['dataset'],
+      },
+      select: {
+        kind: 'transform',
+        title: 'Select',
+        description: 'Demo variant of the select transform',
+        configuration_options: {
+          dimension: {
+            title: 'Dimension',
+            description: 'Dimension to select from the dataset',
+            value_type: 'str',
+          },
+        },
+        inputs: ['dataset'],
+      },
+      histogram: {
+        kind: 'product',
+        title: 'Histogram',
+        description: 'Value distribution of a field',
+        configuration_options: {
+          // Mirrors fiab-plugin-ecmwf's AnemoiSource.ENSEMBLE: a trait-bearing
+          // int (`int{positive}`), to exercise the traits suffix in the fable
+          // type grammar. The trait itself is not yet surfaced in the UI.
+          // No test builds a 'histogram' block, so adding this required
+          // option here cannot break existing fixtures.
+          bins: {
+            title: 'Bins',
+            description: 'Number of histogram bins',
+            value_type: 'int{positive}',
+            default_value: '10',
+          },
+        },
+        inputs: ['dataset'],
+      },
+    },
+  },
 }
 
 /**
@@ -235,6 +280,18 @@ export function getBlocksByKind(
   }
 
   return result
+}
+
+/** resolveDisplay strings per GRIB param id. */
+export const mockParamDisplays: Record<string, string> = {
+  '129': 'Geopotential [m**2 s**-2] (z)',
+  '130': 'Temperature [K] (t)',
+  '151': 'Mean sea level pressure [Pa] (msl)',
+  '165': '10 metre U wind component [m s**-1] (10u)',
+  '166': '10 metre V wind component [m s**-1] (10v)',
+  '167': '2 metre temperature [K] (2t)',
+  '168': '2 metre dewpoint temperature [K] (2d)',
+  '228': 'Total precipitation [m] (tp)',
 }
 
 /**
@@ -359,7 +416,6 @@ export function calculateExpansion(fable: FableBuilderV1): {
   const localGlyphs = fable.local_glyphs ?? {}
 
   // Available blocks by kind (using new PluginCompositeId format)
-  // Only ecmwf-base plugin is loaded
   const sourceBlocks: Array<PluginBlockFactoryId> = [
     {
       plugin: pluginId('ecmwf', 'ecmwf-base'),
@@ -382,6 +438,16 @@ export function calculateExpansion(fable: FableBuilderV1): {
       factory: 'temporalStatistics',
       restrictions: {},
     },
+    {
+      plugin: pluginId('demo', 'demo-plots'),
+      factory: 'select',
+      restrictions: {},
+    },
+    {
+      plugin: pluginId('demo', 'demo-plots'),
+      factory: 'histogram',
+      restrictions: {},
+    },
   ]
   const sinkBlocks: Array<BlockExpansion> = [
     {
@@ -392,6 +458,11 @@ export function calculateExpansion(fable: FableBuilderV1): {
     {
       plugin: pluginId('ecmwf', 'ecmwf-base'),
       factory: 'mapPlotSink',
+      restrictions: {},
+    },
+    {
+      plugin: pluginId('demo', 'demo-plots'),
+      factory: 'mapPlot',
       restrictions: {},
     },
   ]
@@ -450,9 +521,9 @@ export function calculateExpansion(fable: FableBuilderV1): {
       resolved_configuration_options[blockId] = resolvedForBlock
     }
 
-    // Calculate possible expansions based on block kind
+    // Like the backend: sinks may follow any block with an output.
     if (factory.kind === 'source' || factory.kind === 'transform') {
-      possible_expansions[blockId] = qubedBlocks
+      possible_expansions[blockId] = [...qubedBlocks, ...sinkBlocks]
     } else if (factory.kind === 'product') {
       possible_expansions[blockId] = sinkBlocks
     }

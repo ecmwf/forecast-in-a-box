@@ -67,7 +67,7 @@ describe('DateTimeField timezone projection', () => {
     await expect.element(screen.getByLabelText('Time')).toHaveValue('00:00')
     await expect
       .element(screen.getByTestId('datetime-tz-badge'))
-      .toHaveTextContent(/^UTC$/)
+      .toMatchTextContent(/^UTC$/)
   })
 
   it('projects a canonical UTC value into the app timezone for display', async () => {
@@ -79,7 +79,7 @@ describe('DateTimeField timezone projection', () => {
     await expect.element(screen.getByLabelText('Time')).toHaveValue('02:00')
     await expect
       .element(screen.getByTestId('datetime-tz-badge'))
-      .toHaveTextContent(/^UTC\+2$/)
+      .toMatchTextContent(/^UTC\+2$/)
   })
 
   it('stores edits back as canonical UTC', async () => {
@@ -117,7 +117,7 @@ describe('DateTimeField timezone projection', () => {
     await expect.element(screen.getByLabelText('Time')).toHaveValue('02:00')
     await expect
       .element(screen.getByTestId('datetime-tz-badge'))
-      .toHaveTextContent(/^UTC\+2$/)
+      .toMatchTextContent(/^UTC\+2$/)
     // The stored canonical value is not mutated by the timezone change.
     await expect
       .element(screen.getByTestId('value'))

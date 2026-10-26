@@ -29,6 +29,8 @@ import type {
   GlyphFunctionsResponse,
   GlyphListResponse,
   IntrinsicGlyphItem,
+  ResolvableValue,
+  ResolveDisplayResponse,
 } from '@/api/types/fable.types'
 import { apiClient } from '@/api/client'
 import { API_ENDPOINTS } from '@/api/endpoints'
@@ -41,6 +43,7 @@ import {
   GlobalGlyphResponseSchema,
   GlyphFunctionsResponseSchema,
   GlyphListResponseSchema,
+  ResolveDisplayResponseSchema,
   normalizeCatalogueKeys,
   serializeFable,
 } from '@/api/types/fable.types'
@@ -224,4 +227,15 @@ export async function deleteGlobalGlyph(globalGlyphId: string): Promise<void> {
   return apiClient.post(API_ENDPOINTS.fable.glyphsGlobalDelete, {
     global_glyph_id: globalGlyphId,
   })
+}
+
+/** Resolve option values to display strings; 404 on an invalid `typeName`. */
+export async function resolveDisplay(
+  elements: Array<ResolvableValue>,
+): Promise<ResolveDisplayResponse> {
+  return apiClient.post(
+    API_ENDPOINTS.fable.resolveDisplay,
+    { elements },
+    { schema: ResolveDisplayResponseSchema },
+  )
 }

@@ -17,6 +17,7 @@ import type {
   JobExecuteRequest,
   JobExecuteResponse,
   JobExecutionDetail,
+  RunOutputMetadata,
 } from '@/api/types/job.types'
 
 const now = new Date()
@@ -67,7 +68,7 @@ const seedExecutions: Array<JobExecutionDetail> = [
       },
       // GribSink marker: payload is the run-private output directory.
       'task-out-grib': {
-        mime_type: 'text/plain; fiab-format=gribdir',
+        mime_type: 'text/plain; fiab-format=gribdir; fiab-fetchable=1',
         original_block: 'block_sink_1',
         is_available: true,
       },
@@ -213,6 +214,51 @@ export const opaqueMimeExecution: JobExecutionDetail = {
   planned_block_ids: null,
 }
 
+function splitPlotOutput(
+  param: string,
+  short: string,
+  step: string,
+  isAvailable: boolean,
+): RunOutputMetadata {
+  return {
+    mime_type: 'image/png',
+    display_name: `Map Plot (param=${short}, step=${step})`,
+    dimension_kvs: [
+      ['param', param],
+      ['step', step],
+    ],
+    original_block: 'map_plot',
+    is_available: isAvailable,
+  }
+}
+
+/** Test-only split Map Plot (param x step); see {@link injectMockExecution}. */
+export const splitPlotExecution: JobExecutionDetail = {
+  run_id: 'job-split-007',
+  attempt_count: 1,
+  status: 'running',
+  created_at: oneHourAgo,
+  updated_at: oneHourAgo,
+  blueprint_id: 'def-007',
+  blueprint_version: 1,
+  error: null,
+  progress: '80',
+  cascade_job_id: 'cascade-007',
+  lost_task_ids: {},
+  outputs: {
+    'map_plot:9c': splitPlotOutput('167', '2t', '24', true),
+    'map_plot:1a': splitPlotOutput('151', 'msl', '12', true),
+    'map_plot:f0': splitPlotOutput('167', '2t', '0', true),
+    'map_plot:4b': splitPlotOutput('151', 'msl', '0', true),
+    'map_plot:77': splitPlotOutput('167', '2t', '12', true),
+    'map_plot:d8': splitPlotOutput('167', '2t', '36', true),
+    'map_plot:5e': splitPlotOutput('151', 'msl', '24', true),
+    'map_plot:c3': splitPlotOutput('151', 'msl', '36', false),
+  },
+  completed_block_ids: [],
+  planned_block_ids: ['map_plot'],
+}
+
 /** Test-only fixture: completed run of the glyphed `template-typed-inputs`
  * fable with an as-run `resolution` (#640, glyphed options only). Inject via
  * {@link injectMockExecution}. */
@@ -258,8 +304,17 @@ export const noStoredOutputsExecution: JobExecutionDetail = {
   planned_block_ids: null,
 }
 
+/** GribSink directory per run, when a test needs runs to share one. */
+let gribDirOverrides: Record<string, string> = {}
+
+/** Point a run's GribSink markers at `dir` (e.g. a folder shared by runs). */
+export function setMockGribDir(runId: string, dir: string): void {
+  gribDirOverrides[runId] = dir
+}
+
 export function resetJobsState(): void {
   executionsState = {}
+  gribDirOverrides = {}
   executionIdCounter = 200
   for (const exec of seedExecutions) {
     executionsState[exec.run_id] = JSON.parse(
@@ -330,6 +385,37 @@ export function restartExecution(
     planned_block_ids: null,
   }
   return { run_id: executionId, attempt_count }
+}
+
+/** Mock settle time of a stop, as the backend's poll would reconcile it. */
+const STOP_SETTLE_MS = 1000
+
+/** Mirrors `/run/stop` (ecmwf#770): active runs stop, repeats are no-ops. */
+export function stopExecution(
+  executionId: string,
+): 'ok' | 'notFound' | 'notStoppable' {
+  const exec = executionsState[executionId] as JobExecutionDetail | undefined
+  if (!exec) return 'notFound'
+  if (exec.status === 'stopping' || exec.status === 'stopped') return 'ok'
+  if (!['submitted', 'preparing', 'running'].includes(exec.status)) {
+    return 'notStoppable'
+  }
+  executionsState[executionId] = {
+    ...exec,
+    status: 'stopping',
+    updated_at: new Date().toISOString(),
+  }
+  setTimeout(() => {
+    const current = executionsState[executionId] as
+      JobExecutionDetail | undefined
+    if (current?.status !== 'stopping') return
+    executionsState[executionId] = {
+      ...current,
+      status: 'stopped',
+      updated_at: new Date().toISOString(),
+    }
+  }, STOP_SETTLE_MS)
+  return 'ok'
 }
 
 export function deleteExecution(executionId: string): boolean {
@@ -539,11 +625,14 @@ export function createMockSvgBlob(): Blob {
  * sniff-promotion path stays exercised; unknown mimes also fall back to PNG.
  * GribSink markers resolve to a per-run directory path. */
 export function mockBlobForMime(mimeType: string, runId?: string): Blob {
+  // With or without extra mime parameters.
+  if (mimeType.startsWith('text/plain; fiab-format=gribdir')) {
+    const run = runId ?? 'job-completed-001'
+    const dir =
+      run in gribDirOverrides ? gribDirOverrides[run] : `/data/output/${run}_1`
+    return new Blob([dir], { type: 'text/plain' })
+  }
   switch (mimeType) {
-    case 'text/plain; fiab-format=gribdir':
-      return new Blob([`/data/output/${runId ?? 'job-completed-001'}_1`], {
-        type: 'text/plain',
-      })
     case 'application/pdf':
       return createMockPdfBlob()
     case 'image/svg+xml':

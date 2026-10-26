@@ -44,7 +44,7 @@ from forecastbox.utility.time import from_timestamp, value_dt2str
 logger = logging.getLogger(__name__)
 
 
-def get_package_versions(pip_source: str) -> Iterator[str]:
+def get_package_versions(pip_source: str, client: httpx.Client) -> Iterator[str]:
     """Return all versions of *pip_source* available on PyPI.
 
     Fetches ``https://pypi.org/pypi/{pip_source}/json`` and yields every key
@@ -52,24 +52,23 @@ def get_package_versions(pip_source: str) -> Iterator[str]:
     if a ``next`` link is ever introduced the loop below handles it.
     """
     url: str | None = f"https://pypi.org/pypi/{pip_source}/json"
-    with httpx.Client() as client:
-        while url is not None:
-            try:
-                response = client.get(url)
-            except Exception:
-                logger.exception(f"Failed to reach PyPI for {pip_source!r}")
-                return
-            if response.status_code != 200:
-                logger.warning(f"PyPI returned {response.status_code} for {pip_source!r}")
-                return
-            try:
-                data = response.json()
-            except Exception:
-                logger.exception(f"Failed to parse PyPI JSON for {pip_source!r}")
-                return
-            yield from data.get("releases", {}).keys()
-            # PyPI JSON API does not currently paginate; guard for the future.
-            url = data.get("next", None)
+    while url is not None:
+        try:
+            response = client.get(url)
+        except Exception:
+            logger.exception(f"Failed to reach PyPI for {pip_source!r}")
+            return
+        if response.status_code != 200:
+            logger.warning(f"PyPI returned {response.status_code} for {pip_source!r}")
+            return
+        try:
+            data = response.json()
+        except Exception:
+            logger.exception(f"Failed to parse PyPI JSON for {pip_source!r}")
+            return
+        yield from data.get("releases", {}).keys()
+        # PyPI JSON API does not currently paginate; guard for the future.
+        url = data.get("next", None)
 
 
 def try_import(module_name: str) -> ModuleType | None:
@@ -178,7 +177,7 @@ class CommandResult:
 def _run_command(cmd: Sequence[str]) -> CommandResult:
     logger.debug(f"running {list(cmd)}")
     try:
-        result = subprocess.run(list(cmd), check=False, capture_output=True, text=True)
+        result = subprocess.run(list(cmd), check=False, capture_output=True, text=True, timeout=300)
     except FileNotFoundError as ex:
         msg = repr(ex)
         logger.error(f"failed to launch {list(cmd)}: {msg}")
@@ -295,6 +294,13 @@ def query_module_distribution_map(python: str) -> dict[str, list[str]]:
         raise PackagesError(f"failed to parse module/distribution mapping from {python!r}: {ex}") from ex
 
 
+def _is_editable_or_local(line: str) -> bool:
+    # TODO merge with _classify_editable_or_local to allow using it like a flatmap
+    is_editable = line.startswith("-e ") or line.startswith("--editable ")
+    is_local = line.startswith("file://") or (" @ " in line and " @ git" not in line)
+    return is_editable or is_local
+
+
 def _classify_editable_or_local(line: str, source_map: dict[str, str]) -> FrozenDistribution:
     for prefix in ("-e ", "--editable "):
         if line.startswith(prefix):
@@ -311,7 +317,7 @@ def _classify_editable_or_local(line: str, source_map: dict[str, str]) -> Frozen
             return FrozenDistribution(
                 name=name, raw_line=line, kind="editable", constraint=None, requirement_args=(token, reproduction_path)
             )
-    if " @ " in line:
+    if " @ " in line and " @ git" not in line:
         name_part, _, _rest = line.partition(" @ ")
         name = canonicalize_name(name_part.strip())
         return FrozenDistribution(name=name, raw_line=line, kind="local", constraint=None, requirement_args=(line,))
@@ -334,7 +340,7 @@ def parse_frozen_environment(lines: Iterable[str], python: str) -> EnvironmentSn
         line = raw_line.strip()
         if not line or line.startswith("#"):
             continue
-        if line.startswith("-e ") or line.startswith("--editable ") or line.startswith("file://") or " @ " in line:
+        if _is_editable_or_local(line):
             if source_map is None:
                 source_map = _build_source_distribution_map(python)
             distributions.append(_classify_editable_or_local(line, source_map))
@@ -344,6 +350,11 @@ def parse_frozen_environment(lines: Iterable[str], python: str) -> EnvironmentSn
         except InvalidRequirement as ex:
             raise PackagesError(f"cannot parse frozen requirement: {line!r}: {ex}") from ex
         if req.url:
+            if req.url.startswith("git"):
+                # TODO this is a hotfix. If we keep it, regardless of whether as a local or as a pin,
+                # pip complains that it creates a conflicting url resolution, one with pin one without
+                logger.warning(f"ignoring {line} for pip check -- git-based installs misbehave")
+                continue
             distributions.append(
                 FrozenDistribution(name=canonicalize_name(req.name), raw_line=line, kind="local", constraint=None, requirement_args=(line,))
             )

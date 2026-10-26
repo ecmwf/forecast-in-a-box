@@ -1,3 +1,6 @@
+default:
+    @just --list
+
 dbuild:
     docker build -t forecast-in-a-box -f Dockerfile .
 
@@ -59,15 +62,17 @@ dev *args:
     set -euo pipefail
 
     args=({{args}})
+    FIAB_FIRSTRUN_MARKER="${FIAB_ROOT:-.fiab}"/firstrun
 
     # NOTE on MacOS, empty array fails to expand in a for-safe way, hence we need
     # conditional expansion into itself (${var+"$var"} basically)
     for arg in ${args[@]+"${args[@]}"} ; do
-        if [ "$arg" == "full-reinstall" ] ; then
-            echo "full reinstall! Will drop the db and sync the venv"
+        if [ "$arg" == "reinstall" ] ; then
+            echo "reinstall! Will drop the db and sync the venv"
             pushd backend
             uv sync --extra runtime --all-packages
             rm -rf .fiab/*db
+            rm -f $FIAB_FIRSTRUN_MARKER
             popd
         fi
     done
@@ -105,9 +110,24 @@ dev *args:
 
     pushd backend
     if [[ -z "${FIAB_ROOT-}" ]] ; then
+        export FIAB_ROOT=.fiab
         if [[ ! -d .fiab ]] ; then mkdir -p .fiab/data_dir ; fi
         echo "1761908420:d0.0.1" > .fiab/pylock.toml.timestamp
     fi
     if [[ ! -d .venv ]] ; then uv sync --extra runtime --all-packages ; fi
-    FIAB_ROOT=.fiab uv run --no-sync python -m forecastbox.entrypoint.main
+    if [ -f "$FIAB_FIRSTRUN_MARKER" ] ; then
+        >&2 echo ".fiab firstrun found, assuming this is not first run"
+        export FIAB_FIRSTRUN="false"
+    else
+        >&2 echo ".fiab firstrun not found, assuming this is first run"
+        export FIAB_FIRSTRUN="true"
+        touch "$FIAB_FIRSTRUN_MARKER" # TODO create this in the python command instead!
+    fi
+
+    if [[ ! -f "${FIAB_ROOT}/config.toml" ]] ; then
+        echo "copying example config"
+        cp ../docs/developer/guidelines/example_dev_config.toml "${FIAB_ROOT}"/config.toml
+    fi
+
+    uv run --no-sync python -m forecastbox.entrypoint.main
     popd

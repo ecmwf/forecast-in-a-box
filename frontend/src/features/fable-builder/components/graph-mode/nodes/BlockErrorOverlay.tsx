@@ -72,7 +72,7 @@ export function BlockErrorOverlay({
             ? t('errors.collapseAriaLabel')
             : t('errors.expandAriaLabel', { count: errors.length })
         }
-        className="-mr-1 ml-auto flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded hover:bg-destructive/15"
+        className="-mr-1 ml-auto flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded-md hover:bg-destructive/15"
       >
         {expanded ? (
           <ChevronUp className="h-3 w-3" />

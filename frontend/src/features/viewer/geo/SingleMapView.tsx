@@ -38,7 +38,8 @@ import { useWmsLayerStack } from '../hooks/useWmsLayerStack'
 import { useMeasure } from '../hooks/useMeasure'
 import { usePointerReadout } from '../hooks/usePointerReadout'
 import { useTimeStepPrefetch } from '../hooks/useTimeStepPrefetch'
-import { formatLatLon } from '../format'
+import { PointerReadoutBadge } from '../components/PointerReadoutBadge'
+import { viewerProjectionOf } from '../projections'
 import { compositeMapToCanvas } from '../map-export'
 import { MapLoadingBar } from '../components/MapLoadingBar'
 import { PinnedLegendsBar } from '../components/PinnedLegendsBar'
@@ -47,10 +48,12 @@ import { OverlayHoverCard } from './OverlayHoverCard'
 import { isAnnotationFeature, useAnnotationLayer } from './annotations'
 import { CompareSlotTag } from './CompareSlotTag'
 import { LoupeOverlay } from './LoupeOverlay'
+import { PanelCorner, SlotStatusBadges } from './SlotStatusBadges'
+import { MapNavControls } from './MapNavControls'
+import { NAV_CLEARANCE, navEaseMs, panView, zoomView } from './map-nav'
 import type { PinnedLegendItem } from '../components/PinnedLegendsBar'
 import type { MapAnnotation } from './annotations'
 import type { ContextOverlay } from './overlays'
-import type { ParsedLayer } from '../wms-capabilities'
 import type { MeasureMode } from '../hooks/useMeasure'
 import type { SourceSlot } from './layer-pairing'
 import type RenderEvent from 'ol/render/Event'
@@ -59,9 +62,11 @@ import type {
   CaptureResult,
   CompareMapSource,
   CompareModeOptions,
+  FitBboxAction,
   SingleMapMode,
 } from './types'
 import { cn } from '@/lib/utils'
+import { useUiStore } from '@/stores/uiStore'
 
 const noop = () => {}
 /** Stable inert stand-ins for the B stack while running solo. */
@@ -99,6 +104,7 @@ export function SingleMapView({
   onAnnotationEdit,
   onAnnotationMove,
   onRegisterFit,
+  onRegisterFitBbox,
   onRegisterCapture,
 }: {
   view: View
@@ -129,6 +135,8 @@ export function SingleMapView({
   onAnnotationEdit: (id: string) => void
   onAnnotationMove: (id: string, coordinate: [number, number]) => void
   onRegisterFit: (fit: (() => void) | null) => void
+  /** Register the zoom-to-bbox action. */
+  onRegisterFitBbox: (fit: FitBboxAction | null) => void
   onRegisterCapture: (
     capture: (() => Promise<Array<CaptureResult>>) | null,
   ) => void
@@ -155,10 +163,13 @@ export function SingleMapView({
     loupeZoom,
   } = options
 
-  const { mapRef, basemapLayerRef, tryFit, setFitBbox, mapVersion } =
+  const theme = useUiStore((s) => s.resolvedTheme)
+  const { mapRef, basemapLayerRef, tryFit, fitBbox, setFitBbox, mapVersion } =
     useOlMapBase(containerRef, {
       view,
-      resetKey: 'compare-single',
+      // A projection switch swaps the View — rebuild around it.
+      resetKey: `compare-single|${view.getProjection().getCode()}`,
+      theme,
       incLoading: noop,
       decLoading: noop,
     })
@@ -170,6 +181,7 @@ export function SingleMapView({
     decorationLayers: a.decorationLayers,
     basemapId,
     opacity: basemapOpacity,
+    theme,
     incLoading: noop,
     decLoading: noop,
     mapVersion,
@@ -224,6 +236,8 @@ export function SingleMapView({
     masterOpacity: masterA,
     activeOrder: a.activeOrder,
     layerOpacities: a.layerOpacities,
+    layerSettings: a.layerSettings,
+    bboxAxisOrder: a.bboxAxisOrder,
     resolveTime: a.resolveTime,
     incLoading: incA,
     decLoading: decA,
@@ -242,6 +256,8 @@ export function SingleMapView({
       masterOpacity: masterB,
       activeOrder: b?.activeOrder ?? EMPTY_ORDER,
       layerOpacities: b?.layerOpacities ?? EMPTY_OPACITIES,
+      layerSettings: b?.layerSettings,
+      bboxAxisOrder: b?.bboxAxisOrder,
       resolveTime: b?.resolveTime ?? noTime,
       incLoading: incB,
       decLoading: decB,
@@ -263,6 +279,8 @@ export function SingleMapView({
     baseUrl: a.baseUrl,
     layers: a.layers,
     activeOrder: a.activeOrder,
+    layerSettings: a.layerSettings,
+    bboxAxisOrder: a.bboxAxisOrder,
     timeSteps: a.timeSteps,
     mapVersion,
   })
@@ -271,6 +289,8 @@ export function SingleMapView({
     baseUrl: b?.baseUrl ?? a.baseUrl,
     layers: b?.layers ?? EMPTY_LAYERS,
     activeOrder: b?.activeOrder ?? EMPTY_ORDER,
+    layerSettings: b?.layerSettings,
+    bboxAxisOrder: b?.bboxAxisOrder,
     timeSteps: b?.timeSteps ?? EMPTY_ORDER,
     mapVersion,
   })
@@ -337,6 +357,10 @@ export function SingleMapView({
     onRegisterFit(() => tryFit(true))
     return () => onRegisterFit(null)
   }, [tryFit, onRegisterFit])
+  useEffect(() => {
+    onRegisterFitBbox(fitBbox)
+    return () => onRegisterFitBbox(null)
+  }, [fitBbox, onRegisterFitBbox])
 
   // Export capture: composite all layer canvases (basemap, WMS stacks,
   // overlays) — the mode's clipping is baked into the WMS canvas, so the
@@ -644,9 +668,13 @@ export function SingleMapView({
             : undefined
         }
       />
-      {/* left-12 clears the OL zoom control (the tag hid its + button). */}
       {(showA || showB) && (
-        <div className="pointer-events-none absolute top-2 right-2 left-12 z-10 flex items-start gap-2">
+        <div
+          className={cn(
+            'pointer-events-none absolute top-2 left-2 z-10 flex items-start gap-2',
+            NAV_CLEARANCE,
+          )}
+        >
           {showA && (
             <CompareSlotTag
               slot="a"
@@ -654,6 +682,8 @@ export function SingleMapView({
               side="left"
               loading={loadingCount.a > 0 || a.layersLoading}
               timeLabel={a.timeLabel}
+              runLabel={a.runLabel}
+              submittedAt={a.submittedAt}
             />
           )}
           {showB && (
@@ -663,33 +693,27 @@ export function SingleMapView({
               side="right"
               loading={loadingCount.b > 0 || b.layersLoading}
               timeLabel={b.timeLabel}
+              runLabel={b.runLabel}
+              submittedAt={b.submittedAt}
             />
           )}
         </div>
       )}
 
-      {showA && a.hiddenAtTime && <GapBadge slot="A" side="left" />}
-      {showB && b.hiddenAtTime && <GapBadge slot="B" side="right" />}
-      {showA && stackA.errorCount > 0 && !a.hiddenAtTime && (
-        <LoadErrorBadge
-          slot="A"
-          side="left"
-          layers={erroredTitles(stackA.erroredNames, a.layers)}
-        />
-      )}
-      {showB && stackB.errorCount > 0 && !b.hiddenAtTime && (
-        <LoadErrorBadge
-          slot="B"
-          side="right"
-          layers={erroredTitles(stackB.erroredNames, b.layers)}
-        />
-      )}
-      {showA && a.timeTag && (
-        <TimeTagBadge slot="A" tag={a.timeTag} side="left" />
-      )}
-      {showB && b.timeTag && (
-        <TimeTagBadge slot="B" tag={b.timeTag} side="right" />
-      )}
+      <PanelCorner side="left">
+        {showA && (
+          <SlotStatusBadges source={a} erroredNames={stackA.erroredNames} />
+        )}
+      </PanelCorner>
+      <MapNavControls
+        onPan={(dx, dy) => panView(view, dx, dy, navEaseMs())}
+        onZoom={(delta) => zoomView(view, delta)}
+      />
+      <PanelCorner side="right">
+        {showB && (
+          <SlotStatusBadges source={b} erroredNames={stackB.erroredNames} />
+        )}
+      </PanelCorner>
 
       {mode === 'swipe' && !solo && (
         <div
@@ -759,9 +783,12 @@ export function SingleMapView({
       <PinnedLegendsBar items={pinnedLegends} onUnpin={onUnpinLegend} />
 
       {pointer && (
-        <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-md border border-border bg-background/90 px-2.5 py-1 font-mono text-xs tabular-nums shadow-sm backdrop-blur-sm">
-          {formatLatLon(pointer.lat, pointer.lon)}
-        </div>
+        <PointerReadoutBadge
+          pointer={pointer}
+          label={t(`projections.short.${viewerProjectionOf(view).id}`)}
+          crs={view.getProjection().getCode()}
+          metres={viewerProjectionOf(view).gridReadout}
+        />
       )}
 
       {annotateArmed && (
@@ -795,7 +822,7 @@ export function SingleMapView({
                 slotBadge: (
                   <span
                     className={cn(
-                      'rounded px-1',
+                      'rounded-md px-1',
                       SLOT_BADGE_CLASS[flickerFrame],
                     )}
                   />
@@ -803,95 +830,11 @@ export function SingleMapView({
               }}
             />
           </button>
-          <p className="rounded bg-background/75 px-2 py-0.5 text-xs text-muted-foreground">
+          <p className="rounded-md bg-background/75 px-2 py-0.5 text-xs text-muted-foreground">
             {t('modes.flickerHint')}
           </p>
         </div>
       )}
-    </div>
-  )
-}
-
-/** Nearest/offset resolution indicator, e.g. "B +6 h". */
-function TimeTagBadge({
-  slot,
-  tag,
-  side,
-}: {
-  slot: string
-  tag: string
-  side: 'left' | 'right'
-}) {
-  const { t } = useTranslation('visualise')
-  return (
-    <div
-      className={
-        side === 'left'
-          ? 'absolute top-10 left-2 z-10'
-          : 'absolute top-10 right-2 z-10'
-      }
-    >
-      <div className="rounded-md border border-border bg-background/90 px-2 py-1 font-mono text-xs font-medium shadow-sm backdrop-blur-sm">
-        {t('timeline.offsetBadge', { slot, tag })}
-      </div>
-    </div>
-  )
-}
-
-function GapBadge({ slot, side }: { slot: string; side: 'left' | 'right' }) {
-  const { t } = useTranslation('visualise')
-  return (
-    <div
-      className={
-        side === 'left'
-          ? 'absolute top-10 left-2 z-10'
-          : 'absolute top-10 right-2 z-10'
-      }
-    >
-      <div className="rounded-md border border-amber-500/40 bg-amber-50/95 px-2 py-1 text-xs font-medium text-amber-800 dark:bg-amber-500/15 dark:text-amber-200">
-        {t('timeline.gap', { slot })}
-      </div>
-    </div>
-  )
-}
-
-/** Failing layer names → display titles for the badge. */
-export function erroredTitles(
-  names: ReadonlyArray<string>,
-  layers: ReadonlyArray<ParsedLayer>,
-): Array<string> {
-  return names.map((n) => layers.find((l) => l.name === n)?.title ?? n)
-}
-
-/** The server returned no image for the requested instant (the layer is
- *  hidden — an older image must never pose as this time). */
-export function LoadErrorBadge({
-  slot,
-  side,
-  layers,
-}: {
-  slot: string
-  side: 'left' | 'right'
-  /** Titles of the affected layers — named so intact layers aren't accused. */
-  layers: ReadonlyArray<string>
-}) {
-  const { t } = useTranslation('visualise')
-  const shown = layers.slice(0, 2).join(', ')
-  const more = layers.length - 2
-  return (
-    <div
-      className={
-        side === 'left'
-          ? 'absolute top-10 left-2 z-10'
-          : 'absolute top-10 right-2 z-10'
-      }
-    >
-      <div className="max-w-64 rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1 text-xs font-medium text-danger">
-        {t('timeline.loadErrorLayers', {
-          slot,
-          layers: more > 0 ? `${shown} +${more}` : shown,
-        })}
-      </div>
     </div>
   )
 }

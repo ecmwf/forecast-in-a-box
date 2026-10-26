@@ -24,6 +24,7 @@ import { renderWithRouter } from '@tests/utils/render'
 import { worker } from '@tests/test-extend'
 import { ConfigPresetsSection } from '@/features/dashboard/components/ConfigPresetsSection'
 import { PresetsPage } from '@/features/dashboard/components/PresetsPage'
+import { useTemplateBookmarksStore } from '@/stores/templateBookmarksStore'
 import { API_ENDPOINTS } from '@/api/endpoints'
 import { ToastProvider } from '@/providers/ToastProvider'
 import { ONEOFF_TAG } from '@/lib/system-tags'
@@ -140,7 +141,7 @@ describe('ConfigPresetsSection', () => {
     const screen = await renderWithRouter(<ConfigPresetsSection />)
 
     await expect
-      .element(screen.getByText('My Configuration Presets'))
+      .element(screen.getByText('My workflows'))
       .not.toBeInTheDocument()
   })
 
@@ -149,17 +150,15 @@ describe('ConfigPresetsSection', () => {
 
     const screen = await renderWithRouter(<ConfigPresetsSection />)
 
-    await expect
-      .element(screen.getByText('My Configuration Presets'))
-      .toBeVisible()
+    await expect.element(screen.getByText('My workflows')).toBeVisible()
   })
 
-  it('shows "View all presets" link', async () => {
+  it('shows "View all workflows" link', async () => {
     useBlueprintListHandler()
 
     const screen = await renderWithRouter(<ConfigPresetsSection />)
 
-    await expect.element(screen.getByText('View all presets')).toBeVisible()
+    await expect.element(screen.getByText('View all workflows')).toBeVisible()
   })
 
   it('shows at most 4 preset cards on the dashboard', async () => {
@@ -176,9 +175,7 @@ describe('ConfigPresetsSection', () => {
 
     const screen = await renderWithRouter(<ConfigPresetsSection />)
 
-    await expect
-      .element(screen.getByText('My Configuration Presets'))
-      .toBeVisible()
+    await expect.element(screen.getByText('My workflows')).toBeVisible()
   })
 
   it('excludes one-off runs and plugin templates from the presets list', async () => {
@@ -234,7 +231,9 @@ describe('PresetsPage', () => {
 
     const screen = await renderWithRouter(<PresetsPage />)
 
-    await expect.element(screen.getByText('No saved presets yet')).toBeVisible()
+    await expect
+      .element(screen.getByText('No saved workflows yet'))
+      .toBeVisible()
   })
 
   it('renders preset list when blueprints exist', async () => {
@@ -246,7 +245,7 @@ describe('PresetsPage', () => {
       .element(
         screen.getByRole('heading', {
           level: 1,
-          name: 'Configuration Presets',
+          name: 'Workflows',
         }),
       )
       .toBeVisible()
@@ -275,7 +274,7 @@ describe('PresetsPage', () => {
     await userEvent.keyboard('{Enter}')
 
     await expect
-      .element(screen.getByText('No presets match your search.'))
+      .element(screen.getByText('No workflows match your search.'))
       .toBeVisible()
   })
 
@@ -293,7 +292,7 @@ describe('PresetsPage', () => {
 
     const screen = await renderWithRouter(<PresetsPage />)
 
-    const loadButtons = screen.getByText('Use this Preset')
+    const loadButtons = screen.getByText('Use this Workflow')
     await expect.element(loadButtons.first()).toBeVisible()
   })
 })
@@ -325,6 +324,26 @@ describe('PresetsPage — Templates tab', () => {
     await expect
       .element(screen.getByText('European Forecast'))
       .not.toBeInTheDocument()
+  })
+
+  it('bookmarks a template so it also shows under Bookmarked', async () => {
+    useTemplateBookmarksStore.setState({ keys: [] })
+    useSourceAwareListHandler([...mockBlueprints, ...mockTemplates])
+
+    const screen = await renderWithRouter(<PresetsPage />)
+
+    await screen.getByRole('button', { name: 'Templates' }).click()
+    await expect.element(screen.getByText('Fast Map')).toBeVisible()
+    await screen.getByRole('button', { name: 'Bookmark', exact: true }).click()
+    await expect
+      .element(screen.getByRole('button', { name: 'Remove bookmark' }))
+      .toHaveAttribute('aria-pressed', 'true')
+
+    await screen.getByRole('button', { name: 'Bookmarked' }).click()
+    await expect.element(screen.getByText('Fast Map')).toBeVisible()
+    expect(useTemplateBookmarksStore.getState().keys).toEqual([
+      'local:plugin-test::Fast Map',
+    ])
   })
 
   it('does not leak templates into the All tab', async () => {
@@ -430,7 +449,7 @@ describe('PresetsPage — delete preset', () => {
     await screen.getByRole('button', { name: 'More options' }).click()
     await screen.getByText('Delete').click()
 
-    await expect.element(screen.getByText('Preset deleted')).toBeVisible()
+    await expect.element(screen.getByText('Workflow deleted')).toBeVisible()
     await expect
       .element(screen.getByText('European Forecast'))
       .not.toBeInTheDocument()

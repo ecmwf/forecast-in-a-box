@@ -22,16 +22,20 @@ Provides parsing, validation, and conversion for a small set of type expressions
   - country (string subtype)
   - bboxWSEN (bounding box: exactly four integers, west-south-east-north, obeying constraints)
   - geodomain (bounding box or region/country names; the frontend renders a map/region picker)
+- traits: extra validations mixed into any type via a ``{}`` suffix, e.g. ``int{positive}`` or
+  ``float{nonNegative, divisibleBy(3)}`` (see fiab_core.types.traits)
 """
 
 from fiab_core.types.definitions import *
 from fiab_core.types.exceptions import *
 from fiab_core.types.parser import *
+from fiab_core.types.traits import *
 
 __all__ = []
 import fiab_core.types.definitions as definitions
 import fiab_core.types.exceptions as exceptions
 import fiab_core.types.parser as parser
+import fiab_core.types.traits as traits
 
-for mod in (parser, definitions, exceptions):
+for mod in (parser, definitions, exceptions, traits):
     __all__.extend((attr for attr in dir(mod) if not attr.startswith("_")))

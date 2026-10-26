@@ -21,6 +21,10 @@ import {
   firstRunDefinition,
   useFirstRunLaunchContext,
 } from './tutorials/configure-first-run'
+import {
+  useWelcomeTourLaunchContext,
+  welcomeTourDefinition,
+} from './tutorials/welcome-tour'
 import type { TutorialDefinition, TutorialId } from './engine/types'
 
 export interface TutorialEntry<TLaunch = unknown> {
@@ -42,5 +46,9 @@ export const TUTORIALS: Record<TutorialId, TutorialEntry> = {
   'configure-first-run': defineTutorial({
     definition: firstRunDefinition,
     useLaunchContext: useFirstRunLaunchContext,
+  }),
+  'welcome-tour': defineTutorial({
+    definition: welcomeTourDefinition,
+    useLaunchContext: useWelcomeTourLaunchContext,
   }),
 }

@@ -20,6 +20,7 @@ import { useMemo, useState } from 'react'
 import {
   ChevronDown,
   ChevronRight,
+  Clock,
   List,
   ListTree,
   Loader2,
@@ -98,8 +99,9 @@ export function GeoLayerBrowser({
   const [search, setSearch] = useState('')
   const [slotFilter, setSlotFilter] = useState<SlotFilter>('all')
   const [selectedLevels, setSelectedLevels] = useState<Set<number>>(new Set())
-  // Flat by default — prefix grouping fragments mixed catalogs; opt in via the toggle.
+  // Always opens flat; grouping is the toggle's choice.
   const [grouped, setGrouped] = useState(false)
+  const [timeAwareOnly, setTimeAwareOnly] = useState(false)
   const query = search.trim().toLowerCase()
 
   // Per-panel selection browses one catalog at a time: "All" would
@@ -117,8 +119,13 @@ export function GeoLayerBrowser({
         : slotFilter)
 
   const filteredPairs = useMemo(
-    () => pairs.filter((pair) => pairMatchesSearch(pair, query)),
-    [pairs, query],
+    () =>
+      pairs.filter(
+        (pair) =>
+          pairMatchesSearch(pair, query) &&
+          (!timeAwareOnly || !pairIsStatic(pair)),
+      ),
+    [pairs, query, timeAwareOnly],
   )
   const partitioned = useMemo(
     () => groupPairs(filteredPairs, effectiveFilter),
@@ -148,7 +155,7 @@ export function GeoLayerBrowser({
             onClick={onCollapse}
             title={tExec('lens.collapseSidebar')}
             aria-label={tExec('lens.collapseSidebar')}
-            className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+            className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
           >
             <ChevronRight className="h-3.5 w-3.5" />
           </button>
@@ -157,12 +164,25 @@ export function GeoLayerBrowser({
           </P>
           <button
             type="button"
-            onClick={() => setGrouped((v) => !v)}
+            onClick={() => setTimeAwareOnly((v) => !v)}
+            aria-pressed={timeAwareOnly}
+            title={t('browser.timeAwareHint')}
+            aria-label={t('browser.timeAware')}
+            className={cn(
+              'ml-auto flex size-6 shrink-0 items-center justify-center rounded-md hover:bg-accent hover:text-foreground',
+              timeAwareOnly ? 'text-primary' : 'text-muted-foreground',
+            )}
+          >
+            <Clock className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setGrouped(!grouped)}
             aria-pressed={grouped}
             title={t('browser.groupToggle')}
             aria-label={t('browser.groupToggle')}
             className={cn(
-              'ml-auto rounded p-0.5 hover:bg-accent hover:text-foreground',
+              'flex size-6 shrink-0 items-center justify-center rounded-md hover:bg-accent hover:text-foreground',
               grouped ? 'text-foreground' : 'text-muted-foreground',
             )}
           >
@@ -229,7 +249,7 @@ export function GeoLayerBrowser({
                   onClick={() => toggleLevel(level)}
                   aria-pressed={active}
                   className={cn(
-                    'rounded border px-1.5 py-0.5 font-mono text-xs',
+                    'rounded-md border px-1.5 py-0.5 font-mono text-xs',
                     active
                       ? 'border-primary bg-primary text-primary-foreground'
                       : 'border-border hover:bg-accent',
@@ -258,6 +278,7 @@ export function GeoLayerBrowser({
             slotFilter={effectiveFilter}
             selectedLevels={selectedLevels}
             grouped={grouped}
+            timeAwareOnly={timeAwareOnly}
           />
         ) : selection.linkMode === 'linked' ? (
           <LinkedSections
@@ -284,6 +305,7 @@ export function GeoLayerBrowser({
               slotFilter={effectiveFilter}
               selectedLevels={selectedLevels}
               grouped={grouped}
+              timeAwareOnly={timeAwareOnly}
             />
             {hasB && (
               <UnlinkedSourceSection
@@ -294,6 +316,7 @@ export function GeoLayerBrowser({
                 slotFilter={effectiveFilter}
                 selectedLevels={selectedLevels}
                 grouped={grouped}
+                timeAwareOnly={timeAwareOnly}
               />
             )}
           </>
@@ -483,7 +506,7 @@ function PairGroupRow({
         </div>
         <span className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
           {activeCount > 0 && (
-            <span className="rounded bg-primary/10 px-1 font-mono text-primary">
+            <span className="rounded-md bg-primary/10 px-1 font-mono text-primary">
               {activeCount}
             </span>
           )}
@@ -537,7 +560,7 @@ function PairRow({
       data-source-slots={`${pair.perSource.a ? 'a' : ''}${pair.perSource.b ? 'b' : ''}`}
       data-time-aware={pairIsStatic(pair) ? undefined : ''}
       className={cn(
-        'flex w-full items-center gap-2 rounded text-left transition-colors hover:bg-accent',
+        'flex w-full items-center gap-2 rounded-md text-left transition-colors hover:bg-accent',
         compact ? 'px-1.5 py-1' : 'px-2 py-1.5',
         active && 'bg-primary/10 hover:bg-primary/15',
       )}
@@ -577,7 +600,7 @@ function PairRow({
                 : t('link.notAvailableIn', { slot: slot.toUpperCase() })
             }
             className={cn(
-              'flex h-4 w-4 items-center justify-center rounded font-mono text-[10px] font-bold',
+              'flex h-4 w-4 items-center justify-center rounded-md font-mono text-[10px] font-bold',
               chipPair.perSource[slot]
                 ? SLOT_CHIP_CLASS[slot]
                 : 'border border-dashed border-border text-muted-foreground/60',
@@ -603,6 +626,7 @@ function UnlinkedSourceSection({
   slotFilter,
   selectedLevels,
   grouped,
+  timeAwareOnly,
 }: {
   slot: SourceSlot
   source: LensSource
@@ -611,6 +635,7 @@ function UnlinkedSourceSection({
   slotFilter: SlotFilter
   selectedLevels: ReadonlySet<number>
   grouped: boolean
+  timeAwareOnly: boolean
 }) {
   const { t } = useTranslation('visualise')
   const { t: tExec } = useTranslation('executions')
@@ -619,20 +644,27 @@ function UnlinkedSourceSection({
     if (slotFilter !== slot) return null
   }
 
-  const groups = source.groups.filter(
-    (g) =>
-      !query ||
-      g.title.toLowerCase().includes(query) ||
-      (g.subtitle?.toLowerCase().includes(query) ?? false) ||
-      g.entries.some((e) => e.layer.name.toLowerCase().includes(query)),
-  )
+  const groups = source.groups
+    .map((g) =>
+      timeAwareOnly
+        ? { ...g, entries: g.entries.filter((e) => layerIsTimeAware(e.layer)) }
+        : g,
+    )
+    .filter(
+      (g) =>
+        g.entries.length > 0 &&
+        (!query ||
+          g.title.toLowerCase().includes(query) ||
+          (g.subtitle?.toLowerCase().includes(query) ?? false) ||
+          g.entries.some((e) => e.layer.name.toLowerCase().includes(query))),
+    )
 
   return (
     <section>
       <SectionHeading>
         <span
           className={cn(
-            'mr-1.5 inline-flex h-4 w-4 items-center justify-center rounded font-mono text-[10px] font-bold',
+            'mr-1.5 inline-flex h-4 w-4 items-center justify-center rounded-md font-mono text-[10px] font-bold',
             SLOT_CHIP_CLASS[slot],
           )}
         >
@@ -669,7 +701,7 @@ function UnlinkedSourceSection({
                   data-source-slots={slot}
                   data-time-aware={layerIsTimeAware(layer) ? '' : undefined}
                   className={cn(
-                    'flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm hover:bg-accent',
+                    'flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm hover:bg-accent',
                     active && 'bg-primary/10',
                   )}
                 >
@@ -785,7 +817,7 @@ function TitlePrefixGroup({
         </P>
         <span className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
           {activeCount > 0 && (
-            <span className="rounded bg-primary/10 px-1 font-mono text-primary">
+            <span className="rounded-md bg-primary/10 px-1 font-mono text-primary">
               {activeCount}
             </span>
           )}

@@ -21,7 +21,7 @@ from unittest.mock import patch
 
 import pytest
 
-from forecastbox.domain.artifact.manager import ArtifactManager, _refresh_catalog_task, submit_refresh_catalog
+from forecastbox.domain.artifact.manager import ArtifactManager, refresh_catalog, submit_refresh_catalog
 
 
 @pytest.fixture(autouse=True)
@@ -31,10 +31,10 @@ def _reset_artifact_manager() -> Generator[None, None, None]:
     ArtifactManager.refresh_error = None
 
 
-def test_refresh_catalog_task_reraises_and_retains_refresh_error() -> None:
+def testrefresh_catalog_reraises_and_retains_refresh_error() -> None:
     with patch("forecastbox.domain.artifact.manager.get_artifacts_catalog", side_effect=RuntimeError("catalog boom")):
         with pytest.raises(RuntimeError, match="catalog boom"):
-            _refresh_catalog_task()
+            refresh_catalog()
     assert ArtifactManager.refresh_error is not None
     assert "catalog boom" in ArtifactManager.refresh_error
 

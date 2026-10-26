@@ -30,6 +30,8 @@ export function CompareSlotTag({
   side = 'left',
   loading = false,
   timeLabel = null,
+  runLabel = null,
+  submittedAt = null,
 }: {
   slot: SourceSlot
   label: string
@@ -38,6 +40,10 @@ export function CompareSlotTag({
   loading?: boolean
   /** Valid time this side currently displays. */
   timeLabel?: string | null
+  /** Model run in effect, shown muted after the valid time. */
+  runLabel?: string | null
+  /** Run submission time, shown after the name — not a forecast time. */
+  submittedAt?: string | null
 }) {
   const { t } = useTranslation('visualise')
   return (
@@ -57,6 +63,14 @@ export function CompareSlotTag({
           {timeLabel}
         </span>
       )}
+      {runLabel && (
+        <span
+          className="shrink-0 font-mono text-[10px] text-muted-foreground/70 tabular-nums"
+          title={t('slotTag.runTitle')}
+        >
+          {runLabel}
+        </span>
+      )}
       {loading && (
         <Loader2
           role="status"
@@ -67,6 +81,14 @@ export function CompareSlotTag({
       <span className="truncate text-muted-foreground" title={label}>
         {label}
       </span>
+      {submittedAt && (
+        <span
+          className="shrink-0 text-muted-foreground/70"
+          title={t('slotTag.submittedTitle')}
+        >
+          {t('slotTag.submitted', { time: submittedAt })}
+        </span>
+      )}
     </div>
   )
 }

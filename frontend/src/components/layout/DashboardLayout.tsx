@@ -18,8 +18,6 @@ import { useState } from 'react'
 import { AppShell } from './AppShell'
 import type { ReactNode } from 'react'
 import { NotificationBanner } from '@/components/common/NotificationBanner'
-import { cn } from '@/lib/utils'
-import { useUiStore } from '@/stores/uiStore'
 
 interface DashboardLayoutProps {
   children: ReactNode
@@ -41,7 +39,6 @@ export function DashboardLayout({
   notificationLinkHref,
 }: DashboardLayoutProps) {
   const [showNotification, setShowNotification] = useState(true)
-  const dashboardVariant = useUiStore((state) => state.dashboardVariant)
 
   const notificationBanner =
     notificationMessage && showNotification ? (
@@ -59,14 +56,7 @@ export function DashboardLayout({
       useAuthenticatedHeader
       notificationBanner={notificationBanner}
     >
-      <div
-        className={cn(
-          'min-h-full min-w-0 overflow-x-hidden',
-          dashboardVariant === 'modern' && 'bg-muted/50',
-        )}
-      >
-        {children}
-      </div>
+      <div className="min-h-full min-w-0 overflow-x-hidden">{children}</div>
     </AppShell>
   )
 }

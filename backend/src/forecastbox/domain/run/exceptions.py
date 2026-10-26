@@ -22,6 +22,18 @@ class RunAccessDenied(Exception):
     """Raised when the actor lacks permission to read or mutate a Run."""
 
 
+class RunNotStoppable(Exception):
+    """Raised when a stop is requested for a Run whose status does not allow it."""
+
+
+class RunNotDeletable(Exception):
+    """Raised when a delete is requested for a Run that has not reached a terminal status."""
+
+
+class RunConcurrencyIssue(Exception):
+    """Raised when a Run keeps being modified concurrently and the operation gave up on it."""
+
+
 class CompilationDetailNotFound(Exception):
     """Raised when no cached CompilationDetail exists for the given run."""
 

@@ -10,6 +10,7 @@
 
 import { FileDown } from 'lucide-react'
 import { downloadAction } from './actions/download'
+import { canonicalMime } from './mime'
 import type { OutputAdapter } from './types'
 
 const adapters = new Map<string, OutputAdapter>()
@@ -52,7 +53,10 @@ export function registerOutputAdapter(adapter: OutputAdapter): void {
 
 /** Resolve the adapter for a MIME, falling back to GENERIC_ADAPTER. */
 export function resolveAdapter(mime: string): OutputAdapter {
-  return adapters.get(mime) ?? GENERIC_ADAPTER
+  // Extra mime parameters don't change the format.
+  return (
+    adapters.get(mime) ?? adapters.get(canonicalMime(mime)) ?? GENERIC_ADAPTER
+  )
 }
 
 /** Test-only: clear the registry so tests can self-register fixtures. */

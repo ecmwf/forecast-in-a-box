@@ -12,6 +12,8 @@ import { describe, expect, it } from 'vitest'
 import type { MlModelOverview } from '@/api/types/artifacts.types'
 import {
   MlModelOverviewSchema,
+  artifactIdToWire,
+  artifactLabels,
   toArtifactInfo,
 } from '@/api/types/artifacts.types'
 
@@ -57,5 +59,44 @@ describe('toArtifactInfo', () => {
       tags: { ensemble: null },
     }
     expect(toArtifactInfo(overview).tags).toEqual({ ensemble: null })
+  })
+})
+
+describe('artifactIdToWire', () => {
+  it('joins store and local id like CompositeArtifactId.to_str', () => {
+    expect(
+      artifactIdToWire({
+        artifact_store_id: 'ecmwf',
+        artifact_local_id: 'aifs-x',
+      }),
+    ).toBe('ecmwf:aifs-x')
+  })
+})
+
+describe('artifactLabels', () => {
+  const overview = (localId: string, name: string) =>
+    toArtifactInfo({
+      ...baseOverview,
+      composite_id: { artifact_store_id: 'ecmwf', artifact_local_id: localId },
+      display_name: name,
+    })
+
+  it('uses the display name when it is unique', () => {
+    expect(artifactLabels([overview('o48', 'AIFS Global o48')])).toEqual(
+      new Map([['ecmwf:o48', 'AIFS Global o48']]),
+    )
+  })
+
+  it('appends the local id to display names that collide', () => {
+    const labels = artifactLabels([
+      overview('crps_w_sdpa', 'AIFS ENS CRPS 1.0'),
+      overview('crps_w_flash_attn', 'AIFS ENS CRPS 1.0'),
+    ])
+    expect(labels.get('ecmwf:crps_w_sdpa')).toBe(
+      'AIFS ENS CRPS 1.0 · crps_w_sdpa',
+    )
+    expect(labels.get('ecmwf:crps_w_flash_attn')).toBe(
+      'AIFS ENS CRPS 1.0 · crps_w_flash_attn',
+    )
   })
 })

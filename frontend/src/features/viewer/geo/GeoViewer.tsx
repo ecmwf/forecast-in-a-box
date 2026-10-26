@@ -39,38 +39,74 @@ import { fromLonLat } from 'ol/proj'
 import { useLensSource } from '../hooks/useLensSource'
 import { AUTOFIT_KEY, createViewerView } from '../hooks/useOlMapBase'
 import { formatStep } from '../format'
-import { BASEMAPS, DEFAULT_BASEMAP_ID, SKINNYWMS_BASEMAP } from '../ol-layers'
 import {
+  BASEMAPS,
+  DEFAULT_BASEMAP_ID,
+  OUTLINE_BASEMAP,
+  SKINNYWMS_BASEMAP,
+  basemapFitsProjection,
+} from '../ol-layers'
+import { DEFAULT_PROJECTION_ID } from '../projection-ids'
+import {
+  bandMetres,
+  bandResolution,
+  carryCamera,
+  getViewerProjection,
+  viewerProjectionOf,
+} from '../projections'
+import { globeBasemapSpec } from '../globe/globe-layer-specs'
+import { LazyGlobeView } from '../globe/LazyGlobeView'
+import { globeStartCamera, useGlobeViewer } from '../globe/useGlobeViewer'
+import {
+  activeLayersBbox,
   isLensProxyUrl,
   rebaseLensUrl,
+  resolveStyle,
   skinnyWmsBasemap,
+  unionBbox,
 } from '../wms-capabilities'
+import { StartupStatusPill } from '../components/StartupStatusPill'
+import { beforeRunLayers, effectiveRuns, mergeEpochLayers } from './run-window'
 import { GeoPanelResizeStrip } from './GeoPanelResizeStrip'
 import { useGeoPanelWidths } from './useGeoPanelWidths'
 import { buildPairs } from './layer-pairing'
 import { useCompareSelection } from './useCompareSelection'
 import { useGetMapFailureLog } from './getmap-failures'
-import { GeoViewerSkeleton } from './GeoViewerSkeleton'
 import { GeoToolbar } from './GeoToolbar'
 import { GeoExportDialog } from './GeoExportDialog'
 import { AnnotationEditorDialog } from './AnnotationEditorDialog'
 import { useViewerAnnotations } from './useViewerAnnotations'
 import { useViewerUrlState } from './useViewerUrlState'
 import { useViewerExport } from './useViewerExport'
+import { useProjectionOptions } from './useProjectionOptions'
 import { useViewerTimeline } from './useViewerTimeline'
 import { downloadAnnotationsGeojson } from './annotations'
-import { useGeoShortcuts } from './useGeoShortcuts'
+import { useGeoShortcuts, useKeyBadges } from './useGeoShortcuts'
+import { panView, zoomView } from './map-nav'
 import { GeoTimeSlider } from './GeoTimeSlider'
 import { GeoActiveLayersPanel } from './GeoActiveLayersPanel'
 import { GeoLayerBrowser } from './GeoLayerBrowser'
 import { DualMapView } from './DualMapView'
 import { SingleMapView } from './SingleMapView'
+import type { TFunction } from 'i18next'
+import type {
+  Bbox,
+  LayerRequestSettings,
+  ParsedLayer,
+} from '../wms-capabilities'
 import type { GeoPanelSide } from './useGeoPanelWidths'
 import type { MapAnnotation } from './annotations'
 import type { ContextOverlay } from './overlays'
 import type View from 'ol/View'
+import type { FlatProjectionId } from '../projection-ids'
+import type { BboxAxisOrder } from '../projections'
 import type { SourceSlot } from './layer-pairing'
-import type { CompareMapSource, CompareMode, CompareModeOptions } from './types'
+import type {
+  CompareMapSource,
+  CompareMode,
+  CompareModeOptions,
+  FitBboxAction,
+} from './types'
 import type { MeasureMode } from '../hooks/useMeasure'
 import type { ViewerUrlState } from './view-url-state'
 import { CollapsedSidebarHandle } from '@/components/common/CollapsedSidebarHandle'
@@ -88,12 +124,52 @@ import {
 } from '@/components/ui/alert-dialog'
 import { P } from '@/components/base/typography'
 import { useMedia } from '@/hooks/useMedia'
+import {
+  stylePinKey,
+  styleScope,
+  useStylePinsStore,
+} from '@/stores/stylePinsStore'
+import { preloadOutlineData } from '@/lib/map/ol-outline'
+import { useUiStore } from '@/stores/uiStore'
 
 export interface GeoViewerSource {
   /** Stable source identity (basket entry ref) — annotations bind to it. */
   id: string
   baseUrl: string
   label: string
+  /** When the run was submitted ("14 Sep 06:23"); shown after the label. */
+  submittedAt?: string | null
+  /** External server's BBOX axis order; lens sources are always 'xy'. */
+  bboxAxisOrder?: BboxAxisOrder
+}
+
+/** Effect-dep key of a slot's dimension choices. */
+function runsKey(settings: ReadonlyMap<string, LayerRequestSettings>): string {
+  return [...settings]
+    .flatMap(([name, s]) =>
+      s.dims ? [`${name}=${JSON.stringify(s.dims)}`] : [],
+    )
+    .join(',')
+}
+
+/** Lens-proxy answers carry a meaning of their own (backend #712). */
+function lensProxyErrorText(
+  source: { error: string | null; errorStatus: number | null },
+  baseUrl: string,
+  t: TFunction<'visualise'>,
+): string | null {
+  if (!source.error) return null
+  if (!isLensProxyUrl(baseUrl)) return source.error
+  switch (source.errorStatus) {
+    case 500:
+      return t('lens.failed')
+    case 404:
+      return t('lens.gone')
+    case 400:
+      return t('lens.unproxyable')
+    default:
+      return source.error
+  }
 }
 
 export function GeoViewer({
@@ -131,26 +207,104 @@ export function GeoViewer({
   // Mount snapshot — restoration must not react to later URL rewrites.
   const initialViewRef = useRef(initialViewState ?? null)
 
-  // One View for the lifetime of the comparison: camera state survives
-  // mode switches and source swaps.
-  const viewRef = useRef<View | null>(null)
-  if (viewRef.current === null) {
-    viewRef.current = createViewerView()
+  // A globe restore needs hardware WebGL; otherwise the view starts flat.
+  const [globeStart] = useState(() => globeStartCamera(initialViewRef.current))
+  const startOnGlobe = globeStart !== null
+
+  // One View per flat projection (camera carried); kept while on the globe.
+  const [view, setView] = useState<View>(() => {
+    const restored = initialViewRef.current?.projection
+    const projection = getViewerProjection(
+      restored === 'globe' ? DEFAULT_PROJECTION_ID : restored,
+    )
+    const next = createViewerView(projection)
     const cam = initialViewRef.current?.camera
-    if (cam) {
-      viewRef.current.setCenter(fromLonLat([cam.lon, cam.lat]))
-      viewRef.current.setZoom(cam.zoom)
+    if (cam && !startOnGlobe) {
+      next.setCenter(fromLonLat([cam.lon, cam.lat], projection.code))
+      next.setZoom(cam.zoom)
       // A restored camera outranks the initial auto-fit.
-      viewRef.current.set(AUTOFIT_KEY, true, true)
+      next.set(AUTOFIT_KEY, true, true)
     }
-  }
+    return next
+  })
+  // Warm the Outline basemap data so a projection switch is instant.
+  useEffect(() => preloadOutlineData(), [])
+  // Imperative users (pan, zoom, locate) read the live instance.
+  const viewRef = useRef(view)
+  viewRef.current = view
+  const projection = viewerProjectionOf(view)
+  const flatId = projection.id
+  const adoptFlatView = useCallback((next: View) => {
+    viewRef.current = next
+    setView(next)
+  }, [])
+  const changeFlatProjection = useCallback(
+    (id: FlatProjectionId) => {
+      const current = viewRef.current
+      const target = getViewerProjection(id)
+      if (current.getProjection().getCode() === target.code) return
+      const next = createViewerView(target)
+      carryCamera(current, next, target)
+      next.set(AUTOFIT_KEY, true, true)
+      adoptFlatView(next)
+    },
+    [adoptFlatView],
+  )
+
+  // Source focus: a slot views only that source (UI collapses to it); null compares both.
+  const [focusSlot, setFocusSlot] = useState<SourceSlot | null>(null)
+
+  // -------- 3D globe (flat <-> globe handoff) --------
+  const globe = useGlobeViewer({
+    viewRef,
+    adoptFlatView,
+    changeFlatProjection,
+    flatId,
+    initialProjection: initialViewRef.current?.projection,
+    initialCamera: globeStart,
+    hasB,
+    focusSlot,
+    mode,
+  })
+  const { projectionId, changeProjection } = globe
 
   // -------- Pairing + selection --------
   const pairing = useMemo(
     () => buildPairs(sourceA.groups, sourceB.groups),
     [sourceA.groups, sourceB.groups],
   )
-  const selection = useCompareSelection(pairing.pairs)
+  // Pinned default styles: seed newly activated layers (URL styles win).
+  const stylePins = useStylePinsStore((s) => s.pins)
+  const pinStyle = useStylePinsStore((s) => s.pin)
+  const unpinStyle = useStylePinsStore((s) => s.unpin)
+  const bBase = b?.baseUrl ?? null
+  const scopeFor = useCallback(
+    (slot: SourceSlot) => {
+      const base = slot === 'a' ? a.baseUrl : bBase
+      return base === null ? null : styleScope(base)
+    },
+    [a.baseUrl, bBase],
+  )
+  const defaultStyle = useCallback(
+    (slot: SourceSlot, layerName: string) => {
+      const scope = scopeFor(slot)
+      return scope ? (stylePins[stylePinKey(scope, layerName)] ?? null) : null
+    },
+    [scopeFor, stylePins],
+  )
+  const selection = useCompareSelection(pairing.pairs, { defaultStyle })
+  const stylePinControls = useMemo(
+    () => ({
+      pinnedFor: defaultStyle,
+      setPin: (slot: SourceSlot, layerName: string, style: string | null) => {
+        const scope = scopeFor(slot)
+        if (!scope) return
+        if (style) pinStyle(scope, layerName, style)
+        else unpinStyle(scope, layerName)
+      },
+    }),
+    [defaultStyle, scopeFor, pinStyle, unpinStyle],
+  )
 
   const bothReady = !sourceA.loadingLayers && !sourceB.loadingLayers
   // Solo always has zero overlap — never auto-unlink there, it would
@@ -180,6 +334,8 @@ export function GeoViewer({
 
   const activeOrderA = selection.activeOrderFor('a')
   const activeOrderB = selection.activeOrderFor('b')
+  const settingsA = selection.settingsFor('a')
+  const settingsB = selection.settingsFor('b')
 
   // Opacity hierarchy: global × per-source × per-layer (per-layer lives in
   // the selection; the product of the first two feeds the map stacks).
@@ -226,13 +382,16 @@ export function GeoViewer({
   // source or its advertised content changes (a new model run). Layer
   // identity is content-tracked (TanStack structural sharing), so a
   // no-change background refetch keeps the marks.
+  // A run change serves different instants — same rule.
+  const runsKeyA = useMemo(() => runsKey(settingsA), [settingsA])
+  const runsKeyB = useMemo(() => runsKey(settingsB), [settingsB])
   useEffect(
     () => clearFailures('a'),
-    [clearFailures, a.baseUrl, sourceA.layers],
+    [clearFailures, a.baseUrl, sourceA.layers, runsKeyA],
   )
   useEffect(
     () => clearFailures('b'),
-    [clearFailures, b?.baseUrl, sourceB.layers],
+    [clearFailures, b?.baseUrl, sourceB.layers, runsKeyB],
   )
   // A deactivated layer's marks would otherwise linger until the TTL,
   // painting failures the display no longer contains.
@@ -246,6 +405,29 @@ export function GeoViewer({
     [retainFailureLayers, activeOrderB],
   )
   // -------- Valid-time alignment + link policy --------
+  // Steps before a pinned run are known failures.
+  const timelineFailures = useMemo(
+    () => ({
+      a: mergeEpochLayers(
+        failures.failedLayers.a,
+        beforeRunLayers(sourceA.layers, activeOrderA, settingsA),
+      ),
+      b: mergeEpochLayers(
+        failures.failedLayers.b,
+        beforeRunLayers(sourceB.layers, activeOrderB, settingsB),
+      ),
+    }),
+    [
+      failures.failedLayers,
+      sourceA.layers,
+      sourceB.layers,
+      activeOrderA,
+      activeOrderB,
+      settingsA,
+      settingsB,
+    ],
+  )
+
   const {
     timeIndexA,
     timeIndexB,
@@ -280,13 +462,18 @@ export function GeoViewer({
     activeOrderA,
     activeOrderB,
     initial: initialViewRef.current,
-    failedLayers: failures.failedLayers,
+    failedLayers: timelineFailures,
   })
 
   // -------- Fit plumbing (map components register their fit action) ----
   const [fitAction, setFitAction] = useState<(() => void) | null>(null)
   const onRegisterFit = useCallback(
     (fit: (() => void) | null) => setFitAction(() => fit),
+    [],
+  )
+  const [fitBboxAction, setFitBboxAction] = useState<FitBboxAction | null>(null)
+  const onRegisterFitBbox = useCallback(
+    (fit: FitBboxAction | null) => setFitBboxAction(() => fit),
     [],
   )
 
@@ -302,7 +489,11 @@ export function GeoViewer({
     // single-map modes); dual panels fall back per-side when B lacks one.
     const hasSkinny =
       skinnyWmsBasemap(sourceA.decorationLayers).background !== null
-    return [...BASEMAPS, ...(hasSkinny ? [SKINNYWMS_BASEMAP] : [])]
+    return [
+      ...BASEMAPS,
+      OUTLINE_BASEMAP,
+      ...(hasSkinny ? [SKINNYWMS_BASEMAP] : []),
+    ]
   }, [sourceA.decorationLayers])
   // Snap back when a swap drops the option — after A settles (restored SkinnyWMS).
   useEffect(() => {
@@ -311,12 +502,38 @@ export function GeoViewer({
       setBasemapId(DEFAULT_BASEMAP_ID)
     }
   }, [availableBasemaps, basemapId, sourceA.loadingLayers])
+  // Where the choice cannot be drawn the Outline stands in; the choice is kept.
+  const onGlobe = projectionId === 'globe'
+  const effectiveBasemapId = useMemo(() => {
+    const opt = availableBasemaps.find((o) => o.id === basemapId)
+    // Every offered basemap draws on the globe.
+    const fits = !opt || onGlobe || basemapFitsProjection(opt, projection)
+    return fits ? basemapId : OUTLINE_BASEMAP.id
+  }, [availableBasemaps, basemapId, projection, onGlobe])
+  // Under a handoff the flat map matches the globe's first frame: Carto only from Mercator.
+  const flatBasemapId =
+    globe.phase === 'flat' || flatId === 'merc'
+      ? effectiveBasemapId
+      : OUTLINE_BASEMAP.id
+
+  const { projectionOptions, cycleProjection } = useProjectionOptions({
+    sourceA,
+    sourceB,
+    aLabel: a.label,
+    bLabel: b?.label ?? null,
+    globe,
+    focusSlot,
+    mode,
+    projectionId,
+    changeProjection,
+  })
 
   // -------- URL view-state restore + report --------
   useViewerUrlState({
     initial: initialViewRef.current,
     onViewStateChange,
-    viewRef,
+    view,
+    projectionId,
     selection,
     pairing,
     sourceA,
@@ -328,13 +545,16 @@ export function GeoViewer({
     timeLinkMode,
     offsetMs,
     basemapId,
+    globeCamera: globe.phase === 'globe' ? globe.camera : null,
   })
 
   // Time-step prefetch (default off — bandwidth-heavy).
   const [preloadTimeSteps, setPreloadTimeSteps] = useState(false)
 
   // Pinned legends, keyed `${slot}:${layerName}`.
-  const [pinnedLegends, setPinnedLegends] = useState<Set<string>>(new Set())
+  const [pinnedLegends, setPinnedLegends] = useState<Set<string>>(
+    () => new Set(),
+  )
   const togglePinLegend = useCallback((slot: SourceSlot, name: string) => {
     const key = `${slot}:${name}`
     setPinnedLegends((prev) => {
@@ -353,7 +573,10 @@ export function GeoViewer({
       const base = slot === 'a' ? a.baseUrl : bBaseUrl
       const activeOrder = slot === 'a' ? activeOrderA : activeOrderB
       const layer = source.layers.find((l) => l.name === name)
-      const legendUrl = layer?.styles[0]?.legendUrl
+      const legendUrl = layer
+        ? resolveStyle(layer, selection.settingsFor(slot).get(name)?.style)
+            ?.legendUrl
+        : undefined
       // Hide pins whose layer is no longer selected — restored if re-added.
       if (base === null || !layer || !legendUrl || !activeOrder.includes(name))
         return []
@@ -375,6 +598,8 @@ export function GeoViewer({
     hasB,
     activeOrderA,
     activeOrderB,
+    settingsA,
+    settingsB,
   ])
   const unpinLegend = useCallback(
     (key: string) =>
@@ -385,9 +610,6 @@ export function GeoViewer({
       }),
     [],
   )
-
-  // Source focus: a slot views only that source (UI collapses to it); null compares both.
-  const [focusSlot, setFocusSlot] = useState<SourceSlot | null>(null)
 
   // Swap: slot-keyed state follows the content. Replacement: pair-tuned
   // time linking resets (re-adding the SAME B keeps its settings).
@@ -534,6 +756,12 @@ export function GeoViewer({
     },
     [disarmAnnotate],
   )
+  // Map-click tools have no globe counterpart.
+  useEffect(() => {
+    if (globe.phase === 'flat') return
+    disarmAnnotate()
+    setMeasureMode('none')
+  }, [globe.phase, disarmAnnotate])
   // Sidebar attribution is derived, so a swap flips the shown letters.
   const annotationAttribution = useCallback(
     (ann: MapAnnotation) => {
@@ -550,31 +778,46 @@ export function GeoViewer({
 
   // Immediate, extent-constrained nudge — the WASD rAF loop calls this
   // each frame, so per-frame moves compose into one smooth pan.
-  const onPan = useCallback((dx: number, dy: number) => {
-    const view = viewRef.current
-    const center = view?.getCenter()
-    const resolution = view?.getResolution()
-    if (!view || !center || resolution === undefined) return
-    const target: [number, number] = [
-      center[0] + dx * resolution,
-      center[1] - dy * resolution,
-    ]
-    view.setCenter(view.getConstrainedCenter(target, resolution) ?? target)
-  }, [])
+  const {
+    pan: panGlobe,
+    zoomBy: zoomGlobe,
+    zoomToResolution: zoomGlobeToResolution,
+  } = globe
+  const onPan = useCallback(
+    (dx: number, dy: number) => {
+      if (!panGlobe(dx, dy)) panView(viewRef.current, dx, dy)
+    },
+    [panGlobe],
+  )
+  const onZoom = useCallback(
+    (delta: number) => {
+      if (!zoomGlobe(delta)) zoomView(viewRef.current, delta)
+    },
+    [zoomGlobe],
+  )
 
-  // Live resolution drives the panel's scale-band (zoom-range) hints.
-  const [viewResolution, setViewResolution] = useState<number | null>(null)
+  // Live ground resolution (m/px) drives the panel's scale-band hints.
+  const [flatResolution, setFlatResolution] = useState<number | null>(null)
+  const globeSettled = globe.phase === 'globe'
   useEffect(() => {
-    const view = viewRef.current
-    if (!view) return
-    const update = () => setViewResolution(view.getResolution() ?? null)
+    if (globeSettled) return
+    const update = () => setFlatResolution(bandMetres(view))
     update()
     view.on('change:resolution', update)
     return () => view.un('change:resolution', update)
-  }, [])
-  const onZoomToResolution = useCallback((res: number) => {
-    viewRef.current?.animate({ resolution: res, duration: 350 })
-  }, [])
+  }, [view, globeSettled])
+  const viewResolution = globe.resolution ?? flatResolution
+  const onZoomToResolution = useCallback(
+    (res: number) => {
+      if (zoomGlobeToResolution(res)) return
+      const current = viewRef.current
+      current.animate({
+        resolution: bandResolution(current, res),
+        duration: 350,
+      })
+    },
+    [zoomGlobeToResolution],
+  )
 
   // -------- Export (map components register their capture action) ------
   const {
@@ -592,11 +835,15 @@ export function GeoViewer({
     sourceB,
     activeOrderA,
     activeOrderB,
+    settingsA,
+    settingsB,
     annotations,
     slotIds: { a: a.id, b: bId },
   })
 
+  const keyBadges = useKeyBadges()
   useGeoShortcuts({
+    onProjectionCycle: cycleProjection,
     // Any open → collapse both; else restore (one sheet only on phones).
     onToggleSidebars: () => {
       if (!(leftCollapsed && rightCollapsed)) return closeSheets()
@@ -611,7 +858,11 @@ export function GeoViewer({
     onCopy: () => copyView(null),
     onExport: () => setExportOpen(true),
     onHelp,
-    onAnnotate: toggleAnnotate,
+    onToggleBadges: keyBadges.toggle,
+    // Map-click tools have no globe counterpart.
+    onAnnotate: () => {
+      if (globe.phase === 'flat') toggleAnnotate()
+    },
     onAnnotateDisarm: {
       enabled:
         sheetOpen ||
@@ -625,6 +876,7 @@ export function GeoViewer({
       },
     },
     onPan,
+    onZoom,
   })
 
   // -------- User-uploaded GeoJSON context overlays --------
@@ -652,16 +904,57 @@ export function GeoViewer({
     [],
   )
 
+  const runLabelFor = (
+    layers: ReadonlyArray<ParsedLayer>,
+    order: ReadonlyArray<string>,
+    settings: ReadonlyMap<string, LayerRequestSettings>,
+  ): string | null => {
+    const runs = effectiveRuns(layers, order, settings)
+    if (runs.length === 0) return null
+    return runs.length === 1
+      ? t('slotTag.run', { time: formatStep(runs[0]) })
+      : t('slotTag.runCount', { count: runs.length })
+  }
+
+  // Fit target: active layers of both sides, else A's service coverage.
+  const fitBbox = useMemo(() => {
+    const sideBbox = (
+      layers: ReadonlyArray<ParsedLayer>,
+      order: ReadonlyArray<string>,
+      service: Bbox | null,
+    ) =>
+      order.length > 0 ? (activeLayersBbox(layers, order) ?? service) : null
+    return (
+      unionBbox(
+        sideBbox(sourceA.layers, activeOrderA, sourceA.bbox),
+        sideBbox(sourceB.layers, activeOrderB, sourceB.bbox),
+      ) ?? sourceA.bbox
+    )
+  }, [
+    sourceA.layers,
+    sourceA.bbox,
+    sourceB.layers,
+    sourceB.bbox,
+    activeOrderA,
+    activeOrderB,
+  ])
+
   // -------- Source view-model for the map components --------
   const mapSourceA: CompareMapSource = {
     slot: 'a',
     id: a.id,
     baseUrl: a.baseUrl,
     label: a.label,
+    submittedAt: a.submittedAt ?? null,
     layers: sourceA.layers,
     decorationLayers: sourceA.decorationLayers,
     activeOrder: activeOrderA,
     layerOpacities: selection.opacitiesFor('a'),
+    layerSettings: selection.settingsFor('a'),
+    bboxAxisOrder: isLensProxyUrl(a.baseUrl)
+      ? 'xy'
+      : (a.bboxAxisOrder ?? 'epsg'),
+    maxImageSize: sourceA.maxImageSize,
     resolveTime: resolveTimeA,
     onLoadResult: onLoadResultA,
     timeSteps: rawStepsA,
@@ -672,8 +965,9 @@ export function GeoViewer({
       resolvedA.epoch !== null
         ? formatStep(new Date(resolvedA.epoch).toISOString())
         : null,
+    runLabel: runLabelFor(sourceA.layers, activeOrderA, settingsA),
     masterOpacity: globalOpacity * sourceOpacity.a,
-    bbox: sourceA.bbox,
+    bbox: fitBbox,
   }
   const mapSourceB: CompareMapSource | null = b
     ? {
@@ -681,10 +975,16 @@ export function GeoViewer({
         id: b.id,
         baseUrl: b.baseUrl,
         label: b.label,
+        submittedAt: b.submittedAt ?? null,
         layers: sourceB.layers,
         decorationLayers: sourceB.decorationLayers,
         activeOrder: activeOrderB,
         layerOpacities: selection.opacitiesFor('b'),
+        layerSettings: selection.settingsFor('b'),
+        bboxAxisOrder: isLensProxyUrl(b.baseUrl)
+          ? 'xy'
+          : (b.bboxAxisOrder ?? 'epsg'),
+        maxImageSize: sourceB.maxImageSize,
         resolveTime: resolveTimeB,
         onLoadResult: onLoadResultB,
         timeSteps: rawStepsB,
@@ -695,10 +995,26 @@ export function GeoViewer({
           resolvedB.epoch !== null
             ? formatStep(new Date(resolvedB.epoch).toISOString())
             : null,
+        runLabel: runLabelFor(sourceB.layers, activeOrderB, settingsB),
         masterOpacity: globalOpacity * sourceOpacity.b,
-        bbox: sourceB.bbox,
+        bbox: fitBbox,
       }
     : null
+
+  // -------- Globe wiring --------
+  const resolvedTheme = useUiStore((s) => s.resolvedTheme)
+  // The choice itself, not the flat fallback: a warm globe must not switch style mid-bend.
+  const globeBasemap = useMemo(
+    () =>
+      globeBasemapSpec(
+        availableBasemaps.find((o) => o.id === basemapId),
+        resolvedTheme,
+        basemapOpacity,
+      ),
+    [availableBasemaps, basemapId, resolvedTheme, basemapOpacity],
+  )
+  const globeOffered =
+    projectionOptions.find((p) => p.id === 'globe')?.blockedBy === null
 
   // -------- Capabilities load/error surface --------
   // Only A gates the whole viewer; a failing/loading B must not blank a
@@ -706,7 +1022,9 @@ export function GeoViewer({
   if (sourceA.error) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 rounded-md border border-border bg-card p-6 text-center text-sm">
-        <P className="max-w-md text-danger">{sourceA.error}</P>
+        <P className="max-w-md text-danger">
+          {lensProxyErrorText(sourceA, a.baseUrl, t)}
+        </P>
         {!isLensProxyUrl(a.baseUrl) && (
           <P className="text-xs text-muted-foreground">{t('panel.corsHint')}</P>
         )}
@@ -725,9 +1043,27 @@ export function GeoViewer({
       </div>
     )
   }
-  if (sourceA.loadingLayers) {
-    return <GeoViewerSkeleton label={tExec('lens.loadingLayers')} />
-  }
+  // While A's catalogue loads, render the real shell with a status pill.
+  const startup = sourceA.loadingLayers
+    ? isLensProxyUrl(a.baseUrl)
+      ? {
+          steps: [
+            { id: 'server', label: t('startup.server') },
+            { id: 'files', label: t('startup.files') },
+            { id: 'catalogue', label: t('startup.catalogue') },
+          ],
+          // Capabilities failing = SkinnyWMS still booting / reading GRIBs.
+          activeIndex: sourceA.retrying ? 1 : 2,
+          hint: t('startup.firstStartHint'),
+        }
+      : {
+          steps: [
+            { id: 'connect', label: t('startup.connect') },
+            { id: 'catalogue', label: t('startup.catalogue') },
+          ],
+          activeIndex: sourceA.retrying ? 0 : 1,
+        }
+    : null
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-2">
@@ -735,7 +1071,9 @@ export function GeoViewer({
         <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm">
           <span className="min-w-0 truncate">
             <span className="font-medium">{t('panel.bError')}</span>{' '}
-            <span className="text-muted-foreground">{sourceB.error}</span>
+            <span className="text-muted-foreground">
+              {lensProxyErrorText(sourceB, b.baseUrl, t)}
+            </span>
           </span>
           <span className="flex shrink-0 items-center gap-1.5">
             <Button
@@ -770,6 +1108,7 @@ export function GeoViewer({
         onLinkModeChange={(next) => selection.setLinkMode(next)}
         linkDisabled={zeroOverlap}
         onFit={fitAction}
+        showKeys={keyBadges.shown}
         options={modeOptions}
         onOptionsChange={(patch) =>
           setModeOptions((prev) => ({ ...prev, ...patch }))
@@ -785,9 +1124,15 @@ export function GeoViewer({
         onExport={() => setExportOpen(true)}
         onCopy={copyView}
         copySlots={hasB}
-        basemapId={basemapId}
+        basemapId={effectiveBasemapId}
         onBasemapChange={setBasemapId}
         availableBasemaps={availableBasemaps}
+        projection={projection}
+        projectionId={projectionId}
+        projections={projectionOptions}
+        onProjectionChange={changeProjection}
+        globeActive={globe.phase !== 'flat'}
+        onGlobeIntent={globeOffered ? globe.warmUp : undefined}
         basemapOpacity={basemapOpacity}
         onBasemapOpacityChange={setBasemapOpacity}
       />
@@ -893,14 +1238,30 @@ export function GeoViewer({
               available: timeline.epochs.length > 1,
             }}
             pins={{ pinned: pinnedLegends, toggle: togglePinLegend }}
+            stylePins={stylePinControls}
             sources={{
-              a: { label: a.label, baseUrl: a.baseUrl, lens: sourceA },
-              b: b
-                ? { label: b.label, baseUrl: b.baseUrl, lens: sourceB }
-                : null,
+              a: {
+                label: a.label,
+                baseUrl: a.baseUrl,
+                lens: sourceA,
+                resolveTime: resolveTimeA,
+                bboxAxisOrder: mapSourceA.bboxAxisOrder,
+              },
+              b:
+                b && mapSourceB
+                  ? {
+                      label: b.label,
+                      baseUrl: b.baseUrl,
+                      lens: sourceB,
+                      resolveTime: resolveTimeB,
+                      bboxAxisOrder: mapSourceB.bboxAxisOrder,
+                    }
+                  : null,
             }}
             resolution={viewResolution}
             onZoomToResolution={onZoomToResolution}
+            onZoomToBbox={fitBboxAction}
+            previewView={view}
             focusSlot={focusSlot}
             onCollapse={() => setLeftCollapsed(true)}
           />
@@ -915,12 +1276,47 @@ export function GeoViewer({
           />
         )}
         <div
-          className="min-h-0 min-w-0 flex-1"
+          ref={globe.mapAreaRef}
+          className="relative min-h-0 min-w-0 flex-1"
           {...tourAttr(TOUR.visualise.map)}
         >
-          {focusSlot === null && mode === 'side' && mapSourceB ? (
+          {startup && <StartupStatusPill {...startup} />}
+          {(globe.phase !== 'flat' || (globe.warm && globeOffered)) && (
+            <LazyGlobeView
+              layout={globe.panels === 2 ? 'side' : 'single'}
+              sources={
+                globe.panels === 2 && mapSourceB
+                  ? [mapSourceA, mapSourceB]
+                  : [focusSlot === 'b' && mapSourceB ? mapSourceB : mapSourceA]
+              }
+              camera={globe.camera}
+              visible={globe.overlayVisible}
+              active={globe.phase === 'globe'}
+              live={globe.phase !== 'flat'}
+              basemap={globeBasemap}
+              loupe={{
+                sizePx: modeOptions.loupeSizePx,
+                zoom: modeOptions.loupeZoom,
+                latched: modeOptions.loupeLatched,
+                mirror: modeOptions.loupeMirror,
+              }}
+              pinnedLegends={pinnedLegendItems}
+              onUnpinLegend={unpinLegend}
+              registerEngine={globe.registerEngine}
+              onFailure={globe.onFailure}
+              onContextLost={globe.onContextLost}
+              onBasemapFailed={globe.onBasemapFailed}
+              onRegisterFit={onRegisterFit}
+              onRegisterFitBbox={onRegisterFitBbox}
+              onZoom={zoomGlobe}
+              onRegisterCapture={onRegisterCapture}
+            />
+          )}
+          {globe.phase === 'globe' ? null : focusSlot === null &&
+            mode === 'side' &&
+            mapSourceB ? (
             <DualMapView
-              view={viewRef.current}
+              view={view}
               a={mapSourceA}
               b={mapSourceB}
               loupeMirror={modeOptions.loupeMirror}
@@ -939,14 +1335,15 @@ export function GeoViewer({
               onAnnotationCreate={onAnnotationCreate}
               onAnnotationEdit={onAnnotationEdit}
               onAnnotationMove={moveAnnotation}
-              basemapId={basemapId}
+              basemapId={flatBasemapId}
               basemapOpacity={basemapOpacity}
               onRegisterFit={onRegisterFit}
+              onRegisterFitBbox={onRegisterFitBbox}
               onRegisterCapture={onRegisterCapture}
             />
           ) : (
             <SingleMapView
-              view={viewRef.current}
+              view={view}
               a={mapSourceA}
               b={mapSourceB}
               // Focus masks the other source (via per-slot capture); export capture wins.
@@ -967,9 +1364,10 @@ export function GeoViewer({
               onAnnotationCreate={onAnnotationCreate}
               onAnnotationEdit={onAnnotationEdit}
               onAnnotationMove={moveAnnotation}
-              basemapId={basemapId}
+              basemapId={flatBasemapId}
               basemapOpacity={basemapOpacity}
               onRegisterFit={onRegisterFit}
+              onRegisterFitBbox={onRegisterFitBbox}
               onRegisterCapture={onRegisterCapture}
             />
           )}

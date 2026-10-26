@@ -58,8 +58,6 @@ export const STORAGE_KEYS = {
     shelf: 'fiab.fable.shelf',
     /** Legacy per-target draft map — read once for migration into `draft` */
     drafts: 'fiab.fable.drafts',
-    /** Pipeline (form-mode) sidebar open/closed flag */
-    pipelineSidebarOpen: 'fiab.fable.pipeline-sidebar-open',
   },
 
   /**
@@ -94,6 +92,8 @@ export const STORAGE_KEYS = {
   visualise: {
     /** Last-used A/B slot pair; seeds the slots on a bare /visualise visit */
     lastPair: 'fiab.visualise.last-pair',
+    /** Run attempt each lens was started for (keyed by lens instance id) */
+    lensOwners: 'fiab.visualise.lens-owners',
   },
 
   /**
@@ -116,6 +116,12 @@ export const STORAGE_KEYS = {
     onboarding: 'fiab.store.onboarding',
     /** Per-tutorial guided-tour outcomes */
     tutorials: 'fiab.store.tutorials',
+    /** Pinned default WMS style per server and layer */
+    stylePins: 'fiab.store.style-pins',
+    /** The user's ECMWF API key for entitled ecCharts layers */
+    ecmwfKey: 'fiab.store.ecmwf-key',
+    /** Bookmarked plugin templates (shown first on the Overview) */
+    templateBookmarks: 'fiab.store.template-bookmarks',
   },
 } as const
 
@@ -136,13 +142,16 @@ export const STORAGE_KEYS = {
  * ```
  */
 export const STORE_VERSIONS = {
-  ui: 6, // v6: Add application timezone preference
+  ui: 7, // v7: Removed layoutMode, dashboardVariant, panelShadow
   config: 1,
-  fableBuilder: 2, // v2: Removed configDisplayMode, added isMiniMapOpen
+  fableBuilder: 3, // v3: Removed mode, edgeStyle, autoLayout
   activity: 2, // v2: navigateTo rewritten for /executions→/execute, /dashboard→/overview
   comparison: 1,
   onboarding: 2, // v2: Removed pluginStepNeeded
   tutorials: 1,
+  stylePins: 1,
+  ecmwfKey: 1,
+  templateBookmarks: 1,
 } as const
 
 /**

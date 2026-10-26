@@ -14,24 +14,22 @@ from pathlib import Path
 
 import pytest
 from fiab_core.artifacts import AnemoiCheckpoint, ArtifactResolved, ArtifactsProvider, CommonArtifactMetadata, CompositeArtifactId
+from fiab_core.metkit import MetkitParamResolver
+from pymetkit.paramdb import ParamDB
 from qubed import Qube
 
-DUMMY_QUBE = Qube.from_json(
+paramdb = ParamDB()
+MetkitParamResolver.register_param_id_to_shortname(paramdb.param_id_to_shortname)
+MetkitParamResolver.register_shortname_to_param_id(paramdb.shortname_to_param_id)
+
+DUMMY_QUBE = Qube.from_datacube(
     {
-        "key": "root",
-        "values": {"type": "enum", "dtype": "str", "values": ("root",)},
-        "metadata": {},
-        "children": [
-            {
-                "key": "levtype",
-                "values": {"type": "enum", "dtype": "str", "values": ("sfc",)},
-                "metadata": {"name": {"shape": (1, 1, 1), "dtype": "str", "values": ["surface"]}},
-                "children": [
-                    {"key": "param", "values": {"type": "enum", "dtype": "str", "values": ("2t", "msl")}, "metadata": {}, "children": []}
-                ],
-            }
-        ],
-    }
+        "class": "ai",
+        "stream": "oper",
+        "type": "fc",
+        "levtype": "sfc",
+        "param": ["134", "136", "143", "151", "165", "166", "167", "168", "228", "235", "228246", "228247"],
+    },
 )
 
 

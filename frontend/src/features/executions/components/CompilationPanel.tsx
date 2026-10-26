@@ -16,9 +16,9 @@ import {
   Background,
   BackgroundVariant,
   Controls,
-  MiniMap,
   ReactFlow,
   ReactFlowProvider,
+  useNodesState,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { Share2 } from 'lucide-react'
@@ -26,6 +26,7 @@ import { useTranslation } from 'react-i18next'
 import type { Node, NodeMouseHandler, ReactFlowInstance } from '@xyflow/react'
 import type {
   BlockFactoryCatalogue,
+  BlockKind,
   FableBuilderV1,
 } from '@/api/types/fable.types'
 import type { CompilationDetailTask, JobStatus } from '@/api/types/job.types'
@@ -33,6 +34,13 @@ import type {
   BlockGroupData,
   TaskNodeData,
 } from '@/features/executions/utils/taskDagLayout'
+import type { TaskKind } from '@/features/executions/utils/taskClassify'
+import {
+  BLOCK_KIND_MINIMAP_COLOR,
+  CanvasMiniMap,
+  NEUTRAL_MINIMAP_COLOR,
+} from '@/components/common/CanvasMiniMap'
+import { useMedia } from '@/hooks/useMedia'
 import { Button } from '@/components/ui/button'
 import { ApiClientError } from '@/api/client'
 import { getFactory } from '@/api/types/fable.types'
@@ -55,6 +63,7 @@ import { humaniseTaskName } from '@/features/executions/utils/taskName'
 import { useExecutionHoverStore } from '@/features/executions/stores/executionHoverStore'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { P } from '@/components/base/typography'
+import { withMeasured } from '@/components/common/canvas-measured'
 
 interface CompilationPanelProps {
   jobId: string
@@ -75,6 +84,23 @@ const nodeTypes = {
  * Force-graph tab (canvas) handles larger DAGs. */
 const MAX_LAYERED_TASKS = 150
 
+/** Task kinds onto the block kinds whose colour they carry; unknown stays neutral. */
+const TASK_KIND_BLOCK_KIND: Record<TaskKind, BlockKind | null> = {
+  payload: 'source',
+  select: 'transform',
+  transform: 'transform',
+  inference: 'product',
+  plot: 'sink',
+  unknown: null,
+}
+
+function compilationMinimapColor(node: Node): string {
+  if (node.type !== 'compilationTask') return NEUTRAL_MINIMAP_COLOR
+  const task = (node.data as TaskNodeData).task
+  const kind = TASK_KIND_BLOCK_KIND[classifyTask(task.task_id)]
+  return kind ? BLOCK_KIND_MINIMAP_COLOR[kind] : NEUTRAL_MINIMAP_COLOR
+}
+
 export function CompilationPanel({
   jobId,
   status,
@@ -82,6 +108,7 @@ export function CompilationPanel({
   catalogue,
   onSwitchTab,
 }: CompilationPanelProps) {
+  const isDesktop = useMedia('(min-width: 1024px)')
   const { t } = useTranslation('executions')
   const query = useCompilationDetail(jobId, status)
 
@@ -206,6 +233,11 @@ export function CompilationPanel({
       return node
     })
   }, [graph.nodes, selectionTaskSet, contributingBlockIds])
+  // React Flow owns the node state so its measurements stick across rebuilds.
+  const [flowNodes, setFlowNodes, onNodesChange] = useNodesState(nodes)
+  useEffect(() => {
+    setFlowNodes((prev) => withMeasured(nodes, prev))
+  }, [nodes, setFlowNodes])
 
   const edges = useMemo(() => {
     if (!selectionTaskSet) return graph.edges
@@ -304,7 +336,8 @@ export function CompilationPanel({
               // Initial fit — the graph-change effect handles later updates.
               requestAnimationFrame(() => instance.fitView({ padding: 0.18 }))
             }}
-            nodes={nodes}
+            nodes={flowNodes}
+            onNodesChange={onNodesChange}
             edges={edges}
             nodeTypes={nodeTypes}
             nodesDraggable={false}
@@ -314,7 +347,6 @@ export function CompilationPanel({
             zoomOnScroll={true}
             fitView={true}
             fitViewOptions={{ padding: 0.18 }}
-            proOptions={{ hideAttribution: true }}
             onNodeMouseEnter={handleNodeMouseEnter}
             onNodeMouseLeave={handleNodeMouseLeave}
             onNodeClick={handleNodeClick}
@@ -327,21 +359,7 @@ export function CompilationPanel({
               color="#cbd5e1"
               className="dark:opacity-30"
             />
-            <MiniMap
-              position="bottom-right"
-              // Default minimap can't fill our custom node types — pick
-              // explicit colours so the markers are visible.
-              nodeColor={(node) =>
-                node.type === COMPILATION_BLOCK_NODE_TYPE
-                  ? 'rgb(203, 213, 225)'
-                  : 'rgb(59, 130, 246)'
-              }
-              nodeStrokeWidth={2}
-              maskColor="rgba(0, 0, 0, 0.06)"
-              pannable
-              zoomable
-              className="right-2! bottom-2! h-[80px]! w-[120px]! rounded border border-border bg-background/80 shadow-sm"
-            />
+            {isDesktop && <CanvasMiniMap nodeColor={compilationMinimapColor} />}
             <Controls
               showInteractive={false}
               position="bottom-left"
@@ -415,12 +433,12 @@ function TaskInlineDetails({
             <span className="truncate text-sm font-medium">
               {humanised.headline}
             </span>
-            <span className="ml-1 text-xs text-muted-foreground">
+            <span className="ml-1 text-sm text-muted-foreground">
               · {t(`compilation.taskKind.${meta.labelKey}`)}
             </span>
           </div>
           {humanised.modulePath && (
-            <p className="mt-0.5 font-mono text-xs text-muted-foreground">
+            <p className="mt-0.5 font-mono text-sm text-muted-foreground">
               {humanised.modulePath}
             </p>
           )}
@@ -428,14 +446,14 @@ function TaskInlineDetails({
         <button
           type="button"
           onClick={onClose}
-          className="shrink-0 text-xs text-muted-foreground hover:text-foreground"
+          className="shrink-0 text-sm text-muted-foreground hover:text-foreground"
         >
           {t('compilation.close')}
         </button>
       </div>
-      <div className="grid grid-cols-1 gap-2 text-xs md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
         <Field label={t('compilation.fields.taskId')}>
-          <code className="block rounded bg-muted px-1.5 py-1 font-mono text-[11px] break-all">
+          <code className="block rounded-md bg-muted px-1.5 py-1 font-mono text-xs break-all">
             {task.task_id}
           </code>
         </Field>
@@ -450,7 +468,7 @@ function TaskInlineDetails({
                   <li key={parent} className="truncate" title={parent}>
                     {p.headline}
                     {p.hashChip && (
-                      <span className="ml-1 font-mono text-[10px] text-muted-foreground">
+                      <span className="ml-1 font-mono text-xs text-muted-foreground">
                         · {p.hashChip}
                       </span>
                     )}
@@ -474,7 +492,7 @@ function Field({
 }) {
   return (
     <div>
-      <div className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+      <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
         {label}
       </div>
       <div className="mt-0.5">{children}</div>

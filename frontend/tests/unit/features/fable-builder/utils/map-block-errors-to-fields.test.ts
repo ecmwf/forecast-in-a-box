@@ -125,6 +125,32 @@ describe('mapBlockErrorsToFields', () => {
       expect(result.unmapped).toEqual([])
     })
 
+    it('maps "Configuration option ... cannot be empty" to the field', () => {
+      const result = mapBlockErrorsToFields(
+        ["Configuration option 'param' cannot be empty"],
+        {},
+        messages,
+      )
+      expect(result.byConfigKey).toEqual({
+        param: ['Missing required value'],
+      })
+      expect(result.unmapped).toEqual([])
+    })
+
+    it('reports the same message on a field once', () => {
+      const result = mapBlockErrorsToFields(
+        [
+          "Block contains missing config: {'param'}",
+          "Configuration option 'param' cannot be empty",
+        ],
+        {},
+        messages,
+      )
+      expect(result.byConfigKey).toEqual({
+        param: ['Missing required value'],
+      })
+    })
+
     it('drops "Configuration option ... is missing" when the key has an unknown glyph', () => {
       const result = mapBlockErrorsToFields(
         ["Configuration option 'path' is missing for block factory 'gribSink'"],

@@ -18,4 +18,15 @@ class NoLensFound(Exception):
 
 
 class UnproxyableLens(Exception):
-    """Raised when trying to proxy a Lens which is unproxyable, eg, has more than one port or is not running."""
+    """Raised when trying to proxy a Lens which is unproxyable, eg, has more than one port."""
+
+
+class LensStarting(Exception):
+    """Raised when trying to proxy a Lens which is still starting (process alive, port not yet bound).
+
+    The caller should retry later -- this is a transient condition.
+    """
+
+
+class LensFailure(Exception):
+    """Raised when trying to proxy a Lens which has exited (terminated or failed), and thus cannot serve requests."""

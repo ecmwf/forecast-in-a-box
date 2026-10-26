@@ -27,11 +27,19 @@ export type ComponentStatus = 'up' | 'down' | 'off'
  * Backend plugin status values:
  * - "ok"           → "up"   (healthy, idle)
  * - "running"      → "up"   (busy but operational)
+ * - "initializing" → "up"   (stores loading after backend start)
  * - "failure: ..." → "down" (error occurred)
  * - "retrieving"   → "up"   (lock contention, transient)
  */
 export function normalizePluginStatus(raw: string): ComponentStatus {
-  if (raw === 'ok' || raw === 'running' || raw === 'retrieving') return 'up'
+  // `initializing`: stores still loading right after backend start (#716).
+  if (
+    raw === 'ok' ||
+    raw === 'running' ||
+    raw === 'retrieving' ||
+    raw === 'initializing'
+  )
+    return 'up'
   if (raw.startsWith('failure')) return 'down'
   return 'down'
 }

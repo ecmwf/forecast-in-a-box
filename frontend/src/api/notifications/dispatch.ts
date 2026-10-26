@@ -26,6 +26,7 @@ import { API_PREFIX } from '@/api/endpoints'
 import { artifactKeys, wakeDownloadPolling } from '@/api/hooks/useArtifacts'
 import { fableKeys } from '@/api/hooks/useFable'
 import { pluginKeys } from '@/api/hooks/usePlugins'
+import { statusQueryKey } from '@/api/hooks/useStatus'
 import { createLogger } from '@/lib/logger'
 import { queryClient } from '@/lib/queryClient'
 import { showToast } from '@/lib/toast'
@@ -40,6 +41,8 @@ const refreshRouteQueryKeys = new Map<string, ReadonlyArray<QueryKey>>([
     'plugin/list',
     [pluginKeys.list(), fableKeys.catalogue(), fableKeys.blueprintsBase()],
   ],
+  // A finished gateway stop (ecmwf#773) changes the system status pill.
+  ['gateway/status', [statusQueryKey]],
 ])
 
 /** Routes arrive as "api/v1/artifacts/list_models", with or without a leading slash. */

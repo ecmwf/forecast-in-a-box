@@ -26,6 +26,7 @@ import {
   BrushCleaning,
   Check,
   ChevronRight,
+  CircleStop,
   Download,
   HelpCircle,
   Play,
@@ -171,7 +172,7 @@ export function ActivityMonitor() {
                       type="button"
                       aria-label={t('activity.clearAll')}
                       onClick={clearAll}
-                      className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+                      className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
                     />
                   }
                 >
@@ -184,7 +185,7 @@ export function ActivityMonitor() {
             )}
             <PopoverClose
               aria-label={t('close')}
-              className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
             >
               <X className="h-3.5 w-3.5" />
             </PopoverClose>
@@ -373,7 +374,7 @@ function ActivityTaskRow({
             e.stopPropagation()
             onDismiss()
           }}
-          className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted-foreground/60 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-muted hover:text-foreground focus-visible:opacity-100"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/60 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-muted hover:text-foreground focus-visible:opacity-100"
         >
           <X className="h-3.5 w-3.5" />
         </button>
@@ -397,11 +398,13 @@ function ActivityTaskRow({
 function getStatusIcon(task: ActivityTask) {
   if (task.status === 'completed') return Check
   if (task.status === 'failed') return AlertCircle
+  if (task.status === 'stopped') return CircleStop
   return TYPE_CONFIG[task.type].icon
 }
 
 function getStatusColor(task: ActivityTask): string {
-  if (task.status === 'completed') return 'bg-muted-foreground/50'
+  if (task.status === 'completed' || task.status === 'stopped')
+    return 'bg-muted-foreground/50'
   // Failed is conveyed by the AlertCircle icon, not a red pill.
   if (task.status === 'failed') return NEUTRAL_BADGE_BG
   return TYPE_CONFIG[task.type].badgeColor

@@ -10,9 +10,9 @@
 
 /**
  * User-uploaded GeoJSON context overlays (boundaries, tracks, points of
- * interest) drawn above the data layers on every compare panel. One
- * shared VectorSource per overlay — OL sources are shareable across
- * maps, layers are not, so each map mounts its own thin VectorLayer.
+ * interest) drawn above the data layers on every compare panel. Features
+ * are kept in WGS84; each map mounts its own VectorLayer over a copy
+ * reprojected into that map's view projection.
  */
 
 import { useEffect, useState } from 'react'
@@ -24,6 +24,7 @@ import VectorSource from 'ol/source/Vector'
 import { Fill, Stroke, Style, Text } from 'ol/style'
 import CircleStyle from 'ol/style/Circle'
 import type { RefObject } from 'react'
+import type Feature from 'ol/Feature'
 import type Geometry from 'ol/geom/Geometry'
 import type OlMap from 'ol/Map'
 import type { FeatureLike } from 'ol/Feature'
@@ -37,7 +38,8 @@ export interface ContextOverlay {
   id: string
   name: string
   visible: boolean
-  source: VectorSource
+  /** WGS84 features — each map reprojects its own copy. */
+  features: ReadonlyArray<Feature>
   featureCount: number
   /** Property keys found in the file (label choices), frequency-ordered. */
   propertyKeys: Array<string>
@@ -71,35 +73,52 @@ function geometryIsFinite(geometry: Geometry): boolean {
   return false
 }
 
+const finiteFeature = (feature: Feature): boolean => {
+  const geometry = feature.getGeometry()
+  return geometry !== undefined && geometryIsFinite(geometry)
+}
+
 /**
- * Parse GeoJSON text into an overlay (features reprojected to the
- * viewer's Web-Mercator). Non-finite geometries are dropped; throws on
- * unparsable input or zero usable features.
+ * Parse GeoJSON text into an overlay (features kept in WGS84).
+ * Non-finite geometries are dropped; throws on unparsable input or zero
+ * usable features.
  */
 export function parseGeojsonOverlay(
   name: string,
   text: string,
 ): ContextOverlay {
   const features = new GeoJSON()
-    .readFeatures(JSON.parse(text), { featureProjection: 'EPSG:3857' })
-    .filter((feature) => {
-      const geometry = feature.getGeometry()
-      return geometry !== undefined && geometryIsFinite(geometry)
-    })
+    .readFeatures(JSON.parse(text), { featureProjection: 'EPSG:4326' })
+    .filter(finiteFeature)
   if (features.length === 0) {
     throw new Error('GeoJSON contains no features')
   }
   overlayCounter += 1
-  const source = new VectorSource({ features })
   return {
     id: `overlay-${overlayCounter}`,
     name,
     visible: true,
-    source,
+    features,
     featureCount: features.length,
-    propertyKeys: collectPropertyKeys(source),
+    propertyKeys: collectPropertyKeys(features),
     labelProperty: null,
   }
+}
+
+/** A map-projection copy; features that hit a singularity are dropped. */
+function reprojectedSource(
+  features: ReadonlyArray<Feature>,
+  projection: string,
+): VectorSource {
+  return new VectorSource({
+    features: features
+      .map((feature) => {
+        const copy = feature.clone()
+        copy.getGeometry()?.transform('EPSG:4326', projection)
+        return copy
+      })
+      .filter(finiteFeature),
+  })
 }
 
 /** Base style + a canvas Text label from the chosen property — part of
@@ -192,9 +211,10 @@ export function useContextOverlays(
   useEffect(() => {
     const map = mapRef.current
     if (!map || overlays.length === 0) return
+    const projection = map.getView().getProjection().getCode()
     const layers = overlays.map((overlay) => {
       const layer = new VectorLayer({
-        source: overlay.source,
+        source: reprojectedSource(overlay.features, projection),
         style: overlay.labelProperty
           ? (feature) => overlayStylesWithLabel(feature, overlay.labelProperty)
           : OVERLAY_STYLE,
@@ -216,9 +236,11 @@ export function useContextOverlays(
 
 /** Property keys present in the overlay, most frequent first — offered
  *  as permanent-label choices. */
-export function collectPropertyKeys(source: VectorSource): Array<string> {
+export function collectPropertyKeys(
+  features: ReadonlyArray<Feature>,
+): Array<string> {
   const counts = new Map<string, number>()
-  for (const feature of source.getFeatures()) {
+  for (const feature of features) {
     for (const key of Object.keys(feature.getProperties())) {
       if (key === 'geometry') continue
       counts.set(key, (counts.get(key) ?? 0) + 1)

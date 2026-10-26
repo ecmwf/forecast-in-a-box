@@ -16,7 +16,7 @@
 
 import { useCallback, useRef, useState } from 'react'
 import { useBlocker } from '@tanstack/react-router'
-import { toLonLat } from 'ol/proj'
+import { fromLonLat } from 'ol/proj'
 import { formatLatLon } from '../format'
 import {
   defaultAnnotationColor,
@@ -54,18 +54,18 @@ export function useViewerAnnotations({
     useState<AnnotationDraft | null>(null)
   // Where a new annotation will land, captured at map-click time.
   const pendingRef = useRef<{
-    coordinate: [number, number]
+    lonLat: [number, number]
     sourceId: string | null
   } | null>(null)
 
   const onAnnotationCreate = useCallback(
     (
-      coordinate: [number, number],
+      lonLat: [number, number],
       // The binding is the source id; the slot only picks the color default.
       sourceId: string | null,
       slot: SourceSlot | null,
     ) => {
-      pendingRef.current = { coordinate, sourceId }
+      pendingRef.current = { lonLat, sourceId }
       setAnnotationDraft({
         id: null,
         text: '',
@@ -96,10 +96,10 @@ export function useViewerAnnotations({
         ),
       )
     } else if (pendingRef.current) {
-      const { coordinate, sourceId } = pendingRef.current
+      const { lonLat, sourceId } = pendingRef.current
       setAnnotations((prev) => [
         ...prev,
-        { id: nextAnnotationId(), coordinate, sourceId, ...patch },
+        { id: nextAnnotationId(), lonLat, sourceId, ...patch },
       ])
       pendingRef.current = null
     }
@@ -123,9 +123,9 @@ export function useViewerAnnotations({
     [],
   )
   const moveAnnotation = useCallback(
-    (id: string, coordinate: [number, number]) =>
+    (id: string, lonLat: [number, number]) =>
       setAnnotations((prev) =>
-        prev.map((ann) => (ann.id === id ? { ...ann, coordinate } : ann)),
+        prev.map((ann) => (ann.id === id ? { ...ann, lonLat } : ann)),
       ),
     [],
   )
@@ -152,9 +152,10 @@ export function useViewerAnnotations({
   const locateAnnotation = useCallback(
     (id: string) => {
       const annotation = annotations.find((ann) => ann.id === id)
-      if (!annotation) return
-      viewRef.current?.animate({
-        center: annotation.coordinate,
+      const view = viewRef.current
+      if (!annotation || !view) return
+      view.animate({
+        center: fromLonLat(annotation.lonLat, view.getProjection()),
         duration: 350,
       })
     },
@@ -171,12 +172,11 @@ export function useViewerAnnotations({
 
   // The editing pin's position (or the pending click) for the dialog.
   const annotationDraftLocation = (() => {
-    const coordinate = annotationDraft?.id
-      ? annotations.find((ann) => ann.id === annotationDraft.id)?.coordinate
-      : pendingRef.current?.coordinate
-    if (!coordinate) return null
-    const [lon, lat] = toLonLat(coordinate)
-    return formatLatLon(lat, lon)
+    const lonLat = annotationDraft?.id
+      ? annotations.find((ann) => ann.id === annotationDraft.id)?.lonLat
+      : pendingRef.current?.lonLat
+    if (!lonLat) return null
+    return formatLatLon(lonLat[1], lonLat[0])
   })()
 
   return {

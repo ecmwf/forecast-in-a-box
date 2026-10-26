@@ -79,7 +79,7 @@ describe('Load config — missing variables dialog', () => {
 
   it('asks for unknown references and stores them as local variables', async () => {
     const screen = await renderWithRouter(<FableBuilderPage />)
-    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
 
     const input = document.querySelector<HTMLInputElement>('input[type="file"]')
     expect(input).not.toBeNull()
@@ -107,7 +107,7 @@ describe('Load config — missing variables dialog', () => {
 
   it('Global scope creates a global variable instead of a local one', async () => {
     const screen = await renderWithRouter(<FableBuilderPage />)
-    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
 
     const input = document.querySelector<HTMLInputElement>('input[type="file"]')
     await userEvent.upload(
@@ -134,7 +134,7 @@ describe('Load config — missing variables dialog', () => {
 
   it('stays quiet when every reference resolves', async () => {
     const screen = await renderWithRouter(<FableBuilderPage />)
-    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
 
     const selfContained = {
       ...loadedConfig,

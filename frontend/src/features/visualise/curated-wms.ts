@@ -11,12 +11,18 @@
 export interface CuratedWmsServer {
   name: string
   url: string
+  /** Magics servers read the 1.3.0 BBOX as x,y; default = EPSG order. */
+  bboxAxisOrder?: 'xy'
 }
 
 /** Edit freely — one line per server. A backend API replaces this later. */
 export const CURATED_WMS_SERVERS: ReadonlyArray<CuratedWmsServer> = [
   { name: 'DWD', url: 'https://maps.dwd.de/geoserver/ows?' },
-  { name: 'ECMWF', url: 'https://eccharts.ecmwf.int/wms/?token=public' },
+  {
+    name: 'ECMWF',
+    url: 'https://eccharts.ecmwf.int/wms/?token=public',
+    bboxAxisOrder: 'xy',
+  },
   { name: 'EUMETSAT', url: 'https://view.eumetsat.int/geoserver/wms?' },
   { name: 'FMI', url: 'https://openwms.fmi.fi/geoserver/wms?' },
   {
@@ -41,6 +47,11 @@ export const CURATED_WMS_SERVERS: ReadonlyArray<CuratedWmsServer> = [
   },
   { name: 'Victoria WMS', url: 'https://victoria.met.no/wms?' },
 ]
+
+/** BBOX axis order a curated server needs; undefined = EPSG default. */
+export function curatedBboxAxisOrder(url: string): 'xy' | undefined {
+  return CURATED_WMS_SERVERS.find((s) => s.url === url)?.bboxAxisOrder
+}
 
 /** API seam — swap the static list for a backend query here. */
 export function useCuratedWmsServers(): ReadonlyArray<CuratedWmsServer> {

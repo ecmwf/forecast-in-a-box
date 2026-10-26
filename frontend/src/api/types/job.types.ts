@@ -19,14 +19,19 @@ import i18n from 'i18next'
 // Schemas — must match backend models in routes/run.py
 // ---------------------------------------------------------------------------
 
-export const JobStatusSchema = z.enum([
-  'submitted',
-  'preparing',
-  'running',
-  'completed',
-  'failed',
-  'unknown',
-])
+// A status added later degrades to 'unknown' instead of failing whole lists.
+export const JobStatusSchema = z
+  .enum([
+    'submitted',
+    'preparing',
+    'running',
+    'stopping',
+    'stopped',
+    'completed',
+    'failed',
+    'unknown',
+  ])
+  .catch('unknown')
 
 /** routes/run.py: JobExecuteResponse */
 export const JobExecuteResponseSchema = z.object({
@@ -34,9 +39,14 @@ export const JobExecuteResponseSchema = z.object({
   attempt_count: z.number(),
 })
 
-/** routes/run.py: RunOutputDetail */
+/** routes/run.py: RunOutputDetail; the #798 labels are absent on older runs. */
 export const RunOutputMetadataSchema = z.object({
   mime_type: z.string(),
+  display_name: z.string().nullish().catch(null),
+  dimension_kvs: z
+    .array(z.tuple([z.string(), z.string()]))
+    .nullish()
+    .catch(null),
   original_block: z.string(),
   is_available: z.boolean(),
 })
@@ -68,9 +78,10 @@ export const JobExecutionDetailSchema = z.object({
   outputs: RunOutputsSchema.nullable(),
   completed_block_ids: z.array(z.string()).nullable().optional(),
   planned_block_ids: z.array(z.string()).nullable().optional(),
-  /** As-run values of glyphed options, by block then option; absent pre-#640. */
+  /** As-run values of glyphed options, by block then option; absent pre-#640.
+   * A value is null only for an explicitly null option (#691). */
   resolution: z
-    .record(z.string(), z.record(z.string(), z.string()))
+    .record(z.string(), z.record(z.string(), z.string().nullable()))
     .nullable()
     .optional(),
 })
@@ -120,10 +131,18 @@ export type JobStatus = z.infer<typeof JobStatusSchema>
 export const TERMINAL_STATUSES: ReadonlySet<JobStatus> = new Set([
   'completed',
   'failed',
+  'stopped',
 ])
 
 export function isTerminalStatus(status: JobStatus): boolean {
   return TERMINAL_STATUSES.has(status)
+}
+
+/** Statuses `/run/stop` accepts; finished runs are deleted instead. */
+export function isStoppableStatus(status: JobStatus): boolean {
+  return (
+    status === 'submitted' || status === 'preparing' || status === 'running'
+  )
 }
 
 export type JobExecuteResponse = z.infer<typeof JobExecuteResponseSchema>
@@ -177,6 +196,18 @@ export const JOB_STATUS_META: Record<
       return i18n.t('executions:status.running')
     },
     color: 'amber',
+  },
+  stopping: {
+    get label() {
+      return i18n.t('executions:status.stopping')
+    },
+    color: 'gray',
+  },
+  stopped: {
+    get label() {
+      return i18n.t('executions:status.stopped')
+    },
+    color: 'gray',
   },
   completed: {
     get label() {

@@ -30,11 +30,13 @@ import { CompilationForceGraph } from './CompilationForceGraph'
 import { CompilationPanel } from './CompilationPanel'
 import { RunErrorBanner } from './RunErrorBanner'
 import { RunStatusHeader } from './RunStatusHeader'
+import { RunAttemptTimeline } from './RunAttemptTimeline'
 import { LogsPanel } from './LogsPanel'
 import { OutputsPanel } from './OutputsPanel'
 import { SpecificationPanel } from './SpecificationPanel'
 import { StoredOutputsCard } from './StoredOutputsCard'
 import type { CSSProperties, ReactNode } from 'react'
+import { useBlockDisplayNames } from '@/features/fable-builder/hooks/useBlockDisplayNames'
 import { RunMetadataDialog } from '@/features/journal/components/RunMetadataDialog'
 import { useExecutionHoverStore } from '@/features/executions/stores/executionHoverStore'
 import { useViewportFill } from '@/hooks/useViewportFill'
@@ -45,15 +47,20 @@ import { STORAGE_KEYS } from '@/lib/storage-keys'
 import { showToast } from '@/lib/toast'
 import { ApiClientError } from '@/api/client'
 import { useBlockCatalogue, useFableRetrieve } from '@/api/hooks/useFable'
-import { useDeleteJob, useJobStatus, useRestartJob } from '@/api/hooks/useJobs'
+import {
+  useDeleteJob,
+  useJobStatus,
+  useRestartJob,
+  useStopJob,
+} from '@/api/hooks/useJobs'
 import { CoreVersionMismatchBadge } from '@/components/common/CoreVersionMismatchBadge'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useActivityStore } from '@/stores/activityStore'
-import { useUiStore } from '@/stores/uiStore'
 import { P } from '@/components/base/typography'
 import { cn } from '@/lib/utils'
+import { PAGE_WIDTH_CLASS } from '@/lib/page-width'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('RunDetailPage')
@@ -114,9 +121,11 @@ export function RunDetailPage() {
   const statusQuery = useJobStatus(jobId)
   const restartMutation = useRestartJob()
   const deleteMutation = useDeleteJob()
+  const stopMutation = useStopJob()
 
   const jobData = statusQuery.data
   const { data: fableData } = useFableRetrieve(jobData?.blueprint_id)
+  const blockNames = useBlockDisplayNames(fableData?.builder)
 
   // Cross-panel selection is per-run; clear it on mount and on jobId change.
   const resetExecutionSelection = useExecutionHoverStore(
@@ -127,7 +136,6 @@ export function RunDetailPage() {
     return () => resetExecutionSelection()
   }, [jobId, resetExecutionSelection])
 
-  const layoutMode = useUiStore((state) => state.layoutMode)
   const columnsFill = useViewportFill(true, { insetPx: 32 })
   const isWide = useMedia('(min-width: 1280px)')
   const { defaultLayout: splitLayout, onLayoutChanged: onSplitLayoutChanged } =
@@ -180,6 +188,10 @@ export function RunDetailPage() {
     )
   }
 
+  const handleStop = () => {
+    stopMutation.mutate({ runId: jobId, attemptCount: jobData!.attempt_count })
+  }
+
   const handleDelete = () => {
     deleteMutation.mutate(
       { runId: jobId, attemptCount: jobData!.attempt_count },
@@ -211,8 +223,8 @@ export function RunDetailPage() {
     return (
       <div
         className={cn(
-          'mx-auto flex min-h-screen flex-col items-center justify-center px-4 py-8 sm:px-6 lg:px-8',
-          layoutMode === 'boxed' ? 'max-w-7xl' : 'max-w-none',
+          PAGE_WIDTH_CLASS,
+          'flex min-h-screen flex-col items-center justify-center px-4 py-8 sm:px-6 lg:px-8',
         )}
       >
         <LoadingSpinner />
@@ -254,8 +266,8 @@ export function RunDetailPage() {
       className={cn(
         // Underscores in arbitrary values emit spaces; `calc(100vh-15rem)`
         // (no spaces) is invalid CSS and silently discarded.
-        'mx-auto flex min-h-[calc(100vh_-_15rem)] flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8',
-        layoutMode === 'boxed' ? 'max-w-7xl' : 'max-w-none',
+        PAGE_WIDTH_CLASS,
+        'flex min-h-[calc(100vh_-_15rem)] flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8',
       )}
     >
       <RunStatusHeader
@@ -265,14 +277,23 @@ export function RunDetailPage() {
         status={jobData.status}
         progress={jobData.progress ?? '0'}
         createdAt={jobData.created_at}
+        updatedAt={jobData.updated_at}
         onRestart={handleRestart}
+        onStop={handleStop}
         onDelete={handleDelete}
         onEditConfig={canEditConfig ? handleEditConfig : undefined}
         onEditMetadata={() => setMetadataOpen(true)}
         isRestartPending={restartMutation.isPending}
+        isStopPending={stopMutation.isPending}
         isDeletePending={deleteMutation.isPending}
         completedBlockCount={jobData.completed_block_ids?.length ?? null}
         plannedBlockCount={jobData.planned_block_ids?.length ?? null}
+        idLineExtra={
+          <RunAttemptTimeline
+            jobId={jobId}
+            attemptCount={jobData.attempt_count}
+          />
+        }
       />
 
       {fableData?.coreVersionMismatch && (
@@ -379,6 +400,8 @@ export function RunDetailPage() {
                 >
                   <StoredOutputsCard
                     jobId={jobId}
+                    status={jobData.status}
+                    attempt={jobData.attempt_count}
                     outputs={jobData.outputs}
                     lostTaskIds={jobData.lost_task_ids}
                     fable={fableData?.builder}
@@ -392,6 +415,7 @@ export function RunDetailPage() {
                     lostTaskIds={jobData.lost_task_ids}
                     completedBlockIds={jobData.completed_block_ids}
                     plannedBlockIds={jobData.planned_block_ids}
+                    blockNames={blockNames}
                     toolbarSlot={toolbarSlot}
                     onViewLogs={() => setActiveTab('logs')}
                   />

@@ -37,7 +37,7 @@ import {
 } from '@tanstack/react-router'
 import { resetJobsState } from '@tests/../mocks/data/job.data'
 import { mockCatalogue } from '@tests/../mocks/data/fable.data'
-import type { Locator } from '@vitest/browser/context'
+import type { Locator } from 'vitest/browser'
 import type { FableBuilderV1 } from '@/api/types/fable.types'
 import { Route as ConfigureRoute } from '@/routes/_authenticated/configure'
 import { FableBuilderPage } from '@/features/fable-builder/components/FableBuilderPage'
@@ -224,7 +224,7 @@ describe('configure first-run tutorial', () => {
       .element(screen.getByRole('dialog', { name: 'Chain the next block' }))
       .not.toBeInTheDocument()
     await screen
-      .getByRole('button', { name: /^Select/ })
+      .getByRole('button', { name: /^Select · ecmwf-base/ })
       .last()
       .click()
     await expect
@@ -270,13 +270,13 @@ describe('configure first-run tutorial', () => {
       })
       .toBeVisible()
     await expect
-      .element(screen.getByText('Valid', { exact: true }))
+      .element(screen.getByText('Ready to run', { exact: true }))
       .toBeVisible()
     await screen.getByRole('button', { name: 'Show me', exact: true }).click()
     await expect
-      .element(screen.getByRole('heading', { name: 'Submit Forecast Job' }))
+      .element(screen.getByRole('heading', { name: 'Run forecast' }))
       .toBeVisible()
-    await screen.getByRole('button', { name: 'Submit Job' }).click()
+    await screen.getByRole('button', { name: 'Start run' }).click()
 
     // The expected navigation completes the tour instead of ending it.
     await expect
@@ -379,7 +379,7 @@ describe('configure first-run tutorial', () => {
     await openTourFromHelp(screen, 'Take the tour from the top')
     await screen.getByRole('button', { name: 'Start', exact: true }).click()
 
-    // Not pre-satisfied: Show me presses New configuration → 0 blocks.
+    // Not pre-satisfied: Show me presses New workflow → 0 blocks.
     await expect
       .element(
         screen.getByRole('heading', { name: 'Start from a clean canvas' }),

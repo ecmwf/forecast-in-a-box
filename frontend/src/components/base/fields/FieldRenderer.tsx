@@ -9,6 +9,7 @@
  */
 
 import { useMemo } from 'react'
+import { ArtifactField } from './fields/ArtifactField'
 import { DateTimeField } from './fields/DateTimeField'
 import { EnumField } from './fields/EnumField'
 import { EnumListField } from './fields/EnumListField'
@@ -166,6 +167,7 @@ function renderField(
           value={value}
           onChange={onChange}
           options={parsedType.options}
+          lookup={parsedType.lookup}
           placeholder={placeholder}
           disabled={disabled}
           className={className}
@@ -183,6 +185,7 @@ function renderField(
           disabled={disabled}
           className={className}
           itemType={parsedType.itemType}
+          lookup={'lookup' in parsedType ? parsedType.lookup : undefined}
         />
       )
 
@@ -194,6 +197,8 @@ function renderField(
           value={value}
           onChange={onChange}
           options={parsedType.options}
+          closed={parsedType.closed}
+          lookup={parsedType.lookup}
           placeholder={placeholder}
           disabled={disabled}
           className={className}
@@ -207,6 +212,20 @@ function renderField(
           configKey={configKey}
           value={value}
           onChange={onChange}
+          placeholder={placeholder}
+          disabled={disabled}
+          className={className}
+        />
+      )
+
+    case 'artifact':
+      return (
+        <ArtifactField
+          id={id}
+          configKey={configKey}
+          value={value}
+          onChange={onChange}
+          options={parsedType.options}
           placeholder={placeholder}
           disabled={disabled}
           className={className}

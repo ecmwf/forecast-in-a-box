@@ -12,6 +12,7 @@
 import pluginQuery from '@tanstack/eslint-plugin-query'
 import { tanstackConfig } from '@tanstack/eslint-config'
 import licenseHeader from 'eslint-plugin-license-header'
+import reactHooks from 'eslint-plugin-react-hooks'
 
 export default [
   { ignores: ['dist', '*.config.js', 'public', 'development_guidelines'] },
@@ -65,6 +66,21 @@ export default [
           ],
         },
       ],
+    },
+  },
+  {
+    // Hooks after an early return crash with React #310 once the branch flips.
+    files: ['src/**/*.{ts,tsx}'],
+    plugins: { 'react-hooks': reactHooks },
+    rules: { 'react-hooks/rules-of-hooks': 'error' },
+  },
+  {
+    // The globe folder follows the full hook rules, exhaustive deps included.
+    files: ['src/features/viewer/globe/**'],
+    plugins: { 'react-hooks': reactHooks },
+    rules: {
+      ...reactHooks.configs.flat.recommended.rules,
+      'react-hooks/exhaustive-deps': 'error',
     },
   },
   {

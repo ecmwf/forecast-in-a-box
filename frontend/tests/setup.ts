@@ -41,7 +41,7 @@ import { resetPollIntervals } from '@/api/pollIntervals'
 // Start MSW browser worker before all tests
 beforeAll(async () => {
   await worker.start({
-    onUnhandledRequest: 'error',
+    onUnhandledFrame: 'error',
     quiet: true,
   })
 })
@@ -118,5 +118,6 @@ beforeEach(async () => {
 
 // Stop the worker after all tests complete
 afterAll(() => {
-  worker.stop()
+  // Not awaited: stop() waits for requests timeout tests leave hanging.
+  void worker.stop()
 })

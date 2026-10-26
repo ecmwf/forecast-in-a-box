@@ -325,6 +325,7 @@ export function GeoTimeSlider({
           <TimeClipRow
             hasB={hasB && !focused}
             timeline={timeline}
+            failures={failures}
             clip={clip}
             rangeStart={rangeStart}
             rangeEnd={rangeEnd}
@@ -456,7 +457,7 @@ function OffsetControl({
       title={title}
       aria-pressed={ms !== null && offsetMs === ms}
       className={cn(
-        'rounded border border-border px-1.5 py-0.5 text-[10px] font-medium',
+        'rounded-md border border-border px-1.5 py-0.5 text-[10px] font-medium',
         'disabled:opacity-40',
         ms !== null && offsetMs === ms ? 'bg-accent' : 'hover:bg-accent',
       )}
@@ -540,7 +541,7 @@ function HoverTooltip({
   return (
     <div
       className={cn(
-        'pointer-events-none absolute bottom-full z-10 mb-1 rounded border border-border bg-background px-1.5 py-0.5 font-mono text-xs whitespace-nowrap shadow-sm',
+        'pointer-events-none absolute bottom-full z-10 mb-1 rounded-md border border-border bg-background px-1.5 py-0.5 font-mono text-xs whitespace-nowrap shadow-sm',
         anchorClass(fraction),
       )}
       style={{ left: `calc(22px + ${fraction * 100} * (100% - 22px) / 100)` }}
@@ -701,7 +702,7 @@ function SlotRunTrack({
             ))}
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute -top-0.5 -bottom-0.5 w-0.5 -translate-x-1/2 rounded bg-foreground"
+          className="pointer-events-none absolute -top-0.5 -bottom-0.5 w-0.5 -translate-x-1/2 rounded-md bg-foreground"
           style={{ left: `${pct(currentIndex)}%` }}
         />
         {hoverIndex !== null && (
@@ -716,7 +717,7 @@ function SlotRunTrack({
         {hoverIndex !== null && hoverLabel !== null && (
           <span
             className={cn(
-              'pointer-events-none absolute z-10 rounded border border-border bg-background px-1 py-px font-mono text-[10px] whitespace-nowrap shadow-sm',
+              'pointer-events-none absolute z-10 rounded-md border border-border bg-background px-1 py-px font-mono text-[10px] whitespace-nowrap shadow-sm',
               slot === 'a' ? 'bottom-full mb-0.5' : 'top-full mt-0.5',
               anchorClass(
                 availability.length > 0
@@ -744,6 +745,7 @@ function SlotRunTrack({
 function TimeClipRow({
   hasB,
   timeline,
+  failures,
   clip,
   rangeStart,
   rangeEnd,
@@ -751,6 +753,8 @@ function TimeClipRow({
 }: {
   hasB: boolean
   timeline: CompareTimeline
+  /** Not-served marks per cell; presets trim the edges. */
+  failures: Record<SourceSlot, ReadonlyArray<ReadonlyArray<string>>>
   clip: [number, number] | null
   rangeStart: number
   rangeEnd: number
@@ -759,11 +763,13 @@ function TimeClipRow({
   const { t } = useTranslation('visualise')
   const last = timeline.epochs.length - 1
   if (last < 1) return null
-  const rangeA = availabilityRange(timeline.availability.a)
-  const rangeB = availabilityRange(timeline.availability.b)
+  const rangeA = availabilityRange(timeline.availability.a, failures.a)
+  const rangeB = availabilityRange(timeline.availability.b, failures.b)
   const rangeBoth = overlapRange(
     timeline.availability.a,
     timeline.availability.b,
+    failures.a,
+    failures.b,
   )
 
   const apply = (range: [number, number] | null) => {
@@ -787,7 +793,7 @@ function TimeClipRow({
           : false
       }
       className={cn(
-        'rounded border border-border px-1.5 py-0.5 font-mono text-[10px] font-bold',
+        'rounded-md border border-border px-1.5 py-0.5 font-mono text-[10px] font-bold',
         'disabled:opacity-40',
         clip !== null &&
           range !== null &&
@@ -834,7 +840,7 @@ function TimeClipRow({
           onClick={() => onClipChange(null)}
           aria-pressed={clip === null}
           className={cn(
-            'rounded border border-border px-1.5 py-0.5 text-[10px] font-medium',
+            'rounded-md border border-border px-1.5 py-0.5 text-[10px] font-medium',
             clip === null ? 'bg-accent' : 'hover:bg-accent',
           )}
         >

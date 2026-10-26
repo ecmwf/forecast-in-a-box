@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils.ts'
 import { useMedia } from '@/hooks/useMedia.ts'
 import { useAuth } from '@/features/auth/AuthContext.tsx'
 import { Logo } from '@/components/common/Logo.tsx'
+import { GetStartedDialog } from '@/features/landing/components/GetStartedDialog'
 
 const menuItems = [{ nameKey: 'header.about', to: '/about' }] as const
 const mobileLinks = [{ nameKey: 'header.about', to: '/about' }] as const
@@ -143,12 +144,9 @@ export const Header = () => {
                         render={<span>{t('header.login')}</span>}
                         nativeButton={false}
                       />
-                      <Button
-                        size="sm"
-                        onClick={() => signIn()}
-                        render={<span>{t('header.getStarted')}</span>}
-                        nativeButton={false}
-                      />
+                      <GetStartedDialog trigger={<Button size="sm" />}>
+                        {t('header.getStarted')}
+                      </GetStartedDialog>
                     </>
                   )}
                 </div>

@@ -18,7 +18,8 @@ import { P } from '@/components/base/typography'
 import { cn } from '@/lib/utils'
 
 interface SkeletonOutputCardProps {
-  originalBlock: string
+  /** Block name, plus the output's subtitle when split. */
+  label: string
   /** Pulse only fires for currently-executing blocks; idle pending cards stay static. */
   isRunning?: boolean
 }
@@ -27,7 +28,7 @@ interface SkeletonOutputCardProps {
 const RUNNING_PULSE = 'animate-[pulse-strong_1.5s_ease-in-out_infinite]'
 
 export function SkeletonOutputCard({
-  originalBlock,
+  label,
   isRunning = false,
 }: SkeletonOutputCardProps) {
   const pulse = isRunning ? RUNNING_PULSE : 'animate-none'
@@ -37,15 +38,15 @@ export function SkeletonOutputCard({
       aria-live="polite"
       className="w-full space-y-2 overflow-hidden rounded-lg border bg-card p-3"
     >
-      <Skeleton className={cn('aspect-video w-full rounded', pulse)} />
+      <Skeleton className={cn('aspect-video w-full rounded-md', pulse)} />
 
       <div className="space-y-1">
         <Skeleton className={cn('h-4 w-3/4', pulse)} />
         <P
-          className="truncate font-mono text-xs text-muted-foreground/70"
-          title={originalBlock}
+          className="truncate font-mono text-sm text-muted-foreground/70"
+          title={label}
         >
-          {originalBlock}
+          {label}
         </P>
       </div>
 

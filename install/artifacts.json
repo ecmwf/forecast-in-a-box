@@ -14,7 +14,7 @@
           "macos"
         ],
         "tags": {
-            "status": "demo"
+          "status": "demo"
         }
       },
       "specific": {
@@ -169,44 +169,6 @@
           "metadata": {},
           "children": [
             {
-              "key": "class",
-              "values": {
-                "type": "enum",
-                "dtype": "str",
-                "values": [
-                  "ai"
-                ]
-              },
-              "metadata": {},
-              "children": [
-                {
-                  "key": "type",
-                  "values": {
-                    "type": "enum",
-                    "dtype": "str",
-                    "values": [
-                      "fc"
-                    ]
-                  },
-                  "metadata": {},
-                  "children": [
-                    {
-                      "key": "stream",
-                      "values": {
-                        "type": "enum",
-                        "dtype": "str",
-                        "values": [
-                          "oper"
-                        ]
-                      },
-                      "metadata": {},
-                      "children": []
-                    }
-                  ]
-                }
-              ]
-            },
-            {
               "key": "levtype",
               "values": {
                 "type": "enum",
@@ -235,12 +197,12 @@
                     "type": "enum",
                     "dtype": "str",
                     "values": [
-                      "q",
-                      "t",
-                      "u",
-                      "v",
-                      "w",
-                      "z"
+                      "129",
+                      "130",
+                      "131",
+                      "132",
+                      "133",
+                      "135"
                     ]
                   },
                   "metadata": {},
@@ -302,16 +264,16 @@
                     "type": "enum",
                     "dtype": "str",
                     "values": [
-                      "10u",
-                      "10v",
-                      "2d",
-                      "2t",
-                      "cp",
-                      "msl",
-                      "skt",
-                      "sp",
-                      "tcw",
-                      "tp"
+                      "134",
+                      "136",
+                      "143",
+                      "151",
+                      "165",
+                      "166",
+                      "167",
+                      "168",
+                      "228",
+                      "235"
                     ]
                   },
                   "metadata": {},
@@ -320,6 +282,11 @@
               ]
             }
           ]
+        },
+        "extra_output_keys": {
+          "stream": "oper",
+          "type": "fc",
+          "class": "ai"
         },
         "timestep": "6h"
       }
@@ -336,7 +303,7 @@
           "linux"
         ],
         "tags": {
-            "status": "operational"
+          "status": "operational"
         }
       },
       "specific": {
@@ -496,44 +463,6 @@
           "metadata": {},
           "children": [
             {
-              "key": "class",
-              "values": {
-                "type": "enum",
-                "dtype": "str",
-                "values": [
-                  "ai"
-                ]
-              },
-              "metadata": {},
-              "children": [
-                {
-                  "key": "type",
-                  "values": {
-                    "type": "enum",
-                    "dtype": "str",
-                    "values": [
-                      "fc"
-                    ]
-                  },
-                  "metadata": {},
-                  "children": [
-                    {
-                      "key": "stream",
-                      "values": {
-                        "type": "enum",
-                        "dtype": "str",
-                        "values": [
-                          "oper"
-                        ]
-                      },
-                      "metadata": {},
-                      "children": []
-                    }
-                  ]
-                }
-              ]
-            },
-            {
               "key": "levtype",
               "values": {
                 "type": "enum",
@@ -563,12 +492,12 @@
                     "type": "enum",
                     "dtype": "str",
                     "values": [
-                      "q",
-                      "t",
-                      "u",
-                      "v",
-                      "w",
-                      "z"
+                      "129",
+                      "130",
+                      "131",
+                      "132",
+                      "133",
+                      "135"
                     ]
                   },
                   "metadata": {},
@@ -631,30 +560,30 @@
                     "type": "enum",
                     "dtype": "str",
                     "values": [
-                      "100u",
-                      "100v",
-                      "10u",
-                      "10v",
-                      "2d",
-                      "2t",
-                      "cp",
-                      "hcc",
-                      "lcc",
-                      "mcc",
-                      "msl",
-                      "ro",
-                      "sf",
-                      "skt",
-                      "sp",
-                      "ssrd",
-                      "stl1",
-                      "stl2",
-                      "strd",
-                      "swvl1",
-                      "swvl2",
-                      "tcc",
-                      "tcw",
-                      "tp"
+                      "134",
+                      "136",
+                      "139",
+                      "143",
+                      "144",
+                      "151",
+                      "164",
+                      "165",
+                      "166",
+                      "167",
+                      "168",
+                      "169",
+                      "170",
+                      "175",
+                      "186",
+                      "187",
+                      "188",
+                      "205",
+                      "228",
+                      "228246",
+                      "228247",
+                      "235",
+                      "39",
+                      "40"
                     ]
                   },
                   "metadata": {},
@@ -663,6 +592,11 @@
               ]
             }
           ]
+        },
+        "extra_output_keys": {
+          "stream": "oper",
+          "type": "fc",
+          "class": "ai"
         },
         "timestep": "6h",
         "configuration": {
@@ -685,7 +619,7 @@
           "macos"
         ],
         "tags": {
-            "status": "operational"
+          "status": "operational"
         }
       },
       "specific": {
@@ -844,44 +778,6 @@
           "metadata": {},
           "children": [
             {
-              "key": "class",
-              "values": {
-                "type": "enum",
-                "dtype": "str",
-                "values": [
-                  "ai"
-                ]
-              },
-              "metadata": {},
-              "children": [
-                {
-                  "key": "type",
-                  "values": {
-                    "type": "enum",
-                    "dtype": "str",
-                    "values": [
-                      "fc"
-                    ]
-                  },
-                  "metadata": {},
-                  "children": [
-                    {
-                      "key": "stream",
-                      "values": {
-                        "type": "enum",
-                        "dtype": "str",
-                        "values": [
-                          "oper"
-                        ]
-                      },
-                      "metadata": {},
-                      "children": []
-                    }
-                  ]
-                }
-              ]
-            },
-            {
               "key": "levtype",
               "values": {
                 "type": "enum",
@@ -911,12 +807,12 @@
                     "type": "enum",
                     "dtype": "str",
                     "values": [
-                      "q",
-                      "t",
-                      "u",
-                      "v",
-                      "w",
-                      "z"
+                      "129",
+                      "130",
+                      "131",
+                      "132",
+                      "133",
+                      "135"
                     ]
                   },
                   "metadata": {},
@@ -979,30 +875,30 @@
                     "type": "enum",
                     "dtype": "str",
                     "values": [
-                      "100u",
-                      "100v",
-                      "10u",
-                      "10v",
-                      "2d",
-                      "2t",
-                      "cp",
-                      "hcc",
-                      "lcc",
-                      "mcc",
-                      "msl",
-                      "ro",
-                      "sf",
-                      "skt",
-                      "sp",
-                      "ssrd",
-                      "stl1",
-                      "stl2",
-                      "strd",
-                      "swvl1",
-                      "swvl2",
-                      "tcc",
-                      "tcw",
-                      "tp"
+                      "134",
+                      "136",
+                      "139",
+                      "143",
+                      "144",
+                      "151",
+                      "164",
+                      "165",
+                      "166",
+                      "167",
+                      "168",
+                      "169",
+                      "170",
+                      "175",
+                      "186",
+                      "187",
+                      "188",
+                      "205",
+                      "228",
+                      "228246",
+                      "228247",
+                      "235",
+                      "39",
+                      "40"
                     ]
                   },
                   "metadata": {},
@@ -1011,6 +907,11 @@
               ]
             }
           ]
+        },
+        "extra_output_keys": {
+          "stream": "oper",
+          "type": "fc",
+          "class": "ai"
         },
         "timestep": "6h",
         "configuration": {
@@ -1032,7 +933,7 @@
           "linux"
         ],
         "tags": {
-            "status": "operational"
+          "status": "operational"
         }
       },
       "specific": {
@@ -1190,44 +1091,6 @@
           "metadata": {},
           "children": [
             {
-              "key": "class",
-              "values": {
-                "type": "enum",
-                "dtype": "str",
-                "values": [
-                  "ai"
-                ]
-              },
-              "metadata": {},
-              "children": [
-                {
-                  "key": "type",
-                  "values": {
-                    "type": "enum",
-                    "dtype": "str",
-                    "values": [
-                      "fc"
-                    ]
-                  },
-                  "metadata": {},
-                  "children": [
-                    {
-                      "key": "stream",
-                      "values": {
-                        "type": "enum",
-                        "dtype": "str",
-                        "values": [
-                          "oper"
-                        ]
-                      },
-                      "metadata": {},
-                      "children": []
-                    }
-                  ]
-                }
-              ]
-            },
-            {
               "key": "levtype",
               "values": {
                 "type": "enum",
@@ -1257,12 +1120,12 @@
                     "type": "enum",
                     "dtype": "str",
                     "values": [
-                      "q",
-                      "t",
-                      "u",
-                      "v",
-                      "w",
-                      "z"
+                      "129",
+                      "130",
+                      "131",
+                      "132",
+                      "133",
+                      "135"
                     ]
                   },
                   "metadata": {},
@@ -1325,28 +1188,28 @@
                     "type": "enum",
                     "dtype": "str",
                     "values": [
-                      "100u",
-                      "100v",
-                      "10u",
-                      "10v",
-                      "2d",
-                      "2t",
-                      "cp",
-                      "hcc",
-                      "lcc",
-                      "mcc",
-                      "msl",
-                      "ro",
-                      "sf",
-                      "skt",
-                      "sp",
-                      "ssrd",
-                      "stl1",
-                      "stl2",
-                      "strd",
-                      "tcc",
-                      "tcw",
-                      "tp"
+                      "134",
+                      "136",
+                      "139",
+                      "143",
+                      "144",
+                      "151",
+                      "164",
+                      "165",
+                      "166",
+                      "167",
+                      "168",
+                      "169",
+                      "170",
+                      "175",
+                      "186",
+                      "187",
+                      "188",
+                      "205",
+                      "228",
+                      "228246",
+                      "228247",
+                      "235"
                     ]
                   },
                   "metadata": {},
@@ -1355,6 +1218,11 @@
               ]
             }
           ]
+        },
+        "extra_output_keys": {
+          "stream": "oper",
+          "type": "fc",
+          "class": "ai"
         },
         "timestep": "6h",
         "configuration": {
@@ -1377,7 +1245,7 @@
           "macos"
         ],
         "tags": {
-            "status": "operational"
+          "status": "operational"
         }
       },
       "specific": {
@@ -1535,44 +1403,6 @@
           "metadata": {},
           "children": [
             {
-              "key": "class",
-              "values": {
-                "type": "enum",
-                "dtype": "str",
-                "values": [
-                  "ai"
-                ]
-              },
-              "metadata": {},
-              "children": [
-                {
-                  "key": "type",
-                  "values": {
-                    "type": "enum",
-                    "dtype": "str",
-                    "values": [
-                      "fc"
-                    ]
-                  },
-                  "metadata": {},
-                  "children": [
-                    {
-                      "key": "stream",
-                      "values": {
-                        "type": "enum",
-                        "dtype": "str",
-                        "values": [
-                          "oper"
-                        ]
-                      },
-                      "metadata": {},
-                      "children": []
-                    }
-                  ]
-                }
-              ]
-            },
-            {
               "key": "levtype",
               "values": {
                 "type": "enum",
@@ -1602,12 +1432,12 @@
                     "type": "enum",
                     "dtype": "str",
                     "values": [
-                      "q",
-                      "t",
-                      "u",
-                      "v",
-                      "w",
-                      "z"
+                      "129",
+                      "130",
+                      "131",
+                      "132",
+                      "133",
+                      "135"
                     ]
                   },
                   "metadata": {},
@@ -1670,28 +1500,28 @@
                     "type": "enum",
                     "dtype": "str",
                     "values": [
-                      "100u",
-                      "100v",
-                      "10u",
-                      "10v",
-                      "2d",
-                      "2t",
-                      "cp",
-                      "hcc",
-                      "lcc",
-                      "mcc",
-                      "msl",
-                      "ro",
-                      "sf",
-                      "skt",
-                      "sp",
-                      "ssrd",
-                      "stl1",
-                      "stl2",
-                      "strd",
-                      "tcc",
-                      "tcw",
-                      "tp"
+                      "134",
+                      "136",
+                      "139",
+                      "143",
+                      "144",
+                      "151",
+                      "164",
+                      "165",
+                      "166",
+                      "167",
+                      "168",
+                      "169",
+                      "170",
+                      "175",
+                      "186",
+                      "187",
+                      "188",
+                      "205",
+                      "228",
+                      "228246",
+                      "228247",
+                      "235"
                     ]
                   },
                   "metadata": {},
@@ -1700,6 +1530,11 @@
               ]
             }
           ]
+        },
+        "extra_output_keys": {
+          "stream": "oper",
+          "type": "fc",
+          "class": "ai"
         },
         "timestep": "6h",
         "configuration": {
@@ -1721,7 +1556,7 @@
           "linux"
         ],
         "tags": {
-            "status": "operational"
+          "status": "operational"
         }
       },
       "specific": {
@@ -1929,44 +1764,6 @@
           "metadata": {},
           "children": [
             {
-              "key": "class",
-              "values": {
-                "type": "enum",
-                "dtype": "str",
-                "values": [
-                  "ai"
-                ]
-              },
-              "metadata": {},
-              "children": [
-                {
-                  "key": "type",
-                  "values": {
-                    "type": "enum",
-                    "dtype": "str",
-                    "values": [
-                      "fc"
-                    ]
-                  },
-                  "metadata": {},
-                  "children": [
-                    {
-                      "key": "stream",
-                      "values": {
-                        "type": "enum",
-                        "dtype": "str",
-                        "values": [
-                          "oper"
-                        ]
-                      },
-                      "metadata": {},
-                      "children": []
-                    }
-                  ]
-                }
-              ]
-            },
-            {
               "key": "levtype",
               "values": {
                 "type": "enum",
@@ -1995,7 +1792,7 @@
                     "type": "enum",
                     "dtype": "str",
                     "values": [
-                      "q"
+                      "133"
                     ]
                   },
                   "metadata": {},
@@ -2032,11 +1829,11 @@
                     "type": "enum",
                     "dtype": "str",
                     "values": [
-                      "t",
-                      "u",
-                      "v",
-                      "w",
-                      "z"
+                      "129",
+                      "130",
+                      "131",
+                      "132",
+                      "135"
                     ]
                   },
                   "metadata": {},
@@ -2099,43 +1896,42 @@
                     "type": "enum",
                     "dtype": "str",
                     "values": [
-                      "100u",
-                      "100v",
-                      "10u",
-                      "10v",
-                      "2d",
-                      "2t",
-                      "cdww",
-                      "cos_mwd",
-                      "cp",
-                      "h1012",
-                      "h1214",
-                      "h1417",
-                      "h1721",
-                      "h2125",
-                      "h2530",
-                      "hcc",
-                      "lcc",
-                      "mcc",
-                      "msl",
-                      "mwp",
-                      "ro",
-                      "sd",
-                      "sf",
-                      "sin_mwd",
-                      "skt",
-                      "snowc",
-                      "sp",
-                      "ssrd",
-                      "stl1",
-                      "stl2",
-                      "strd",
-                      "swh",
-                      "swvl1",
-                      "swvl2",
-                      "tcc",
-                      "tcw",
-                      "tp"
+                      "134",
+                      "136",
+                      "139",
+                      "140114",
+                      "140115",
+                      "140116",
+                      "140117",
+                      "140118",
+                      "140119",
+                      "140230",
+                      "140232",
+                      "140233",
+                      "141",
+                      "143",
+                      "144",
+                      "151",
+                      "164",
+                      "165",
+                      "166",
+                      "167",
+                      "168",
+                      "169",
+                      "170",
+                      "175",
+                      "186",
+                      "187",
+                      "188",
+                      "205",
+                      "228",
+                      "228246",
+                      "228247",
+                      "235",
+                      "260289",
+                      "3100",
+                      "39",
+                      "40"
                     ]
                   },
                   "metadata": {},
@@ -2144,6 +1940,11 @@
               ]
             }
           ]
+        },
+        "extra_output_keys": {
+          "stream": "oper",
+          "type": "fc",
+          "class": "ai"
         },
         "timestep": "6h",
         "configuration": {
@@ -2169,7 +1970,7 @@
         "display_description": "",
         "comment": "",
         "tags": {
-            "status": "operational"
+          "status": "operational"
         },
         "disk_size_bytes": 1330651150,
         "supported_platforms": [
@@ -2332,44 +2133,6 @@
           "metadata": {},
           "children": [
             {
-              "key": "class",
-              "values": {
-                "type": "enum",
-                "dtype": "str",
-                "values": [
-                  "ai"
-                ]
-              },
-              "metadata": {},
-              "children": [
-                {
-                  "key": "type",
-                  "values": {
-                    "type": "enum",
-                    "dtype": "str",
-                    "values": [
-                      "fc"
-                    ]
-                  },
-                  "metadata": {},
-                  "children": [
-                    {
-                      "key": "stream",
-                      "values": {
-                        "type": "enum",
-                        "dtype": "str",
-                        "values": [
-                          "oper"
-                        ]
-                      },
-                      "metadata": {},
-                      "children": []
-                    }
-                  ]
-                }
-              ]
-            },
-            {
               "key": "levtype",
               "values": {
                 "type": "enum",
@@ -2398,12 +2161,12 @@
                     "type": "enum",
                     "dtype": "str",
                     "values": [
-                      "q",
-                      "t",
-                      "u",
-                      "v",
-                      "w",
-                      "z"
+                      "129",
+                      "130",
+                      "131",
+                      "132",
+                      "133",
+                      "135"
                     ]
                   },
                   "metadata": {},
@@ -2464,21 +2227,21 @@
                     "type": "enum",
                     "dtype": "str",
                     "values": [
-                      "10u",
-                      "10v",
-                      "2d",
-                      "2t",
-                      "hcc",
-                      "lcc",
-                      "mcc",
-                      "msl",
-                      "skt",
-                      "sp",
-                      "ssrd",
-                      "strd",
-                      "tcc",
-                      "tcw",
-                      "tp"
+                      "134",
+                      "136",
+                      "151",
+                      "164",
+                      "165",
+                      "166",
+                      "167",
+                      "168",
+                      "169",
+                      "175",
+                      "186",
+                      "187",
+                      "188",
+                      "228",
+                      "235"
                     ]
                   },
                   "metadata": {},
@@ -2487,6 +2250,11 @@
               ]
             }
           ]
+        },
+        "extra_output_keys": {
+          "stream": "oper",
+          "type": "fc",
+          "class": "ai"
         },
         "configuration": {
           "pre_processors": [],
@@ -2526,7 +2294,7 @@
         "display_description": "",
         "comment": "",
         "tags": {
-            "status": "operational"
+          "status": "operational"
         },
         "disk_size_bytes": 993937386,
         "supported_platforms": [
@@ -2690,44 +2458,6 @@
           "metadata": {},
           "children": [
             {
-              "key": "class",
-              "values": {
-                "type": "enum",
-                "dtype": "str",
-                "values": [
-                  "ai"
-                ]
-              },
-              "metadata": {},
-              "children": [
-                {
-                  "key": "type",
-                  "values": {
-                    "type": "enum",
-                    "dtype": "str",
-                    "values": [
-                      "fc"
-                    ]
-                  },
-                  "metadata": {},
-                  "children": [
-                    {
-                      "key": "stream",
-                      "values": {
-                        "type": "enum",
-                        "dtype": "str",
-                        "values": [
-                          "oper"
-                        ]
-                      },
-                      "metadata": {},
-                      "children": []
-                    }
-                  ]
-                }
-              ]
-            },
-            {
               "key": "levtype",
               "values": {
                 "type": "enum",
@@ -2757,12 +2487,12 @@
                     "type": "enum",
                     "dtype": "str",
                     "values": [
-                      "q",
-                      "t",
-                      "u",
-                      "v",
-                      "w",
-                      "z"
+                      "129",
+                      "130",
+                      "131",
+                      "132",
+                      "133",
+                      "135"
                     ]
                   },
                   "metadata": {},
@@ -2825,30 +2555,30 @@
                     "type": "enum",
                     "dtype": "str",
                     "values": [
-                      "100u",
-                      "100v",
-                      "10u",
-                      "10v",
-                      "2d",
-                      "2t",
-                      "cp",
-                      "hcc",
-                      "lcc",
-                      "mcc",
-                      "msl",
-                      "ro",
-                      "sf",
-                      "skt",
-                      "sp",
-                      "ssrd",
-                      "stl1",
-                      "stl2",
-                      "strd",
-                      "swvl1",
-                      "swvl2",
-                      "tcc",
-                      "tcw",
-                      "tp"
+                      "134",
+                      "136",
+                      "139",
+                      "143",
+                      "144",
+                      "151",
+                      "164",
+                      "165",
+                      "166",
+                      "167",
+                      "168",
+                      "169",
+                      "170",
+                      "175",
+                      "186",
+                      "187",
+                      "188",
+                      "205",
+                      "228",
+                      "228246",
+                      "228247",
+                      "235",
+                      "39",
+                      "40"
                     ]
                   },
                   "metadata": {},
@@ -2857,6 +2587,11 @@
               ]
             }
           ]
+        },
+        "extra_output_keys": {
+          "stream": "oper",
+          "type": "fc",
+          "class": "ai"
         },
         "configuration": {
           "pre_processors": [],
@@ -2878,7 +2613,7 @@
         "display_description": "",
         "comment": "",
         "tags": {
-            "status": "operational"
+          "status": "operational"
         },
         "disk_size_bytes": 1449403913,
         "supported_platforms": [
@@ -3041,44 +2776,6 @@
           "metadata": {},
           "children": [
             {
-              "key": "class",
-              "values": {
-                "type": "enum",
-                "dtype": "str",
-                "values": [
-                  "ai"
-                ]
-              },
-              "metadata": {},
-              "children": [
-                {
-                  "key": "type",
-                  "values": {
-                    "type": "enum",
-                    "dtype": "str",
-                    "values": [
-                      "fc"
-                    ]
-                  },
-                  "metadata": {},
-                  "children": [
-                    {
-                      "key": "stream",
-                      "values": {
-                        "type": "enum",
-                        "dtype": "str",
-                        "values": [
-                          "oper"
-                        ]
-                      },
-                      "metadata": {},
-                      "children": []
-                    }
-                  ]
-                }
-              ]
-            },
-            {
               "key": "levtype",
               "values": {
                 "type": "enum",
@@ -3107,12 +2804,12 @@
                     "type": "enum",
                     "dtype": "str",
                     "values": [
-                      "q",
-                      "t",
-                      "u",
-                      "v",
-                      "w",
-                      "z"
+                      "129",
+                      "130",
+                      "131",
+                      "132",
+                      "133",
+                      "135"
                     ]
                   },
                   "metadata": {},
@@ -3173,21 +2870,21 @@
                     "type": "enum",
                     "dtype": "str",
                     "values": [
-                      "10u",
-                      "10v",
-                      "2d",
-                      "2t",
-                      "hcc",
-                      "lcc",
-                      "mcc",
-                      "msl",
-                      "skt",
-                      "sp",
-                      "ssrd",
-                      "strd",
-                      "tcc",
-                      "tcw",
-                      "tp"
+                      "134",
+                      "136",
+                      "151",
+                      "164",
+                      "165",
+                      "166",
+                      "167",
+                      "168",
+                      "169",
+                      "175",
+                      "186",
+                      "187",
+                      "188",
+                      "228",
+                      "235"
                     ]
                   },
                   "metadata": {},
@@ -3196,6 +2893,11 @@
               ]
             }
           ]
+        },
+        "extra_output_keys": {
+          "stream": "oper",
+          "type": "fc",
+          "class": "ai"
         },
         "configuration": {
           "pre_processors": [],
@@ -3235,7 +2937,7 @@
         "display_description": "",
         "comment": "",
         "tags": {
-            "status": "operational"
+          "status": "operational"
         },
         "disk_size_bytes": 1891893167,
         "supported_platforms": [
@@ -3394,44 +3096,6 @@
           "metadata": {},
           "children": [
             {
-              "key": "class",
-              "values": {
-                "type": "enum",
-                "dtype": "str",
-                "values": [
-                  "ai"
-                ]
-              },
-              "metadata": {},
-              "children": [
-                {
-                  "key": "type",
-                  "values": {
-                    "type": "enum",
-                    "dtype": "str",
-                    "values": [
-                      "fc"
-                    ]
-                  },
-                  "metadata": {},
-                  "children": [
-                    {
-                      "key": "stream",
-                      "values": {
-                        "type": "enum",
-                        "dtype": "str",
-                        "values": [
-                          "oper"
-                        ]
-                      },
-                      "metadata": {},
-                      "children": []
-                    }
-                  ]
-                }
-              ]
-            },
-            {
               "key": "levtype",
               "values": {
                 "type": "enum",
@@ -3460,12 +3124,12 @@
                     "type": "enum",
                     "dtype": "str",
                     "values": [
-                      "q",
-                      "t",
-                      "u",
-                      "v",
-                      "w",
-                      "z"
+                      "129",
+                      "130",
+                      "131",
+                      "132",
+                      "133",
+                      "135"
                     ]
                   },
                   "metadata": {},
@@ -3526,15 +3190,15 @@
                     "type": "enum",
                     "dtype": "str",
                     "values": [
-                      "10u",
-                      "10v",
-                      "2d",
-                      "2t",
-                      "msl",
-                      "skt",
-                      "sp",
-                      "tcw",
-                      "tp"
+                      "134",
+                      "136",
+                      "151",
+                      "165",
+                      "166",
+                      "167",
+                      "168",
+                      "228",
+                      "235"
                     ]
                   },
                   "metadata": {},
@@ -3544,6 +3208,11 @@
             }
           ]
         },
+        "extra_output_keys": {
+          "stream": "oper",
+          "type": "fc",
+          "class": "ai"
+        },
         "configuration": {
           "pre_processors": [],
           "post_processors": [],
@@ -3552,7 +3221,7 @@
           },
           "input_options": [
             {
-              "lam_0": {
+              "source0": {
                 "grid": "N320",
                 "pre_processors": [
                   {
@@ -3568,7 +3237,7 @@
             }
           ],
           "nested_model": true,
-          "region_of_interest": "lam_0"
+          "region_of_interest": "source0"
         },
         "timestep": "6h"
       }
@@ -3582,7 +3251,7 @@
         "display_description": "",
         "comment": "",
         "tags": {
-            "status": "demo"
+          "status": "demo"
         },
         "disk_size_bytes": 1016336351,
         "supported_platforms": [
@@ -3746,44 +3415,6 @@
           "metadata": {},
           "children": [
             {
-              "key": "class",
-              "values": {
-                "type": "enum",
-                "dtype": "str",
-                "values": [
-                  "ai"
-                ]
-              },
-              "metadata": {},
-              "children": [
-                {
-                  "key": "type",
-                  "values": {
-                    "type": "enum",
-                    "dtype": "str",
-                    "values": [
-                      "fc"
-                    ]
-                  },
-                  "metadata": {},
-                  "children": [
-                    {
-                      "key": "stream",
-                      "values": {
-                        "type": "enum",
-                        "dtype": "str",
-                        "values": [
-                          "oper"
-                        ]
-                      },
-                      "metadata": {},
-                      "children": []
-                    }
-                  ]
-                }
-              ]
-            },
-            {
               "key": "levtype",
               "values": {
                 "type": "enum",
@@ -3812,12 +3443,12 @@
                     "type": "enum",
                     "dtype": "str",
                     "values": [
-                      "q",
-                      "t",
-                      "u",
-                      "v",
-                      "w",
-                      "z"
+                      "129",
+                      "130",
+                      "131",
+                      "132",
+                      "133",
+                      "135"
                     ]
                   },
                   "metadata": {},
@@ -3878,21 +3509,21 @@
                     "type": "enum",
                     "dtype": "str",
                     "values": [
-                      "10u",
-                      "10v",
-                      "2d",
-                      "2t",
-                      "hcc",
-                      "lcc",
-                      "mcc",
-                      "msl",
-                      "skt",
-                      "sp",
-                      "ssrd",
-                      "strd",
-                      "tcc",
-                      "tcw",
-                      "tp"
+                      "134",
+                      "136",
+                      "151",
+                      "164",
+                      "165",
+                      "166",
+                      "167",
+                      "168",
+                      "169",
+                      "175",
+                      "186",
+                      "187",
+                      "188",
+                      "228",
+                      "235"
                     ]
                   },
                   "metadata": {},
@@ -3901,6 +3532,11 @@
               ]
             }
           ]
+        },
+        "extra_output_keys": {
+          "stream": "oper",
+          "type": "fc",
+          "class": "ai"
         },
         "configuration": {
           "pre_processors": [],

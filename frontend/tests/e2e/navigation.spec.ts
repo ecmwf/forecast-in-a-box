@@ -31,7 +31,9 @@ test.describe('Navigation', () => {
   test('header nav reaches the overview workspace', async ({ page }) => {
     await page.goto('/execute')
 
-    const overviewLink = page.getByRole('link', { name: 'Overview' })
+    const overviewLink = page
+      .getByRole('navigation', { name: 'Main navigation' })
+      .getByRole('link', { name: 'Overview' })
     await expect(overviewLink).toBeVisible()
     await overviewLink.click()
     await expect(page).toHaveURL(/\/overview/)

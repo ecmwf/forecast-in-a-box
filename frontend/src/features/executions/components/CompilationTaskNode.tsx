@@ -84,11 +84,11 @@ export const CompilationTaskNode = memo(function ({
         </span>
       </div>
       <div className="mt-0.5 flex items-center justify-between gap-1.5">
-        <span className="truncate text-xs text-muted-foreground">
+        <span className="truncate text-sm text-muted-foreground">
           {t(`compilation.taskKind.${meta.labelKey}`)}
         </span>
         {humanised.hashChip && (
-          <span className="rounded-sm bg-muted px-1 py-px font-mono text-[10px] leading-none text-muted-foreground">
+          <span className="rounded-sm bg-muted px-1 py-px font-mono text-xs leading-none text-muted-foreground">
             {humanised.hashChip}
           </span>
         )}

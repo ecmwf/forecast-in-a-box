@@ -18,11 +18,13 @@ import {
   geodomainType,
   intType,
   listOf,
+  noneType,
   openEnum,
   paramType,
   parseFableType,
   serializeValueType,
   stringType,
+  timedeltaType,
   unionOf,
 } from '@/components/base/fields/fable-type'
 
@@ -36,6 +38,8 @@ describe('serializeValueType', () => {
     expect(serializeValueType(floatType)).toBe('float')
     expect(serializeValueType(dateType)).toBe('date')
     expect(serializeValueType(datetimeType)).toBe('datetime')
+    expect(serializeValueType(timedeltaType)).toBe('timedelta')
+    expect(serializeValueType(noneType)).toBe('none')
     expect(serializeValueType(geodomainType)).toBe('geodomain')
     expect(serializeValueType(artifactType)).toBe('artifact')
     expect(serializeValueType(paramType)).toBe('param')
@@ -112,10 +116,30 @@ describe('parseFableType', () => {
       listOf(closedEnum(['2t', 'msl'])),
       unionOf([intType, stringType]),
       unionOf([listOf(intType), closedEnum(['a', 'b'])]),
+      // fiab-core #691 (none) and #704 (timedelta) in every documented position.
+      timedeltaType,
+      listOf(timedeltaType),
+      unionOf([timedeltaType, stringType]),
+      unionOf([datetimeType, timedeltaType]),
+      unionOf([stringType, noneType]),
+      closedEnum(['PT3H', 'PT6H'], timedeltaType),
     ]
     for (const t of representatives) {
       expect(parseFableType(serializeValueType(t))).toEqual(t)
     }
+  })
+
+  it('reads the none and timedelta atoms exactly as the backend emits them', () => {
+    expect(parseFableType('timedelta')).toEqual(timedeltaType)
+    expect(parseFableType('none')).toEqual(noneType)
+    expect(parseFableType('union[str,none]')).toEqual(
+      unionOf([stringType, noneType]),
+    )
+    expect(parseFableType('list[timedelta]')).toEqual(listOf(timedeltaType))
+    // Longest-match ordering: `timedelta` must not be eaten by `date`.
+    expect(parseFableType('union[datetime,timedelta]')).toEqual(
+      unionOf([datetimeType, timedeltaType]),
+    )
   })
 
   it('tolerates legacy aliases, casing, spaces, and unquoted items', () => {
@@ -131,6 +155,19 @@ describe('parseFableType', () => {
     )
     // Legacy bare `enum` reads as the open form.
     expect(parseFableType("enum[str]('a')")).toEqual(openEnum(['a']))
+  })
+
+  it('ignores a trailing traits suffix, anywhere it can appear', () => {
+    // *TODO* once traits are represented in FableType, these should carry
+    // the parsed trait descriptors instead of being silently dropped.
+    expect(parseFableType('int{positive}')).toEqual(intType)
+    expect(parseFableType('float{nonNegative,divisibleBy(3)}')).toEqual(
+      floatType,
+    )
+    expect(parseFableType('list[int{positive}]')).toEqual(listOf(intType))
+    expect(parseFableType('union[int{positive},str]')).toEqual(
+      unionOf([intType, stringType]),
+    )
   })
 
   it('rejects strings outside the grammar', () => {

@@ -43,14 +43,14 @@ export const CompilationBlockNode = memo(function ({ data }: NodeProps) {
       <div className="flex items-center justify-between gap-2 px-2.5 py-1">
         <span
           className={cn(
-            'truncate text-xs font-medium',
+            'truncate text-sm font-medium',
             isSelected ? 'text-primary' : 'text-muted-foreground',
           )}
           title={label}
         >
           {label}
         </span>
-        <span className="shrink-0 rounded-sm bg-background px-1 py-px font-mono text-[10px] text-muted-foreground">
+        <span className="shrink-0 rounded-sm bg-background px-1 py-px font-mono text-xs text-muted-foreground">
           {t('compilation.taskCount', { count: taskCount })}
         </span>
       </div>

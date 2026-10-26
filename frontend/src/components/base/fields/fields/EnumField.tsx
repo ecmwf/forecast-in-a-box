@@ -10,6 +10,10 @@
 
 import { useTranslation } from 'react-i18next'
 import { GlyphFieldWrapper } from './GlyphFieldWrapper'
+import { ParamOptionLabel } from './ParamOptionLabel'
+import type { DisplayLookup } from '@/components/base/fields/value-type-parser'
+import { paramLabel } from '@/components/base/fields/param-display'
+import { useParamLabels } from '@/api/hooks/useFable'
 import {
   Select,
   SelectContent,
@@ -25,10 +29,14 @@ export interface EnumFieldProps {
   value: string
   onChange: (value: string) => void
   options: Array<string>
+  /** Label options via a backend lookup instead of showing raw ids. */
+  lookup?: DisplayLookup
   placeholder?: string
   disabled?: boolean
   className?: string
 }
+
+const NO_OPTIONS: Array<string> = []
 
 export function EnumField({
   id,
@@ -36,12 +44,15 @@ export function EnumField({
   value,
   onChange,
   options,
+  lookup,
   placeholder,
   disabled,
   className,
 }: EnumFieldProps) {
   const { t } = useTranslation('common')
   const resolvedPlaceholder = placeholder ?? t('field.selectPlaceholder')
+  const labels = useParamLabels(lookup === 'param' ? options : NO_OPTIONS)
+  const labelled = labels.size > 0
   return (
     <GlyphFieldWrapper
       id={id}
@@ -56,6 +67,9 @@ export function EnumField({
       <Select
         value={value || null}
         onValueChange={(newValue) => onChange(newValue ?? '')}
+        itemToStringLabel={
+          labelled ? (v: string) => paramLabel(v, labels, 'full') : undefined
+        }
         disabled={disabled}
       >
         <SelectTrigger id={id} className={cn('w-full', className)}>
@@ -64,7 +78,11 @@ export function EnumField({
         <SelectContent>
           {options.map((option) => (
             <SelectItem key={option} value={option}>
-              {option}
+              {labelled ? (
+                <ParamOptionLabel id={option} labels={labels} />
+              ) : (
+                option
+              )}
             </SelectItem>
           ))}
         </SelectContent>

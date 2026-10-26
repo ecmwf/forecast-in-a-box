@@ -10,9 +10,9 @@
 
 import { Suspense, lazy } from 'react'
 import { useTranslation } from 'react-i18next'
+import { GetStartedDialog } from './GetStartedDialog'
 import { Button } from '@/components/ui/button'
 import { H1, Typography } from '@/components/base/typography'
-import { useAuth } from '@/features/auth/AuthContext'
 
 // Lazy load the globe to ensure Three.js initializes properly in production builds
 const RotatingGlobe = lazy(
@@ -21,7 +21,6 @@ const RotatingGlobe = lazy(
 
 export function IntroGlobeSection() {
   const { t } = useTranslation('landing')
-  const { signIn } = useAuth()
   return (
     <section>
       <div className="relative overflow-x-hidden bg-muted py-24">
@@ -53,13 +52,16 @@ export function IntroGlobeSection() {
             </Typography>
 
             <div className="flex justify-center gap-3">
-              <Button
-                size="lg"
-                className="border-transparent px-4 text-sm shadow-2xl shadow-indigo-900/40"
-                onClick={() => signIn()}
-                render={<span>{t('hero.getStarted')}</span>}
-                nativeButton={false}
-              />
+              <GetStartedDialog
+                trigger={
+                  <Button
+                    size="lg"
+                    className="border-transparent px-4 text-sm shadow-2xl shadow-indigo-900/40"
+                  />
+                }
+              >
+                {t('hero.getStarted')}
+              </GetStartedDialog>
             </div>
           </div>
           <div className="flex items-center justify-center">

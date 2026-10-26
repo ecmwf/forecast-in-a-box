@@ -51,9 +51,13 @@ def get_model_details_endpoint(composite_id: CompositeArtifactId) -> MlModelDeta
 
 
 @router.post("/download_model")
-def download_model_endpoint(composite_id: CompositeArtifactId, admin: UserRead | None = Depends(get_admin_user)) -> dict[str, str | int]:
+def download_model_endpoint(
+    composite_id: CompositeArtifactId,
+    retry: bool = False,
+    admin: UserRead | None = Depends(get_admin_user),
+) -> dict[str, str | int]:
     """Submit a download request for a specific ML model or get status of ongoing download."""
-    result = submit_artifact_download(composite_id)
+    result = submit_artifact_download(composite_id, retry=retry)
     if result.t is not None:
         if result.t == 100:
             return {"status": "available", "progress": 100, "composite_id": str(composite_id)}

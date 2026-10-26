@@ -25,12 +25,12 @@
   "yes": "Yes",
   "no": "No",
   "appName": "Forecast-in-a-Box",
-  "logoAlt": "Forecast In a Box Logo",
+  "logoAlt": "Forecast-in-a-Box logo",
   "spinnerLabel": "Loading",
   "activity": {
-    "label": "Notification Center",
-    "title": "Notification Center",
-    "help": "Shows long-running tasks such as model downloads, plugin installations, and forecast job executions. Completed items stay here until you dismiss them.",
+    "label": "Notification centre",
+    "title": "Notification centre",
+    "help": "Shows long-running tasks such as model downloads, plugin installations, and forecast runs. Completed items stay here until you dismiss them.",
     "clear": "Clear",
     "clearAll": "Clear all",
     "empty": "No notifications",
@@ -41,12 +41,14 @@
     "filterPlaceholder": "Filter notifications…",
     "noMatches": "No matches",
     "dismiss": "Dismiss",
-    "viewAll": "Open executions",
+    "viewAll": "Open runs",
     "downloadStarting": "Starting download...",
     "downloadProgress": "Downloading {{progress}}%",
     "downloadComplete": "Download complete",
-    "jobLabel": "Job {{id}}",
+    "downloadFailed": "Failed: {{error}}",
+    "jobLabel": "Run {{id}}",
     "jobCompleted": "Completed",
+    "jobStopped": "Stopped",
     "jobFailed": "Failed: {{error}}",
     "unknownError": "Unknown error"
   },
@@ -58,22 +60,23 @@
     "visualise": "Visualise"
   },
   "status": {
-    "title": "System Status",
-    "allSystemsNormal": "All Systems Normal",
-    "partialOutage": "Partial Outage",
-    "systemOutage": "System Outage",
+    "title": "System status",
+    "allSystemsNormal": "All systems normal",
+    "partialOutage": "Partial outage",
+    "systemOutage": "System outage",
     "components": "Components",
     "componentUp": "Online",
     "componentDown": "Offline",
     "componentOff": "Disabled",
-    "apiServer": "API Server",
+    "apiServer": "API server",
     "cascade": "Cascade",
-    "ecmwfData": "ECMWF Data",
+    "ecmwfData": "ECMWF data",
     "scheduler": "Scheduler",
     "plugins": "Plugins",
     "concurrency": "Concurrency",
-    "refresh": "Refresh Status",
-    "lastUpdated": "Last updated"
+    "refresh": "Refresh status",
+    "lastUpdated": "Last updated",
+    "componentInitializing": "Loading"
   },
   "pagination": {
     "first": "First page",
@@ -85,18 +88,18 @@
   "splash": {
     "loading": "Loading configuration",
     "loadingHint": "Please wait while we set up the application",
-    "errorTitle": "Configuration Error",
+    "errorTitle": "Configuration error",
     "errorIntro": "Failed to load application configuration:",
     "errorHint": "If the problem persists, please contact support."
   },
   "header": {
     "home": "home",
     "about": "About",
-    "openMenu": "Open Menu",
-    "closeMenu": "Close Menu",
-    "login": "Login",
-    "logout": "Logout",
-    "getStarted": "Get Started"
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "login": "Sign in",
+    "logout": "Sign out",
+    "getStarted": "Get started"
   },
   "footer": {
     "copyright": "© European Centre for Medium-Range Weather Forecasts",
@@ -107,72 +110,84 @@
     "memberStates": "Flags of the ECMWF member and co-operating states"
   },
   "userMenu": {
-    "dashboard": "Dashboard",
+    "dashboard": "Overview",
     "help": "Help",
     "settings": "Settings",
     "view": "View",
-    "fluidLayout": "Fluid Layout",
-    "boxedLayout": "Boxed Layout",
     "theme": "Theme",
     "themeLight": "Light",
     "themeDark": "Dark",
     "themeSystem": "System",
-    "cardStyle": "Card Style",
-    "cardDefault": "Default",
-    "cardFlat": "Flat",
-    "cardModern": "Modern",
-    "cardGradient": "Gradient",
     "timezone": "Timezone",
     "welcomeTour": "Show welcome tour",
-    "helpSupport": "Help & Support",
+    "helpSupport": "Help & support",
     "documentation": "Documentation",
     "account": "Account",
     "profile": "Profile",
     "userFallback": "User",
     "administration": "Administration",
     "plugins": "Plugins",
-    "artifacts": "Artifacts",
-    "globalVariables": "Global Variables",
-    "signOut": "Sign Out",
+    "artifacts": "ML models",
+    "globalVariables": "Global variables",
+    "signOut": "Sign out",
     "timezoneDialogTitle": "Application timezone",
-    "timezoneDialogDescription": "All dates and times — including forecast base times — are shown and entered in this timezone. Defaults to UTC."
+    "timezoneDialogDescription": "All dates and times — including forecast base times — are shown and entered in this timezone. Defaults to UTC.",
+    "schedules": "Schedules",
+    "ecmwfKey": "ECMWF API key",
+    "ecmwfKeySet": "set"
   },
   "commandPalette": {
-    "title": "Command Palette",
+    "title": "Command palette",
     "description": "Search for a command to run...",
-    "placeholder": "Type a command or search...",
+    "placeholder": "Search pages, workflows, runs and blocks...",
     "empty": "No results found.",
     "navigate": "navigate",
     "select": "select",
     "close": "close",
-    "esc": "Esc"
+    "esc": "Esc",
+    "open": "Search and commands"
   },
   "commands": {
     "newConfiguration": {
-      "label": "New Forecast Configuration",
+      "label": "New workflow",
       "description": "Start from a blank canvas"
     },
-    "categoryGettingStarted": "Getting Started",
+    "categoryGettingStarted": "Getting started",
     "categoryNavigation": "Navigation",
     "dashboard": {
-      "label": "Dashboard",
-      "description": "Go to dashboard"
+      "label": "Overview",
+      "description": "Go to the overview"
     },
     "configure": {
       "label": "Configure",
-      "description": "Create a new forecast configuration"
+      "description": "Build a new workflow"
     },
     "executions": {
       "label": "Execute",
-      "description": "Monitor forecast job executions"
+      "description": "Monitor forecast runs"
     },
     "admin": {
-      "label": "Admin",
+      "label": "Administration",
       "description": "Manage plugins and models"
     },
     "visualise": {
       "label": "Visualise",
       "description": "View and compare geo outputs on a map"
+    },
+    "categoryPresets": "Workflows",
+    "categoryRuns": "Recent runs",
+    "categoryBlocks": "Blocks",
+    "preset": {
+      "description": "Open in Configure"
+    },
+    "template": {
+      "description": "Workflow template"
+    },
+    "run": {
+      "untitled": "Untitled run"
+    },
+    "addBlock": {
+      "description": "Add to the canvas"
     }
   },
   "timezone": {
@@ -189,7 +204,8 @@
   "field": {
     "selectPlaceholder": "Select an option...",
     "addItemPlaceholder": "Add item...",
-    "noMatches": "No matches"
+    "noMatches": "No matches",
+    "staleValue": "{{value}} is no longer offered by the input. Remove it."
   },
   "geoDomain": {
     "placeholder": "Select an area…",
@@ -220,6 +236,16 @@
   "coreVersionMismatch": {
     "label": "Core version mismatch",
     "detail": "Built with fiab-core v{{stored}}; you're running v{{current}}. It should still work, but may behave unexpectedly.",
-    "detailUnknown": "This configuration was created with a different fiab-core major version. It should still work, but may behave unexpectedly."
+    "detailUnknown": "This workflow was created with a different fiab-core major version. It should still work, but may behave unexpectedly."
+  },
+  "catalogue": {
+    "viewTable": "Table view",
+    "viewCard": "Card view",
+    "noMatches": "Nothing matches these filters",
+    "noMatchesHint": "Try another search term or status.",
+    "clearFilters": "Clear filters",
+    "sortBy": "Sort by",
+    "sortedAsc": "Sorted ascending",
+    "sortedDesc": "Sorted descending"
   }
 }

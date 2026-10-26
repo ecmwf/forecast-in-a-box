@@ -75,6 +75,8 @@ export const API_ENDPOINTS = {
     glyphsGlobalPost: `${API_PREFIX}/blueprint/glyphs/global/post`,
     /** POST - Delete a global glyph by ID */
     glyphsGlobalDelete: `${API_PREFIX}/blueprint/glyphs/global/delete`,
+    /** POST - Resolve param/artifact option values to display strings */
+    resolveDisplay: `${API_PREFIX}/blueprint/options/resolveDisplay`,
   },
 
   /**
@@ -161,10 +163,14 @@ export const API_ENDPOINTS = {
     restart: `${API_PREFIX}/run/restart`,
     /** GET - Get a single output's content (query: run_id, dataset_id) */
     outputContent: `${API_PREFIX}/run/outputContent`,
+    /** GET - Fetchable output folder as ZIP (query: run_id, dataset_id) */
+    outputZipped: `${API_PREFIX}/run/outputZipped`,
     /** GET - Download job logs as ZIP (query: run_id) */
     logs: `${API_PREFIX}/run/logs`,
     /** POST - Delete an execution (body: { run_id, attempt_count }) */
     delete: `${API_PREFIX}/run/delete`,
+    /** POST - Stop an active run (body: { run_id, attempt_count }) */
+    stop: `${API_PREFIX}/run/stop`,
   },
 
   /**
@@ -216,4 +222,9 @@ export const API_ENDPOINTS = {
     /** GET - Get the scheduler's current time */
     currentTime: `${API_PREFIX}/experiment/operational/scheduler/current_time`,
   },
+} as const
+
+/** Static files served next to the app and fetched at runtime. */
+export const STATIC_FILES = {
+  communityNews: '/community-news.json',
 } as const

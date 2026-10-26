@@ -71,7 +71,10 @@ class CommonArtifactMetadata(FiabCoreBaseModel):
 class AnemoiCheckpointConfiguration(FiabCoreBaseModel):
     """Advanced configuration for an Anemoi model"""
 
-    pre_processors: list[dict[str, Any]] = Field(default_factory=list, description="List of preprocessors to apply")
+    pre_processors: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="List of preprocessors to apply at the top level of the runner configuration, sibling to input, e.g. coordinate_reorder",
+    )
     post_processors: list[dict[str, Any]] = Field(default_factory=list, description="List of postprocessors to apply")
     control_options: dict[str, Any] | None = Field(
         description="Environment variables to set to control model behavior, such as backend selection for attention implementation",
@@ -108,6 +111,10 @@ class AnemoiCheckpoint(FiabCoreBaseModel):
 
     input_qube: dict[str, Any] = Field(description="Json Dump of the input qube structure, including variables, levels")
     output_qube: dict[str, Any] = Field(description="Json Dump of the output qube structure, including variables, levels, but not step")
+
+    extra_output_keys: dict[str, str] = Field(
+        default_factory=dict, description="Additional keys for output of a model, stored as key-value pairs"
+    )
 
     configuration: AnemoiCheckpointConfiguration = Field(
         default_factory=AnemoiCheckpointConfiguration,

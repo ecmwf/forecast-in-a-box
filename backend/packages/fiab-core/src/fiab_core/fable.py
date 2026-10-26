@@ -148,6 +148,19 @@ def is_textual(mime_type: str) -> bool:
     return mime_type.startswith("text/plain")
 
 
+def get_fetchable_mime(format_name: str) -> str:
+    """Mime type of a textual output whose value is a path to data (a file or a directory tree) that can be fetched as a zip."""
+    return f"text/plain; fiab-format={format_name}; fiab-fetchable=1"
+
+
+def is_fetchable_mime(mime_type: str) -> bool:
+    """Whether the mime type is text/plain with the `fiab-fetchable=1` extension."""
+    if not is_textual(mime_type):
+        return False
+    params = [part.strip() for part in mime_type.split(";")[1:]]
+    return "fiab-fetchable=1" in params
+
+
 class NoOutput(FiabCoreBaseModel):
     # use this when there is no output whatsoever -- this stops *any* expansion of the block
     pass

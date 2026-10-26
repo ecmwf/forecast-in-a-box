@@ -24,21 +24,44 @@ warmup mode:
 ./fiab.sh warmup
 ```
 
-This creates the virtual environment and installs the default plugin into it. To install a different
-set of plugins, pass their composite ids (`store:plugin`) with `-p`, comma-separated:
+This creates the virtual environment and installs the default plugins into it. The plugins are
+the composite ids (`store:plugin`) listed in `default_plugins` of the `[external]` section of the
+`config.toml` in the fiab root directory.
+
+By default, the most recent release is installed. To install a particular one instead, give it
+as an argument -- this is only allowed when nothing is installed yet:
 
 ```bash
-./fiab.sh warmup -p ecmwf:ecmwf-base,mystore:myplugin
+./fiab.sh warmup v1.2.3
 ```
 
 The warmup expects to run in isolation -- do not run it while a backend is running, as both mutate
 the same virtual environment, configuration file and database. Once a warmup has been executed, a
 subsequent regular launch does not attempt any plugin installation on its own.
 
+## Upgrading and reinstalling
+
+A regular launch never changes the installed release. To change it, stop the running Forecast-in-a-Box
+(or the service), then run either of:
+
+```bash
+./fiab.sh upgrade [v1.2.3]   # the most recent release if not given
+./fiab.sh reinstall [v1.2.3] # prompts for the current or the most recent release if not given
+```
+
+The `upgrade` keeps the database, configuration and artifacts, and only updates the launcher and the
+virtual environment. It is currently supported only within the same major version, and never to
+a lower version. The `reinstall` deletes the whole fiab root directory (`~/.fiab`) and installs from scratch.
+Neither launches Forecast-in-a-Box -- run the launcher again (or restart the service) afterwards.
+
 # Containerized Setup
 Consult the docker examples:
 1. [slim](../../deployment/v2) -- just "run fiab.sh warmup in a Dockerfile" which is sufficient for a demonstration,
 2. [ewc](../../deployment/ewc) -- a more involved setup, though may be a bit out of date.
+
+For a smooth and performant execution of bigger models, a GPU is recommended.
+The `slim` image does _not_ come with CUDA pre-installed, however, cooperates well with [NVIDIA Container Toolkit](https://github.com/NVIDIA/nvidia-container-toolkit).
+In other words, install the toolkit on the _host_ machine, then run `slim` in any container runtime (docker, compose, containerd, ...) with the GPU resource, and the FIAB in the container recognizes and utilizes the mounted GPU.
 
 # Developer Setup
 

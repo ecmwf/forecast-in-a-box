@@ -32,3 +32,7 @@ class GatewayExited(GatewayError):
     def __init__(self, exitcode: int) -> None:
         self.exitcode = exitcode
         super().__init__(f"Gateway exited with code {exitcode}")
+
+
+class GatewayStopInProgress(GatewayError):
+    """Raised when a gateway stop is requested while a previous one is still being processed."""

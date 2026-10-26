@@ -93,7 +93,7 @@ export function RunErrorBanner({
         <div className="relative mb-1 w-full">
           <pre
             className={cn(
-              'w-full rounded-md bg-destructive/5 p-3 pr-20 font-mono text-xs leading-relaxed break-words whitespace-pre-wrap',
+              'w-full rounded-md bg-destructive/5 p-3 pr-20 font-mono text-sm leading-relaxed break-words whitespace-pre-wrap',
               collapsible && !expanded && 'max-h-40 overflow-hidden',
               collapsible && expanded && 'max-h-96 overflow-auto',
             )}

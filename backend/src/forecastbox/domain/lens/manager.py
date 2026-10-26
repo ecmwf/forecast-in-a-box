@@ -18,7 +18,9 @@ Pyrsistent immutable structures allow safe lock-free reads.
 
 import logging
 import os
+import socket
 import subprocess
+import sys
 import threading
 import uuid
 from dataclasses import dataclass
@@ -29,6 +31,7 @@ from pyrsistent import pmap
 from pyrsistent.typing import PMap
 
 from forecastbox.domain.lens.exceptions import NoLensFound
+from forecastbox.entrypoint.bootstrap.config import BACKEND_LOG_DIRECTORY_ENV
 from forecastbox.utility.concurrency.ports import FreePortsManager, NoFreePortsException
 from forecastbox.utility.concurrency.shutdown import shutdown_popen
 from forecastbox.utility.concurrency.synchronization import timed_acquire
@@ -42,6 +45,8 @@ LensName = Literal["skinnyWMS"]
 LensStatus = Literal["starting", "running", "terminated", "failed"]
 
 timeout_acquire = 1
+# gunicorn worker timeout, seconds, as the proxy's read timeout; the first request scans the data folder
+timeout_lens_worker = 120
 
 
 class LensInstanceDetail(FiabBaseModel):
@@ -68,17 +73,34 @@ class LensInstanceManager:
     instances: PMap[LensInstanceId, LensInstance] = pmap()
 
 
+def check_server_ready(host: str = "127.0.0.1", port: int = 8000, timeout: float = 0.1) -> bool:
+    """Ultra-fast check to see if the lens process has successfully bound to the port.
+
+    Returns True if the port is open and accepting connections, False otherwise.
+    """
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(timeout)
+        try:
+            # connect_ex returns 0 on success, or an error code on failure
+            return s.connect_ex((host, port)) == 0
+        except Exception:
+            return False
+
+
 def _compute_status(instance: LensInstance) -> LensInstanceDetail:
     status: LensStatus
     if instance.lens_name == "skinnyWMS":
         if instance.process is None:
+            # process not spawned yet at all
             status = "starting"
-        elif instance.process.poll() is None:
+        elif instance.process.poll() is not None:
+            status = "terminated" if instance.process.returncode == 0 else "failed"
+        elif all(check_server_ready(port=port) for port in instance.ports):
+            # process alive and its port(s) are bound -- guvicorn/gunicorn finished starting
             status = "running"
-        elif instance.process.returncode == 0:
-            status = "terminated"
         else:
-            status = "failed"
+            # process alive but not yet listening -- still starting up
+            status = "starting"
     else:
         assert_never(instance.lens_name)
 
@@ -110,26 +132,47 @@ def start_skinny_wms(local_path: str) -> LensInstanceId:
 
     failed: str | None = None
     try:
-        cmd = ["uv", "run", "gunicorn", "--bind", f"127.0.0.1:{port}", "skinnywms.wmssvr:application"]
+        cmd = [
+            "uv",
+            "run",
+            "gunicorn",
+            "--bind",
+            f"127.0.0.1:{port}",
+            "--timeout",
+            str(timeout_lens_worker),
+            "skinnywms.wmssvr:application",
+        ]
         env = {
             **os.environ,
+            # So that responses such as GetCapabilities refer to client-visible proxy urls,
+            # instead of localhost-based ones
+            "SKINNYWMS_TRUST_XFORWARDED": "1",
             "SKINNYWMS_DATA_PATH": local_path,
-            # Browser clients (the in-app WMS viewer, crossOrigin tile requests)
+            # In case the clients (the in-app WMS viewer, crossOrigin tile requests, ogw)
             # call the lens directly on its own port, i.e. cross-origin.
             # SkinnyWMS honours this via flask-cors on all endpoints.
+            # *DEPRECATED* -- remove the xforwarded-based path verified
             "SKINNYWMS_CORS_ORIGINS": "*",
+            # Equivalent of --enable-reference-time-dimension: fields from different
+            # forecast runs sharing a validity time are exposed via DIM_REFERENCE_TIME
+            "SKINNYWMS_ENABLE_REFERENCE_TIME_DIMENSION": "1",
             # SkinnyWMS localizes naive UTC GRIB datetimes via astimezone(),
             # shifting advertised times by the host's UTC offset — we explicitly
             # use the backend-wide default tz
             "TZ": default_tz_fallback(),
+            "MAGICS_STYLE_PATH": sys.prefix + "/share/magics/styles/dccms",
         }
-        process: subprocess.Popen[bytes] = subprocess.Popen(
-            cmd,
-            env=env,
-            start_new_session=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        log_directory = os.environ[BACKEND_LOG_DIRECTORY_ENV]
+        stdout_path = os.path.join(log_directory, f"lens.{instance_id}.stdout.txt")
+        stderr_path = os.path.join(log_directory, f"lens.{instance_id}.stderr.txt")
+        with open(stdout_path, "ab") as stdout_file, open(stderr_path, "ab") as stderr_file:
+            process: subprocess.Popen[bytes] = subprocess.Popen(
+                cmd,
+                env=env,
+                start_new_session=True,
+                stdout=stdout_file,
+                stderr=stderr_file,
+            )
     except Exception as e:
         failed = repr(e)
         logger.error(f"failed to start skinny wms: {failed}")

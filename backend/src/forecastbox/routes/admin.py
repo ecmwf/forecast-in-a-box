@@ -93,9 +93,10 @@ async def get_release_status(admin: UserRead | None = Depends(get_admin_user)) -
     )
 
 
-@router.post("/release", response_model=UpdateReleaseResponse)
+# TODO rework to rely solely on `fiab.sh upgrade` -- this neither replaces the launcher nor checks the upgrade scope
+@router.post("/release", response_model=UpdateReleaseResponse, deprecated=True)
 async def update_release(tag: str | None = None, admin: UserRead | None = Depends(get_admin_user)) -> UpdateReleaseResponse:
-    """Update release"""
+    """Update release. Deprecated, use `fiab.sh upgrade` instead"""
     if tag:
         release = Release.from_string(tag)
     else:

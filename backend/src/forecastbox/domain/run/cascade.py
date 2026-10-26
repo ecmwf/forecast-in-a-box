@@ -13,7 +13,16 @@ import time
 from pathlib import Path
 from typing import Literal
 
-from cascade.gateway.api import JobSpec, LocalProcesses, SlurmCluster, SshCluster, SubmitJobRequest, SubmitJobResponse
+from cascade.controller.report import JobId
+from cascade.gateway.api import (
+    JobSpec,
+    LocalProcesses,
+    ResultDeletionRequest,
+    SlurmCluster,
+    SshCluster,
+    SubmitJobRequest,
+    SubmitJobResponse,
+)
 from cascade.gateway.client import request_response
 from cascade.low.core import JobInstance, JobInstanceRich, TaskId
 from fiab_core.fable import BlockInstanceId
@@ -83,6 +92,8 @@ stored_output_max_length = 10 * 1024**2
 
 class RunOutputCharacteristic(FiabBaseModel):
     mime_type: str = "application/octet-stream"
+    display_name: str | None = None
+    dimension_kvs: list[tuple[str, str]] | None = None
     original_block: BlockInstanceId
     value: str | None = Field(
         default=None,
@@ -154,3 +165,9 @@ def execute_cascade(spec: ExecutionSpecification) -> SubmitJobResponse:
         return SubmitJobResponse(job_id=None, error=repr(e))
 
     return submit_job_response
+
+
+def delete_cascade_datasets(cascade_job_id: str) -> None:
+    """Delete all datasets of the given job in the gateway. Errors reported by the gateway are ignored."""
+    request = ResultDeletionRequest(datasets={JobId(cascade_job_id): []})
+    request_response(request, get_gateway_url())

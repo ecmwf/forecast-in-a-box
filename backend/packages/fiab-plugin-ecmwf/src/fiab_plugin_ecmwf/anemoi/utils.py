@@ -8,6 +8,7 @@
 # nor does it submit to any jurisdiction.
 
 import importlib.metadata
+import itertools
 import logging
 from copy import deepcopy
 from functools import reduce
@@ -21,13 +22,36 @@ from fiab_core.tools.plugins import _detect_editable_install
 from fiab_core.types import ArtifactType, ClosedEnumType, FableType
 from qubed import Qube
 
+from fiab_plugin_ecmwf.environments import mars_dependencies, opendata_dependencies, polytope_dependencies
+
 from ..qubed_utils import expand
 
-INPUT_SOURCE_CONFIGURATION_OPTIONS = {
-    "polytope": {"collection": "ecmwf-mars"},
-    "opendata:google": {"source": "google"},
-    "opendata:aws": {"source": "aws"},
+INPUT_SOURCE_CONFIGURATION_OPTIONS: dict[str, list[dict[str, dict[str, Any]]]] = {
+    "polytope": [
+        {
+            "test": {"collection": "ecmwf-test"},
+            "mars": {"collection": "ecmwf-mars"},
+        }
+    ],
+    "opendata": [
+        {"ecmwf": {"source": "ecmwf"}, "google": {"source": "google"}, "aws": {"source": "aws"}},
+        {"highres": {"resol": "0p1"}, "lowres": {"resol": "0p25"}},
+    ],
 }
+"""Variant groups per input source, matched by position against the parts after the base source name."""
+
+INPUT_SOURCE_DEFAULTS: dict[str, dict[str, Any]] = {
+    "polytope": {"collection": "ecmwf-mars"},
+}
+"""Configuration arguments applied to an input source before its variant settings."""
+
+INPUT_SOURCE_EXTRAS = {
+    "opendata": [*opendata_dependencies, "anemoi-plugins-ecmwf-inference[opendata]>=0.7.0"],
+    "polytope": [*polytope_dependencies, "anemoi-plugins-ecmwf-inference[polytope]>=0.7.0"],
+    "mars": mars_dependencies,
+    "dummy": [],
+}
+"""Additional environment dependencies for input sources."""
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +70,52 @@ def get_available_checkpoints() -> dict[CompositeArtifactId, AnemoiCheckpoint]:
         for composite_id, artifact in all_artifacts.items()
         if artifact.artifact_type == "AnemoiCheckpoint" and artifact.is_locally_compatible
     }
+
+
+def get_input_source_extras(source: str) -> list[str]:
+    """Get the extra environment dependencies for the specified input source."""
+    return INPUT_SOURCE_EXTRAS.get(source.split(":", 1)[0], [])
+
+
+def get_available_input_sources() -> list[str]:
+    """Get the list of available input sources.
+
+    Contains each base source from INPUT_SOURCE_EXTRAS that has no variant groups, followed by
+    each full combination of the variant groups of every source in INPUT_SOURCE_CONFIGURATION_OPTIONS
+    joined with ':'.
+    """
+    base_sources = set(INPUT_SOURCE_EXTRAS.keys()) - set(INPUT_SOURCE_CONFIGURATION_OPTIONS.keys())
+    available_input_sources = list(base_sources)
+    for source in INPUT_SOURCE_CONFIGURATION_OPTIONS.keys():
+        variant_groups = INPUT_SOURCE_CONFIGURATION_OPTIONS[source]
+        for combination in itertools.product(*variant_groups):
+            available_input_sources.append(":".join([source, *combination]))
+    return available_input_sources
+
+
+def _get_input_source_config(source_name: str) -> dict[str, Any]:
+    """Get the configuration for the specified input source.
+
+    Variant parts after the base source name are matched by position against the variant groups
+    of the source, and partial prefixes are accepted. Base sources without variant groups
+    yield an empty configuration. Raises ValueError for an unknown or surplus variant part.
+    """
+    source, *variants = source_name.split(":")
+    variant_groups = INPUT_SOURCE_CONFIGURATION_OPTIONS.get(source)
+    if variant_groups is None:
+        return {}
+
+    config: dict[str, Any] = dict(INPUT_SOURCE_DEFAULTS.get(source, {}))
+    for position, variant in enumerate(variants):
+        if position >= len(variant_groups):
+            raise ValueError(f"Unexpected variant {variant!r} in input source {source_name!r}: {source!r} takes no further variants")
+        group = variant_groups[position]
+        if variant not in group:
+            raise ValueError(
+                f"Unknown variant {variant!r} in input source {source_name!r}: allowed variants at this position are {list(group)}"
+            )
+        config.update(group[variant])
+    return config
 
 
 def get_checkpoint_enum_type() -> FableType:
@@ -87,6 +157,9 @@ class CheckpointArtifact:
         """Get local path to the checkpoint artifact, assumes it is already locally available, does not trigger download"""
         return Path(ArtifactsProvider.get_artifact_local_path(self.artifact))
 
+    def get_url(self) -> str:
+        return ArtifactsProvider.get_artifacts_lookup()[self.artifact].common.url
+
     def _open_qube_json(self, qube_json: dict) -> Qube | dict[str, Qube]:
         """Open a qube from a json representation, handling both single qube and multiple qube cases."""
         if not "key" in qube_json:
@@ -126,6 +199,14 @@ class CheckpointArtifact:
             return None
         return checkpoint.configuration.is_ensemble_model is True
 
+    @property
+    def extra_output_keys(self) -> dict[str, str]:
+        """Additional metadata from the checkpoint artifact for use in actions and qubes.
+
+        i.e. MARS metadata
+        """
+        return self.checkpoint().extra_output_keys
+
     def get_model_output(self, lead_time: int) -> Qube | dict[str, Qube]:
         """Get the model output qube from the checkpoint artifact"""
         checkpoint = self.checkpoint()
@@ -162,6 +243,7 @@ class CheckpointArtifact:
             post_processors.append({"extract_from_state": configuration.region_of_interest})
 
         return {
+            "pre_processors": list(configuration.pre_processors),
             "post_processors": post_processors,
             "env": configuration.control_options or {},
         }
@@ -177,16 +259,11 @@ class CheckpointArtifact:
 
         source_name: str = next(iter(input_source.keys()))
         input_source = deepcopy(input_source)  # Don't modify the original input source dict
-
-        if source_name in INPUT_SOURCE_CONFIGURATION_OPTIONS:
-            input_source[source_name].update(INPUT_SOURCE_CONFIGURATION_OPTIONS[source_name])
+        input_source[source_name].update(_get_input_source_config(source_name))
 
         if ":" in source_name:
             input_source[source_name.split(":")[0]] = input_source.pop(source_name)
             source_name = source_name.split(":")[0]
-
-        if configuration.pre_processors is not None:
-            input_source[source_name].setdefault("pre_processors", []).extend(configuration.pre_processors)
 
         if configuration.input_options is None:
             return input_source

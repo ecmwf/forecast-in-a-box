@@ -64,10 +64,29 @@ export function useAdvanceCondition({
     return advance.subscribe(evaluate)
   }, [advance, stepKey])
 
+  // Baseline for search steps; the page's own writes during the settle
+  // window move it instead of counting as the user's action.
+  const baselineRef = useRef({ key: '', search: searchAtEntry, at: 0 })
   useEffect(() => {
     if (advance.kind !== 'search') return
     const search = router.state.location.search as SearchRecord
-    if (advance.check(search, searchAtEntry)) {
+    if (baselineRef.current.key !== stepKey) {
+      baselineRef.current = {
+        key: stepKey,
+        search: searchAtEntry,
+        at: Date.now(),
+      }
+    }
+    const baseline = baselineRef.current
+    if (
+      advance.settleMs !== undefined &&
+      Date.now() - baseline.at < advance.settleMs &&
+      search !== baseline.search
+    ) {
+      baseline.search = search
+      return
+    }
+    if (advance.check(search, baseline.search)) {
       onBlockerRef.current?.(null)
       fireRef.current()
       return

@@ -20,7 +20,7 @@
  *   running → Copy + Stop controls appear → Stop tears it down
  */
 
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { I18nextProvider } from 'react-i18next'
@@ -33,10 +33,12 @@ import {
   createRouter,
 } from '@tanstack/react-router'
 import { listMockLenses, resetLensState } from '@tests/../mocks/data/lens.data'
-import { resetJobsState } from '@tests/../mocks/data/job.data'
-import type { RunOutputs } from '@/api/types/job.types'
+import { resetJobsState, setMockGribDir } from '@tests/../mocks/data/job.data'
+import type { JobStatus, RunOutputs } from '@/api/types/job.types'
 import { StoredOutputsCard } from '@/features/executions/components/StoredOutputsCard'
+import { lensOwner } from '@/features/visualise/lens-owners'
 import i18n from '@/lib/i18n'
+import { useConfigStore } from '@/stores/configStore'
 
 // Matches the job-completed-001 seed: its `task-out-grib` marker output's
 // payload resolves to /data/output/job-completed-001_1 (mockBlobForMime).
@@ -61,7 +63,11 @@ const outputsWithMarkers: RunOutputs = {
   },
 }
 
-async function renderCard(outputs: RunOutputs | null, runName?: string) {
+async function renderCard(
+  outputs: RunOutputs | null,
+  runName?: string,
+  status: JobStatus = 'completed',
+) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
@@ -73,6 +79,8 @@ async function renderCard(outputs: RunOutputs | null, runName?: string) {
     component: () => (
       <StoredOutputsCard
         jobId="job-completed-001"
+        status={status}
+        attempt={1}
         outputs={outputs}
         runName={runName}
       />
@@ -110,6 +118,33 @@ describe('StoredOutputsCard', () => {
     expect(screen.getByText('block_sink_1').elements()).toHaveLength(1)
     // Non-marker outputs are not listed.
     expect(screen.getByText('sink_temperature_map').elements()).toHaveLength(0)
+    // The folder carries the run ID: not shared.
+    expect(
+      screen.getByText('Folder shared with other runs').elements(),
+    ).toHaveLength(0)
+  })
+
+  it('lists markers whose mime also carries fiab-fetchable', async () => {
+    const { screen } = await renderCard({
+      'task-out-grib': {
+        mime_type: `${GRIB_DIR_MIME}; fiab-fetchable=1`,
+        original_block: 'block_sink_1',
+        is_available: true,
+      },
+    })
+    await expect.element(screen.getByText('job-completed-001_1')).toBeVisible()
+    await expect
+      .element(screen.getByRole('button', { name: 'Visualise' }))
+      .toBeVisible()
+  })
+
+  it('flags a folder without the run ID as shared with other runs', async () => {
+    setMockGribDir('job-completed-001', '/data/output/latest')
+    const { screen } = await renderCard(outputsWithMarkers)
+    await expect.element(screen.getByText('latest')).toBeVisible()
+    await expect
+      .element(screen.getByText('Folder shared with other runs'))
+      .toBeVisible()
   })
 
   it('renders nothing without marker outputs', async () => {
@@ -138,6 +173,40 @@ describe('StoredOutputsCard', () => {
     expect(
       screen.getByRole('button', { name: /start wms server/i }).elements(),
     ).toHaveLength(0)
+  })
+
+  it('holds lens actions until the sink has written every file', async () => {
+    const writing: RunOutputs = {
+      ...outputsWithMarkers,
+      'task-out-grib-2': {
+        ...outputsWithMarkers['task-out-grib-2'],
+        is_available: false,
+      },
+    }
+    const { screen } = await renderCard(writing, undefined, 'running')
+    await expect.element(screen.getByText('job-completed-001_1')).toBeVisible()
+    await expect.element(screen.getByText('1 of 2 files written')).toBeVisible()
+    await expect
+      .element(screen.getByRole('button', { name: /^visualise$/i }))
+      .toBeDisabled()
+    await expect
+      .element(screen.getByRole('button', { name: /start wms server/i }))
+      .toBeDisabled()
+  })
+
+  it('enables lens actions once the run ends, even with a file missing', async () => {
+    const partial: RunOutputs = {
+      ...outputsWithMarkers,
+      'task-out-grib-2': {
+        ...outputsWithMarkers['task-out-grib-2'],
+        is_available: false,
+      },
+    }
+    const { screen } = await renderCard(partial, undefined, 'failed')
+    await expect.element(screen.getByText('2 files')).toBeVisible()
+    await expect
+      .element(screen.getByRole('button', { name: /^visualise$/i }))
+      .toBeEnabled()
   })
 
   it('disables lens actions when SkinnyWMS is not installed on the server', async () => {
@@ -172,6 +241,10 @@ describe('StoredOutputsCard', () => {
     expect(listMockLenses()[0].lens_params.local_path).toBe(
       '/data/output/job-completed-001_1',
     )
+    // Recorded as this run attempt's lens.
+    expect(lensOwner(listMockLenses()[0].lens_instance_id)).toBe(
+      'job-completed-001#1',
+    )
 
     // Copy writes the WMS URL to the clipboard (no throw).
     await screen.getByRole('button', { name: /copy wms url/i }).click()
@@ -194,5 +267,107 @@ describe('StoredOutputsCard', () => {
       a: 'run:job-completed-001~task-out-grib',
       b: 'off',
     })
+  })
+})
+
+describe('StoredOutputsCard zip download', () => {
+  const FETCHABLE = `${GRIB_DIR_MIME}; fiab-fetchable=1`
+  const fetchableOutputs: RunOutputs = {
+    'task-out-grib': {
+      mime_type: FETCHABLE,
+      original_block: 'block_sink_1',
+      is_available: true,
+    },
+  }
+  const ZIP_URL =
+    '/api/v1/run/outputZipped?run_id=job-completed-001&dataset_id=task-out-grib'
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    useConfigStore.getState().resetConfig()
+  })
+
+  it('hands the zip URL to the browser download', async () => {
+    const hrefs: Array<string> = []
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      hrefs.push(this.href)
+    })
+    const { screen } = await renderCard(fetchableOutputs)
+    await expect.element(screen.getByText('job-completed-001_1')).toBeVisible()
+
+    await screen.getByRole('button', { name: 'Download .zip' }).click()
+    expect(hrefs).toHaveLength(1)
+    expect(hrefs[0]).toContain(ZIP_URL)
+  })
+
+  it('offers no zip for markers from before the fetchable flag', async () => {
+    const { screen } = await renderCard(outputsWithMarkers)
+    await expect
+      .element(screen.getByRole('button', { name: /^visualise$/i }))
+      .toBeVisible()
+    expect(
+      screen.getByRole('button', { name: 'Download .zip' }).elements(),
+    ).toHaveLength(0)
+  })
+
+  it('holds the zip until the sink has written every file', async () => {
+    const writing: RunOutputs = {
+      ...fetchableOutputs,
+      'task-out-grib-2': {
+        mime_type: FETCHABLE,
+        original_block: 'block_sink_1',
+        is_available: false,
+      },
+    }
+    const { screen } = await renderCard(writing, undefined, 'running')
+    await expect.element(screen.getByText('1 of 2 files written')).toBeVisible()
+    await expect
+      .element(screen.getByRole('button', { name: 'Download .zip' }))
+      .toBeDisabled()
+    await expect
+      .element(screen.getByRole('button', { name: 'More download options' }))
+      .toBeDisabled()
+  })
+
+  it('copies a curl command without sign-in', async () => {
+    const writeText = vi
+      .spyOn(navigator.clipboard, 'writeText')
+      .mockResolvedValue()
+    const { screen } = await renderCard(fetchableOutputs)
+    await expect.element(screen.getByText('job-completed-001_1')).toBeVisible()
+
+    await screen.getByRole('button', { name: 'More download options' }).click()
+    await screen
+      .getByRole('menuitem', { name: /^Copy download command/ })
+      .click()
+    await expect.poll(() => writeText.mock.calls.length).toBe(1)
+    const copied = writeText.mock.calls[0][0]
+    expect(copied.startsWith('curl -fOJ "http')).toBe(true)
+    expect(copied).toContain(ZIP_URL)
+  })
+
+  it('copies the plain link when signed in', async () => {
+    useConfigStore.getState().setConfig(
+      {
+        language_iso639_1: 'en',
+        authType: 'authenticated',
+        loginEndpoint: null,
+      },
+      'api',
+    )
+    const writeText = vi
+      .spyOn(navigator.clipboard, 'writeText')
+      .mockResolvedValue()
+    const { screen } = await renderCard(fetchableOutputs)
+    await expect.element(screen.getByText('job-completed-001_1')).toBeVisible()
+
+    await screen.getByRole('button', { name: 'More download options' }).click()
+    await screen.getByRole('menuitem', { name: /^Copy download link/ }).click()
+    await expect.poll(() => writeText.mock.calls.length).toBe(1)
+    const copied = writeText.mock.calls[0][0]
+    expect(copied.startsWith('http')).toBe(true)
+    expect(copied).toContain(ZIP_URL)
   })
 })

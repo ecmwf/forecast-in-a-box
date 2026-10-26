@@ -12,6 +12,9 @@ import { defineConfig, mergeConfig } from 'vitest/config'
 import { playwright } from '@vitest/browser-playwright'
 import viteConfig from './vite.config.ts'
 
+/** Local only (`npm run test:gpu`): real-WebGL tests, slow on CI's software GL, and CI-flaky ones. */
+export const GPU_TESTS = 'tests/**/*.gpu.test.{ts,tsx}'
+
 export default mergeConfig(
   viteConfig({ mode: 'test', command: 'serve' }),
   defineConfig({
@@ -32,8 +35,9 @@ export default mergeConfig(
         '@tanstack/charts/scales/band',
         '@tanstack/charts/scales/linear',
         '@tanstack/charts/tooltip',
-        '@tanstack/react-charts/tooltip',
+        '@tanstack/charts/react/tooltip',
         '@base-ui/react/checkbox',
+        'zustand/react/shallow',
       ],
     },
     test: {
@@ -44,8 +48,10 @@ export default mergeConfig(
         'src/**/*.{test,spec}.{ts,tsx}',
         'tests/**/*.{test,spec}.{ts,tsx}',
       ],
-      exclude: ['tests/e2e/**', 'node_modules/**'],
+      exclude: ['tests/e2e/**', 'node_modules/**', GPU_TESTS],
       setupFiles: ['./tests/setup.ts'],
+      // expect.poll's 1 s default flakes on loaded CI runners; only failures wait longer.
+      expect: { poll: { timeout: 5000 } },
       browser: {
         enabled: true,
         provider: playwright(),

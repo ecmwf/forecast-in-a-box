@@ -43,6 +43,8 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      // The globe spec relies on mocked runs.
+      testIgnore: /globe\.spec\.ts/,
     },
   ],
 })

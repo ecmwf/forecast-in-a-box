@@ -17,6 +17,7 @@
 import {
   AlertCircle,
   CheckCircle2,
+  CircleStop,
   HelpCircle,
   Hourglass,
   Loader2,
@@ -30,6 +31,10 @@ export function RunStatusIcon({ status }: { status: JobStatus }) {
       return <Hourglass className="h-5 w-5 text-blue-500" />
     case 'running':
       return <Loader2 className="h-5 w-5 animate-spin text-amber-500" />
+    case 'stopping':
+      return <CircleStop className="h-5 w-5 animate-pulse text-slate-400" />
+    case 'stopped':
+      return <CircleStop className="h-5 w-5 text-slate-500" />
     case 'completed':
       return (
         <CheckCircle2 className="h-5 w-5 fill-emerald-500 text-emerald-500" />

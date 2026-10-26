@@ -26,7 +26,7 @@ export function JournalChip({
   onClick?: () => void
 }) {
   const className = cn(
-    'rounded px-2 py-0.5 text-sm transition-colors',
+    'rounded-md px-2 py-0.5 text-sm transition-colors',
     variant === 'facet'
       ? 'bg-muted text-muted-foreground'
       : 'border border-border bg-card text-muted-foreground',

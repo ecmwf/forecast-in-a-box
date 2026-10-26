@@ -8,6 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
+import { useMemo } from 'react'
 import { AlertCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type {
@@ -15,6 +16,9 @@ import type {
   BlockFactoryCatalogue,
   BlockInstanceId,
 } from '@/api/types/fable.types'
+import type { ValueLabel } from '@/features/fable-builder/hooks/useConfigValueLabels'
+import { blockDisplayNames } from '@/features/fable-builder/utils/block-names'
+import { useConfigValueLabels } from '@/features/fable-builder/hooks/useConfigValueLabels'
 import {
   useBlockValidation,
   useFableBuilderStore,
@@ -22,6 +26,9 @@ import {
 import { P } from '@/components/base/typography'
 import { getFactory } from '@/api/types/fable.types'
 import { cn } from '@/lib/utils'
+import { BlockName } from '@/features/fable-builder/components/shared/BlockName'
+import { ValueLabelHint } from '@/features/fable-builder/components/shared/ValueLabelHint'
+import { TooltipProvider } from '@/components/ui/tooltip'
 
 interface ConfigSummaryCardProps {
   instanceId: BlockInstanceId
@@ -35,9 +42,26 @@ export function ConfigSummaryCard({
   const { t } = useTranslation('configure')
   const fable = useFableBuilderStore((state) => state.fable)
   const blockValidation = useBlockValidation(instanceId)
+  const restrictions = useFableBuilderStore(
+    (state) =>
+      state.validationState?.blockStates[instanceId]?.configurationRestrictions,
+  )
+  const names = useMemo(
+    () => blockDisplayNames(fable, catalogue),
+    [fable, catalogue],
+  )
 
   const instance = fable.blocks[instanceId]
   const factory = getFactory(catalogue, instance.factory_id)
+  const valueLabels = useConfigValueLabels(
+    instance.configuration_values,
+    Object.fromEntries(
+      Object.keys(instance.configuration_values).map((key) => [
+        key,
+        restrictions?.[key] ?? factory?.configuration_options[key]?.value_type,
+      ]),
+    ),
+  )
 
   if (!factory) {
     return null
@@ -53,11 +77,9 @@ export function ConfigSummaryCard({
   const connectedInputs = Object.entries(instance.input_ids)
     .filter(([_, sourceId]) => sourceId && sourceId in fable.blocks)
     .map(([inputName, sourceId]) => {
-      const sourceBlock = fable.blocks[sourceId]
-      const sourceFactory = getFactory(catalogue, sourceBlock.factory_id)
       return {
         inputName,
-        sourceTitle: sourceFactory?.title ?? t('configSummary.unknownSource'),
+        sourceTitle: names[sourceId] ?? t('configSummary.unknownSource'),
       }
     })
 
@@ -69,9 +91,11 @@ export function ConfigSummaryCard({
       )}
     >
       <div className="mb-2 flex items-center justify-between">
-        <span className="font-medium">{factory.title}</span>
+        <span className="font-medium">
+          <BlockName name={names[instanceId]} />
+        </span>
         {hasErrors && (
-          <span className="inline-flex items-center gap-1 rounded border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-sm font-medium text-danger">
+          <span className="inline-flex items-center gap-1 rounded-md border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-sm font-medium text-danger">
             <AlertCircle className="h-3 w-3" />
             {errors.length}
           </span>
@@ -79,7 +103,7 @@ export function ConfigSummaryCard({
       </div>
 
       {hasErrors && (
-        <div className="mb-2 rounded bg-destructive/10 p-2 text-sm text-danger">
+        <div className="mb-2 rounded-md bg-destructive/10 p-2 text-sm text-danger">
           <ul className="list-disc space-y-0.5 pl-4">
             {errors.map((error, index) => (
               <li key={`${error}-${index}`}>{error}</li>
@@ -89,24 +113,35 @@ export function ConfigSummaryCard({
       )}
 
       {configuredValues.length > 0 && (
-        <div className="space-y-1">
-          {configuredValues.map(([key, value]) => {
-            // The key may be absent at runtime; cast to surface undefined.
-            const option = factory.configuration_options[key] as
-              BlockConfigurationOption | undefined
-            return (
-              <div
-                key={key}
-                className="flex items-center justify-between text-sm"
-              >
-                <span className="text-muted-foreground">
-                  {option?.title || key}:
-                </span>
-                <span className="font-mono text-sm">{value}</span>
-              </div>
-            )
-          })}
-        </div>
+        <TooltipProvider delay={120}>
+          <div className="space-y-1">
+            {configuredValues.map(([key, value]) => {
+              // The key may be absent at runtime; cast to surface undefined.
+              const option = factory.configuration_options[key] as
+                BlockConfigurationOption | undefined
+              const valueLabel = valueLabels[key] as ValueLabel | undefined
+              return (
+                <div
+                  key={key}
+                  className="flex items-center justify-between text-sm"
+                >
+                  <span className="text-muted-foreground">
+                    {option?.title || key}:
+                  </span>
+                  {valueLabel ? (
+                    <ValueLabelHint label={valueLabel}>
+                      <span className="text-right text-sm">
+                        {valueLabel.full}
+                      </span>
+                    </ValueLabelHint>
+                  ) : (
+                    <span className="font-mono text-sm">{value}</span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </TooltipProvider>
       )}
 
       {connectedInputs.length > 0 && (
@@ -117,7 +152,7 @@ export function ConfigSummaryCard({
               className="flex items-center justify-between text-sm"
             >
               <span className="text-muted-foreground">{inputName}:</span>
-              <span className="rounded border border-border bg-card px-2 py-0.5 text-sm text-muted-foreground">
+              <span className="rounded-md border border-border bg-card px-2 py-0.5 text-sm text-muted-foreground">
                 {sourceTitle}
               </span>
             </div>

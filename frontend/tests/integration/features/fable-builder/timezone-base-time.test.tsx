@@ -75,7 +75,7 @@ describe('Fable Builder — base time wire contract', () => {
   it('transmits the canonical UTC base time verbatim', async () => {
     useUiStore.setState({ timeZone: 'UTC' })
     const screen = await renderWithRouter(<FableBuilderPage />)
-    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
 
     seedSourceBlock()
     useFableBuilderStore
@@ -83,7 +83,7 @@ describe('Fable Builder — base time wire contract', () => {
       .updateBlockConfig('source1', 'base_time', '2026-05-15T00:00:00')
 
     const body = captureUpsert()
-    await screen.getByRole('button', { name: /Save Config/i }).click()
+    await screen.getByRole('button', { name: /Save workflow/i }).click()
     await screen.getByLabelText('Title').fill('Timezone Test UTC')
     await screen.getByRole('button', { name: 'Save', exact: true }).click()
     await expect
@@ -107,7 +107,7 @@ describe('Fable Builder — base time wire contract', () => {
     // The upsert must send that canonical value untouched — never local time.
     useUiStore.setState({ timeZone: 'Europe/Berlin' })
     const screen = await renderWithRouter(<FableBuilderPage />)
-    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
 
     seedSourceBlock()
     useFableBuilderStore
@@ -115,7 +115,7 @@ describe('Fable Builder — base time wire contract', () => {
       .updateBlockConfig('source1', 'base_time', '2026-05-14T22:00:00')
 
     const body = captureUpsert()
-    await screen.getByRole('button', { name: /Save Config/i }).click()
+    await screen.getByRole('button', { name: /Save workflow/i }).click()
     await screen.getByLabelText('Title').fill('Timezone Test Berlin')
     await screen.getByRole('button', { name: 'Save', exact: true }).click()
     await expect

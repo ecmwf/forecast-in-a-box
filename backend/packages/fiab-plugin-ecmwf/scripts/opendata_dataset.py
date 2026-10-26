@@ -3,7 +3,8 @@
 # dependencies = [
 #    "ecmwf-opendata",
 #    "beautifulsoup4",
-#    "qubed",
+#    "qubed>=0.3.1,<0.4.4",
+#    "pymetkit>=1.21.0.28",
 # ]
 # ///
 
@@ -15,9 +16,15 @@ from urllib.parse import urlparse
 
 import requests
 from ecmwf.opendata import Client
+from pymetkit.paramdb import ParamDB
 from qubed import Qube
 
-EXCLUDE = [{"type": ["em", "es", "ep"]}, {"levtype": ["sol"]}, {"param": ["z", "sdor", "slor"], "levtype": ["sfc"]}]
+EXCLUDE = [
+    {"type": ["em", "es", "ep"]},
+    {"levtype": ["sol"]},
+    {"param": ["z", "sdor", "slor"], "levtype": ["sfc"]},
+    {"param": ["z"], "levtype": ["pl"]},
+]
 SPLIT_BY = ["stream", "type", "levtype", "time"]
 DROP = ["date"]
 TYPES = {
@@ -76,6 +83,7 @@ if __name__ == "__main__":
     parser.add_argument("--member-zero", type=str, default="type=fc", help="Identifier for member zero")
     args = parser.parse_args()
 
+    paramdb = ParamDB()
     yesterday = datetime.now() - timedelta(days=1)
     base_url = url.path + ("" if url.path.endswith("/") else "/") + yesterday.strftime("%Y%m%d") + "/"
     datacubes = {}
@@ -89,7 +97,13 @@ if __name__ == "__main__":
             if k in TYPES:
                 v = list(map(TYPES[k], v))
             final_qcube[k] = sorted(v)
-        qube = qube | Qube.from_datacube(final_qcube)
+        final_qcube["param"] = sorted(
+            [
+                str(paramdb.shortname_to_param_id(shortname, context={k: final_qcube[k] for k in ["class", "stream", "type"]}))
+                for shortname in final_qcube["param"]
+            ]
+        )
+        qube = qube | Qube.from_datacube(dict(sorted(final_qcube.items())))
     qube = qube.compress()
 
     config = {}

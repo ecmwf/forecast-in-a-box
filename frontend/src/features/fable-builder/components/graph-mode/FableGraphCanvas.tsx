@@ -13,7 +13,6 @@ import {
   Background,
   BackgroundVariant,
   Controls,
-  MiniMap,
   ReactFlow,
   ReactFlowProvider,
   addEdge,
@@ -25,22 +24,31 @@ import '@xyflow/react/dist/style.css'
 import { FableEdgeComponent } from './FableEdge'
 import { BlockNode } from './nodes/BlockNode'
 import { BlockDragPreview } from './BlockDragPreview'
+import { AddSourcePopover } from './AddSourcePopover'
+import { CanvasStatus } from './CanvasStatus'
 import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
 import type { Connection, Edge, EdgeTypes, NodeTypes } from '@xyflow/react'
 import type { NodeDimensions } from '@/features/fable-builder/utils/layout-blocks'
 import type { FableNode } from './nodes/BlockNode'
+import { CanvasMiniMap } from '@/components/common/CanvasMiniMap'
+import { withMeasured } from '@/components/common/canvas-measured'
 import { getFactory } from '@/api/types/fable.types'
-import {
-  layoutNodes,
-  needsLayout,
-} from '@/features/fable-builder/utils/layout-blocks'
+import { layoutNodes } from '@/features/fable-builder/utils/layout-blocks'
 import { fableToGraph } from '@/features/fable-builder/utils/fable-to-graph'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import { useSidebarBlockDrop } from '@/features/fable-builder/hooks/useSidebarBlockDrop'
 import { useMedia } from '@/hooks/useMedia'
-import { useUiStore } from '@/stores/uiStore'
 import { TOUR, tourAttr } from '@/features/tutorials/anchors'
 import { cn } from '@/lib/utils'
+
+/** Debounce for the resize relayout. */
+const RESIZE_RELAYOUT_DELAY_MS = 150
+
+function heightsOf(dims: NodeDimensions): Record<string, number> {
+  return Object.fromEntries(
+    Object.entries(dims).map(([id, { height }]) => [id, height]),
+  )
+}
 
 interface FableGraphCanvasProps {
   catalogue: BlockFactoryCatalogue
@@ -60,12 +68,10 @@ const edgeTypes: EdgeTypes = {
 function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
   // Must match FableBuilderPage's layout breakpoint (lg).
   const isDesktop = useMedia('(min-width: 1024px)')
-  const resolvedTheme = useUiStore((state) => state.resolvedTheme)
-  const isDark = resolvedTheme === 'dark'
 
   // Use individual selectors to avoid creating new objects on every render
   const fable = useFableBuilderStore((state) => state.fable)
-  const autoLayout = useFableBuilderStore((state) => state.autoLayout)
+  const layoutTrigger = useFableBuilderStore((state) => state.layoutTrigger)
   const layoutDirection = useFableBuilderStore((state) => state.layoutDirection)
   const nodesLocked = useFableBuilderStore((state) => state.nodesLocked)
   const isMiniMapOpen = useFableBuilderStore((state) => state.isMiniMapOpen)
@@ -85,13 +91,14 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
 
   const containerRef = useRef<HTMLDivElement>(null)
+  const [sourceAnchor, setSourceAnchor] = useState<HTMLDivElement | null>(null)
   // Current selection mirrored into a ref so the layout effect can re-apply
   // it on a block-driven rebuild without depending on it (which would force a
   // full re-layout on every selection change).
   const selectedBlockIdRef = useRef(selectedBlockId)
   selectedBlockIdRef.current = selectedBlockId
   const prevBlocksRef = useRef<typeof fable.blocks | null>(null)
-  const prevAutoLayoutRef = useRef(autoLayout)
+  const prevLayoutTriggerRef = useRef(layoutTrigger)
   const prevLayoutDirectionRef = useRef(layoutDirection)
   const hasInitializedViewportRef = useRef<boolean>(false)
   const lastBlockCountRef = useRef<number>(0)
@@ -99,6 +106,8 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
   const [measurePending, setMeasurePending] = useState(false)
   // Full-graph replacement: additionally hidden until the measured layout.
   const [settling, setSettling] = useState(false)
+  // Card heights the last layout used.
+  const layoutHeightsRef = useRef<Record<string, number>>({})
 
   // Real node sizes, read from the DOM — neither xyflow's dimension events
   // nor its internal store deliver measurements in this controlled setup.
@@ -131,6 +140,7 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
         return
       }
       if (ready) {
+        layoutHeightsRef.current = heightsOf(dims)
         setNodes((current) =>
           layoutNodes(current, edges, { direction: layoutDirection }, dims),
         )
@@ -158,27 +168,26 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
     // changes if and only if the blocks content changes.
     const blocksChanged = fable.blocks !== prevBlocksRef.current
     const layoutChanged =
-      autoLayout !== prevAutoLayoutRef.current ||
+      layoutTrigger !== prevLayoutTriggerRef.current ||
       layoutDirection !== prevLayoutDirectionRef.current
 
     if (!blocksChanged && !layoutChanged) return
 
     prevBlocksRef.current = fable.blocks
-    prevAutoLayoutRef.current = autoLayout
+    prevLayoutTriggerRef.current = layoutTrigger
     prevLayoutDirectionRef.current = layoutDirection
 
     const { nodes: newNodes, edges: newEdges } = fableToGraph(fable, catalogue)
 
+    // Pre-render heights; the resize relayout below corrects them.
     const dimensions = measuredDimensions()
-    const shouldLayout = autoLayout || needsLayout(newNodes)
-    const layouted = shouldLayout
-      ? layoutNodes(
-          newNodes,
-          newEdges,
-          { direction: layoutDirection },
-          dimensions,
-        )
-      : newNodes
+    layoutHeightsRef.current = heightsOf(dimensions)
+    const layouted = layoutNodes(
+      newNodes,
+      newEdges,
+      { direction: layoutDirection },
+      dimensions,
+    )
 
     // Detect preset load: going from 0 blocks to multiple blocks
     // In this case, reset the viewport initialization to reposition the graph
@@ -191,28 +200,68 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
 
     // Unmeasured nodes → post-mount relayout; full replacements also hide.
     const unmeasured = layouted.filter((node) => !(node.id in dimensions))
-    const anyNew = shouldLayout && unmeasured.length > 0
+    const anyNew = unmeasured.length > 0
     setMeasurePending(anyNew)
     setSettling(anyNew && unmeasured.length === layouted.length)
 
     // Preserve the current selection — `fableToGraph` builds nodes without a
     // `selected` flag, so re-apply it here for the same-commit rebuild.
-    setNodes(
-      layouted.map((node) =>
-        node.id === selectedBlockIdRef.current
-          ? { ...node, selected: true }
-          : node,
+    setNodes((prev) =>
+      withMeasured(
+        layouted.map((node) =>
+          node.id === selectedBlockIdRef.current
+            ? { ...node, selected: true }
+            : node,
+        ),
+        prev,
       ),
     )
     setEdges(newEdges)
   }, [
     fable,
     catalogue,
-    autoLayout,
+    layoutTrigger,
     layoutDirection,
     measuredDimensions,
     setNodes,
     setEdges,
+  ])
+
+  // Re-centre cards whose height changed after layout (handles sit mid-height).
+  const nodeIds = nodes.map((node) => node.id).join(',')
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container || measurePending) return
+    let timer = 0
+    const observer = new ResizeObserver(() => {
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => {
+        const dims = measuredDimensions()
+        const drifted = Object.entries(dims).some(([id, { height }]) => {
+          const laidOut = layoutHeightsRef.current[id] as number | undefined
+          return laidOut !== undefined && Math.abs(height - laidOut) > 1
+        })
+        if (!drifted) return
+        layoutHeightsRef.current = heightsOf(dims)
+        setNodes((current) =>
+          layoutNodes(current, edges, { direction: layoutDirection }, dims),
+        )
+      }, RESIZE_RELAYOUT_DELAY_MS)
+    })
+    container
+      .querySelectorAll('.react-flow__node')
+      .forEach((element) => observer.observe(element))
+    return () => {
+      observer.disconnect()
+      window.clearTimeout(timer)
+    }
+  }, [
+    nodeIds,
+    edges,
+    layoutDirection,
+    measurePending,
+    measuredDimensions,
+    setNodes,
   ])
 
   // Position viewport once on initial load based on layout direction
@@ -393,9 +442,16 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
   return (
     <div
       ref={containerRef}
-      className="h-full w-full"
+      className="relative h-full w-full"
       {...tourAttr(TOUR.configure.canvas)}
     >
+      {/* Hangs the source picker off the upper third of the canvas. */}
+      <div
+        ref={setSourceAnchor}
+        aria-hidden
+        className="pointer-events-none absolute top-1/3 left-1/2 h-px w-px"
+      />
+      <AddSourcePopover anchor={sourceAnchor} catalogue={catalogue} />
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -415,7 +471,6 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
           // Instant hide while settling; fade in once the layout is final.
           settling ? 'opacity-0' : 'transition-opacity duration-150',
         )}
-        proOptions={{ hideAttribution: true }}
         // Default 0.5 floor can't fit a wide pipeline into a phone container.
         minZoom={0.1}
       >
@@ -431,17 +486,10 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
           position="bottom-left"
           className="bottom-2! left-2!"
         />
-        {isMiniMapOpen && isDesktop && (
-          <MiniMap
-            nodeStrokeWidth={3}
-            pannable
-            zoomable
-            position="bottom-right"
-            className="right-4! bottom-4! rounded-lg border border-border shadow-sm"
-            style={{ backgroundColor: isDark ? '#0f172a' : undefined }}
-            maskColor={isDark ? 'rgba(2, 6, 23, 0.6)' : 'rgba(0, 0, 0, 0.1)'}
-          />
+        {isDesktop && (
+          <CanvasStatus nodeCount={nodes.length} edgeCount={edges.length} />
         )}
+        {isMiniMapOpen && isDesktop && <CanvasMiniMap />}
       </ReactFlow>
       <BlockDragPreview mode={dropMode} />
     </div>

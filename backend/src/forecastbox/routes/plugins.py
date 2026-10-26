@@ -29,12 +29,14 @@ from forecastbox.domain.plugin.compatibility import get_compatible_versions
 from forecastbox.domain.plugin.db import PluginStateRecord, get_plugin_state, upsert_plugin_state
 from forecastbox.domain.plugin.detail import PluginListing, build_plugin_listing
 from forecastbox.domain.plugin.exceptions import PluginManagerBusy, PluginNotFound
+from forecastbox.domain.plugin.settings import PluginRefreshStrategy, PluginSettings
 from forecastbox.domain.plugin.state import PluginManager
 from forecastbox.domain.plugin.store import get_plugins_detail, submit_install_single
 from forecastbox.domain.plugin.submit import submit_uninstall_single, submit_unload_single, submit_update_single
 from forecastbox.routes.admin import get_admin_user
 from forecastbox.utility.concurrency.manager import execution_manager
-from forecastbox.utility.config import ROUTE_PREFIX, PluginSettings, config
+from forecastbox.utility.config import ROUTE_PREFIX
+from forecastbox.utility.http_pools import HttpProfile, get_sync
 from forecastbox.utility.packages import get_package_versions
 from forecastbox.utility.pydantic import FiabBaseModel
 
@@ -90,11 +92,10 @@ async def update_plugin(
         except InvalidVersion:
             raise HTTPException(status_code=422, detail=f"Invalid version string: {version!r}")
     else:
-        settings_and_source = _pluginId2settingsAndSource(pluginCompositeId)
-        if settings_and_source is None:
+        settings = await _pluginId2settings(pluginCompositeId)
+        if settings is None:
             raise HTTPException(status_code=404, detail=f"Plugin {pluginCompositeId!r} not found")
-        plugin_settings, pip_source = settings_and_source
-        versions = _settings2Versions(plugin_settings, pip_source)
+        versions = _source2Versions(settings.pip_source)
         if not versions.versions:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -112,43 +113,47 @@ class PluginVersions(FiabBaseModel):
     """Compatible versions, sorted newest first."""
 
 
-def _pluginId2settingsAndSource(pluginCompositeId: PluginCompositeId) -> tuple[PluginSettings, str] | None:
+async def _pluginId2settings(pluginCompositeId: PluginCompositeId) -> PluginSettings | None:
     store_detail = get_plugins_detail()
     if pluginCompositeId in store_detail:
         store_entry, _ = store_detail[pluginCompositeId]
         pip_source = store_entry.pip_source
-        return PluginSettings(pip_source=pip_source, module_name=store_entry.module_name), pip_source
-    if pluginCompositeId in config.external.plugins:
-        plugin_settings = config.external.plugins[pluginCompositeId]
-        return plugin_settings, plugin_settings.pip_source
+        return PluginSettings(pip_source=pip_source, module_name=store_entry.module_name)
+    plugin_id_str = PluginCompositeId.to_str(pluginCompositeId)
+    db_state = await execution_manager.await_jobs_db("plugin.state.get", partial(get_plugin_state, plugin_id_str))
+    if db_state is not None:
+        return db_state.to_settings()
     return None
 
 
-def _settings2Versions(pluginSettings: PluginSettings, pipSource: str) -> PluginVersions:
-    available = get_package_versions(pipSource)
-    compatible = get_compatible_versions(pluginSettings, available)
+def _source2Versions(pipSource: str) -> PluginVersions:
+    client = get_sync(HttpProfile.Default)
+    available = get_package_versions(pipSource, client)
+    compatible = get_compatible_versions(pipSource, available)
     sorted_versions = sorted(compatible, key=lambda v: Version(v), reverse=True)
     return PluginVersions(versions=sorted_versions)
 
 
 @router.get("/versions")
-def get_plugin_versions(pluginCompositeId: Annotated[PluginCompositeId, Depends()]) -> PluginVersions:
+async def get_plugin_versions(pluginCompositeId: Annotated[PluginCompositeId, Depends()]) -> PluginVersions:
     """Return available PyPI versions of a plugin that are compatible with the installed ``fiab-core``.
 
     Compatibility is defined as equal major version. Only versions published
     on PyPI are considered; locally-installed or git-sourced plugins will
     receive an empty list.
     """
-    settings_and_source = _pluginId2settingsAndSource(pluginCompositeId)
-    if settings_and_source is None:
+    settings = await _pluginId2settings(pluginCompositeId)
+    if settings is None:
         raise HTTPException(status_code=404, detail=f"Plugin {pluginCompositeId!r} not found")
-    return _settings2Versions(*settings_and_source)
+    return _source2Versions(settings.pip_source)
 
 
 @router.post("/install")
 async def install_plugin(pluginCompositeId: PluginCompositeId, admin: UserRead | None = Depends(get_admin_user)) -> Response:
     # TODO possibly add optional version parameter
-    await submit_install_single(pluginCompositeId)
+    result = await submit_install_single(pluginCompositeId)
+    if result:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result)
     return Accepted
 
 
@@ -168,6 +173,9 @@ class PluginSettingsUpdateRequest(FiabBaseModel):
     glyph_remapping: dict[str, str] | None = None
     """Glyph rename map to persist. ``None`` leaves the stored map unchanged;
     an empty dict explicitly clears all remappings."""
+    update_strategy: PluginRefreshStrategy | None = None
+    """Whether to pip-update the plugin on every launch (``automatic``) or leave it to manual/API
+    updates (``manual``). ``None`` leaves the stored value unchanged."""
 
 
 @router.post("/settings")
@@ -175,7 +183,7 @@ async def update_plugin_settings_endpoint(
     body: PluginSettingsUpdateRequest,
     admin: UserRead | None = Depends(get_admin_user),
 ) -> Response:
-    """Persist plugin settings (enabled flag, exclusions, remapping) and trigger a re-ingest."""
+    """Persist plugin settings (enabled flag, exclusions, remapping, update strategy) and trigger a re-ingest."""
     plugin_id_str = PluginCompositeId.to_str(body.pluginCompositeId)
     try:
         await execution_manager.await_jobs_db(
@@ -186,6 +194,7 @@ async def update_plugin_settings_endpoint(
                 enabled=body.isEnabled,
                 excluded_templates=body.excluded_templates,
                 glyph_remapping=body.glyph_remapping,
+                update_strategy=body.update_strategy,
             ),
         )
     except PluginNotFound:

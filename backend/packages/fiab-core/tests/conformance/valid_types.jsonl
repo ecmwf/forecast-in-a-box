@@ -1,0 +1,63 @@
+{"term": "str", "ast": {"name": "String"}, "value_valid": "hello world", "value_invalid": 42}
+{"term": "int", "ast": {"name": "Int"}, "value_valid": "42", "value_invalid": "not_an_int"}
+{"term": "int", "ast": {"name": "Int"}, "value_valid": "-7", "value_invalid": "42.5"}
+{"term": "float", "ast": {"name": "Float"}, "value_valid": "3.14", "value_invalid": "not_a_float"}
+{"term": "float", "ast": {"name": "Float"}, "value_valid": "42", "value_invalid": null}
+{"term": "date", "ast": {"name": "Date"}, "value_valid": "2026-05-08", "value_invalid": "05/08/2026"}
+{"term": "datetime", "ast": {"name": "Datetime"}, "value_valid": "2026-05-08T10:30:45", "value_invalid": "2026-05-08"}
+{"term": "datetime", "ast": {"name": "Datetime"}, "value_valid": "2026-05-08T10:30:45.123456+00:00", "value_invalid": "invalid_datetime"}
+{"term": "timedelta", "ast": {"name": "TimeDelta"}, "value_valid": "P3DT12H", "value_invalid": "P1Y"}
+{"term": "timedelta", "ast": {"name": "TimeDelta"}, "value_valid": "T30M", "value_invalid": "not_a_duration"}
+{"term": "none", "ast": {"name": "None"}, "value_valid": null, "value_invalid": ""}
+{"term": "param", "ast": {"name": "Parameter"}, "value_valid": "167", "value_invalid": 167}
+{"term": "artifact", "ast": {"name": "Artifact"}, "value_valid": "store:checkpoint", "value_invalid": "nocolon"}
+{"term": "geodomainSingle", "ast": {"name": "GeoDomainSingle"}, "value_valid": "France", "value_invalid": "auto"}
+{"term": "geodomainSingle", "ast": {"name": "GeoDomainSingle"}, "value_valid": "Germany", "value_invalid": "42"}
+{"term": "bboxWSEN", "ast": {"name": "BoundingBoxWSEN"}, "value_valid": "-10,40,30,70", "value_invalid": "1,2,3"}
+{"term": "bboxWSEN", "ast": {"name": "BoundingBoxWSEN"}, "value_valid": "170,-10,-170,10", "value_invalid": "-10,60,30,35"}
+{"term": "geodomain", "ast": {"name": "GeoDomain"}, "value_valid": "Germany,France,Italy", "value_invalid": "auto,Germany"}
+{"term": "geodomain", "ast": {"name": "GeoDomain"}, "value_valid": "-10,35,30,60", "value_invalid": "-10.25,35.5,30,60"}
+{"term": "geodomain", "ast": {"name": "GeoDomain"}, "value_valid": "global", "value_invalid": ["Germany"]}
+{"term": "enumClosed[str]('a','b','c')", "ast": {"name": "ClosedEnum", "subtype": {"name": "String"}, "items": ["a", "b", "c"]}, "value_valid": "b", "value_invalid": "d"}
+{"term": "enumClosed[str]('Option1','Option2')", "ast": {"name": "ClosedEnum", "subtype": {"name": "String"}, "items": ["Option1", "Option2"]}, "value_valid": "Option1", "value_invalid": "option1"}
+{"term": "enumClosed[str]('New York','Paris')", "ast": {"name": "ClosedEnum", "subtype": {"name": "String"}, "items": ["New York", "Paris"]}, "value_valid": "New York", "value_invalid": "NewYork"}
+{"term": "enumClosed[int](1,2,3)", "ast": {"name": "ClosedEnum", "subtype": {"name": "Int"}, "items": ["1", "2", "3"]}, "value_valid": "2", "value_invalid": "4"}
+{"term": "enumClosed[float](0.5,1.5)", "ast": {"name": "ClosedEnum", "subtype": {"name": "Float"}, "items": ["0.5", "1.5"]}, "value_valid": "1.5", "value_invalid": "2.5"}
+{"term": "enumClosed[date](2026-01-01,2026-12-31)", "ast": {"name": "ClosedEnum", "subtype": {"name": "Date"}, "items": ["2026-01-01", "2026-12-31"]}, "value_valid": "2026-01-01", "value_invalid": "2026-06-01"}
+{"term": "enumClosed[datetime](2026-01-01T00:00:00,2026-01-01T12:00:00)", "ast": {"name": "ClosedEnum", "subtype": {"name": "Datetime"}, "items": ["2026-01-01T00:00:00", "2026-01-01T12:00:00"]}, "value_valid": "2026-01-01T12:00:00", "value_invalid": "2026-01-01T06:00:00"}
+{"term": "enumClosed[artifact]('store:model1','store:model2')", "ast": {"name": "ClosedEnum", "subtype": {"name": "Artifact"}, "items": ["store:model1", "store:model2"]}, "value_valid": "store:model1", "value_invalid": "store:model3"}
+{"term": "enumClosed[int{positive}](1,2)", "ast": {"name": "ClosedEnum", "subtype": {"name": "Int", "traits": [{"name": "Positive"}]}, "items": ["1", "2"]}, "value_valid": "1", "value_invalid": "3"}
+{"term": "enumOpen[str]('x','y')", "ast": {"name": "OpenEnum", "subtype": {"name": "String"}, "items": ["x", "y"]}, "value_valid": "any_value", "value_invalid": 1}
+{"term": "enumOpen[int](1,2)", "ast": {"name": "OpenEnum", "subtype": {"name": "Int"}, "items": ["1", "2"]}, "value_valid": "99", "value_invalid": "abc"}
+{"term": "enumOpen[float](0.25,0.5)", "ast": {"name": "OpenEnum", "subtype": {"name": "Float"}, "items": ["0.25", "0.5"]}, "value_valid": "0.75", "value_invalid": "x"}
+{"term": "list[int]", "ast": {"name": "List", "item": {"name": "Int"}}, "value_valid": "1,2,3", "value_invalid": "1,not_an_int,3"}
+{"term": "list[int]", "ast": {"name": "List", "item": {"name": "Int"}}, "value_valid": "", "value_invalid": 123}
+{"term": "list[str]", "ast": {"name": "List", "item": {"name": "String"}}, "value_valid": "a,b,c", "value_invalid": null}
+{"term": "list[float]", "ast": {"name": "List", "item": {"name": "Float"}}, "value_valid": "1.5, 2.5, 3.5", "value_invalid": "1.5,x"}
+{"term": "list[timedelta]", "ast": {"name": "List", "item": {"name": "TimeDelta"}}, "value_valid": "P1D,PT12H,T30M", "value_invalid": "P1D,P1M"}
+{"term": "list[list[int]]", "ast": {"name": "List", "item": {"name": "List", "item": {"name": "Int"}}}, "value_valid": "1,2,3", "value_invalid": "1,a"}
+{"term": "list[enumClosed[str]('a','b')]", "ast": {"name": "List", "item": {"name": "ClosedEnum", "subtype": {"name": "String"}, "items": ["a", "b"]}}, "value_valid": "a,b,a", "value_invalid": "a,invalid"}
+{"term": "list[union[int,str]]", "ast": {"name": "List", "item": {"name": "Union", "types": [{"name": "Int"}, {"name": "String"}]}}, "value_valid": "42,hello,3", "value_invalid": ["42"]}
+{"term": "list[bboxWSEN]", "ast": {"name": "List", "item": {"name": "BoundingBoxWSEN"}}, "value_valid": "", "value_invalid": "1,2,3,4"}
+{"term": "list[int{positive}]", "ast": {"name": "List", "item": {"name": "Int", "traits": [{"name": "Positive"}]}}, "value_valid": "1,2,3", "value_invalid": "1,0,3"}
+{"term": "enumOpen[int](1,2){positive}", "ast": {"name": "OpenEnum", "subtype": {"name": "Int"}, "items": ["1", "2"], "traits": [{"name": "Positive"}]}, "value_valid": "7", "value_invalid": "-7"}
+{"term": "union[int,str]", "ast": {"name": "Union", "types": [{"name": "Int"}, {"name": "String"}]}, "value_valid": "hello", "value_invalid": 42}
+{"term": "union[int,float]", "ast": {"name": "Union", "types": [{"name": "Int"}, {"name": "Float"}]}, "value_valid": "3.14", "value_invalid": "not_a_number"}
+{"term": "union[int,none]", "ast": {"name": "Union", "types": [{"name": "Int"}, {"name": "None"}]}, "value_valid": null, "value_invalid": "not_an_int"}
+{"term": "union[str,none]", "ast": {"name": "Union", "types": [{"name": "String"}, {"name": "None"}]}, "value_valid": "", "value_invalid": 42}
+{"term": "union[date,datetime]", "ast": {"name": "Union", "types": [{"name": "Date"}, {"name": "Datetime"}]}, "value_valid": "2026-05-08T10:30:45", "value_invalid": "yesterday"}
+{"term": "union[timedelta,datetime]", "ast": {"name": "Union", "types": [{"name": "TimeDelta"}, {"name": "Datetime"}]}, "value_valid": "P1DT12H", "value_invalid": "2026-05-08"}
+{"term": "union[union[int,str],float]", "ast": {"name": "Union", "types": [{"name": "Union", "types": [{"name": "Int"}, {"name": "String"}]}, {"name": "Float"}]}, "value_valid": "42", "value_invalid": null}
+{"term": "union[list[int],list[float]]", "ast": {"name": "Union", "types": [{"name": "List", "item": {"name": "Int"}}, {"name": "List", "item": {"name": "Float"}}]}, "value_valid": "1.5,2.5", "value_invalid": "a,b"}
+{"term": "union[bboxWSEN,none]", "ast": {"name": "Union", "types": [{"name": "BoundingBoxWSEN"}, {"name": "None"}]}, "value_valid": "1,2,3,4", "value_invalid": "1,2,3"}
+{"term": "union[enumClosed[str]('a','b'),int]", "ast": {"name": "Union", "types": [{"name": "ClosedEnum", "subtype": {"name": "String"}, "items": ["a", "b"]}, {"name": "Int"}]}, "value_valid": "a", "value_invalid": "c"}
+{"term": "union[int]", "ast": {"name": "Union", "types": [{"name": "Int"}]}, "value_valid": "1", "value_invalid": "x"}
+{"term": "union[int,float]{nonNegative}", "ast": {"name": "Union", "types": [{"name": "Int"}, {"name": "Float"}], "traits": [{"name": "NonNegative"}]}, "value_valid": "0.5", "value_invalid": "-1"}
+{"term": "int{positive}", "ast": {"name": "Int", "traits": [{"name": "Positive"}]}, "value_valid": "5", "value_invalid": "0"}
+{"term": "int{nonNegative}", "ast": {"name": "Int", "traits": [{"name": "NonNegative"}]}, "value_valid": "0", "value_invalid": "-1"}
+{"term": "float{nonNegative}", "ast": {"name": "Float", "traits": [{"name": "NonNegative"}]}, "value_valid": "0.0", "value_invalid": "-0.5"}
+{"term": "int{divisibleBy(3)}", "ast": {"name": "Int", "traits": [{"name": "DivisibleBy", "arg": "3"}]}, "value_valid": "9", "value_invalid": "10"}
+{"term": "float{divisibleBy(0.5)}", "ast": {"name": "Float", "traits": [{"name": "DivisibleBy", "arg": "0.5"}]}, "value_valid": "2.5", "value_invalid": "2.25"}
+{"term": "int{positive,divisibleBy(3)}", "ast": {"name": "Int", "traits": [{"name": "Positive"}, {"name": "DivisibleBy", "arg": "3"}]}, "value_valid": "6", "value_invalid": "-3"}
+{"term": "timedelta{divisibleBy(P1D)}", "ast": {"name": "TimeDelta", "traits": [{"name": "DivisibleBy", "arg": "P1D"}]}, "value_valid": "P3D", "value_invalid": "PT12H"}
+{"term": "timedelta{positive,divisibleBy(PT6H)}", "ast": {"name": "TimeDelta", "traits": [{"name": "Positive"}, {"name": "DivisibleBy", "arg": "PT6H"}]}, "value_valid": "PT18H", "value_invalid": "PT0H"}

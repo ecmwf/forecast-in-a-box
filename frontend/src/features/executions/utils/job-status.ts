@@ -23,6 +23,8 @@ const JOB_STATUS_VARIANT: Record<
   submitted: 'warning',
   preparing: 'warning',
   running: 'busy',
+  stopping: 'disabled',
+  stopped: 'disabled',
   completed: 'active',
   failed: 'error',
   unknown: 'disabled',

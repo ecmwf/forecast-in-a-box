@@ -12,7 +12,7 @@
 import logging
 from dataclasses import dataclass
 
-import requests
+import httpx
 from cascade.gateway import api, client
 from fastapi import APIRouter, Request
 
@@ -21,6 +21,7 @@ from forecastbox.domain.gateway.service import get_gateway_url
 from forecastbox.domain.plugin.status import status_brief
 from forecastbox.utility.concurrency.manager import ExecutionStatus, execution_manager
 from forecastbox.utility.config import ROUTE_PREFIX, config
+from forecastbox.utility.http_pools import HttpProfile, get_async
 
 PREFIX = f"{ROUTE_PREFIX}/status"
 
@@ -41,7 +42,7 @@ class StatusResponse:
 
 
 @router.get("")
-def get_status(request: Request) -> StatusResponse:
+async def get_status(request: Request) -> StatusResponse:
     """Overall system status endpoint."""
 
     status: dict[str, str] = {"api": "up", "cascade": "up", "ecmwf": "up", "scheduler": "up", "version": request.app.version}
@@ -66,12 +67,12 @@ def get_status(request: Request) -> StatusResponse:
         status["plugins"] = f"failure getting status"
 
     try:
-        response = requests.get(f"{config.external.model_repository}/MANIFEST", timeout=5)
+        response = await get_async(HttpProfile.Default).get(f"{config.external.model_repository}/MANIFEST", timeout=5)
         if response.status_code == 200:
             status["ecmwf"] = "up"
         else:
             status["ecmwf"] = "down"
-    except Exception:
+    except httpx.HTTPError:
         status["ecmwf"] = "down"
 
     return StatusResponse(**status, concurrency=execution_manager.status())

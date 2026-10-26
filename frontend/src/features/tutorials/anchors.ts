@@ -17,6 +17,15 @@
  */
 
 export const TOUR = {
+  nav: {
+    overview: 'nav.overview',
+    configure: 'nav.configure',
+    execute: 'nav.execute',
+    visualise: 'nav.visualise',
+  },
+  overview: {
+    starters: 'overview.starters',
+  },
   configure: {
     canvas: 'configure.canvas',
     palette: 'configure.palette',
@@ -34,6 +43,7 @@ export const TOUR = {
     addSource: 'visualise.add-source',
     hub: 'visualise.hub',
     knownWms: 'visualise.known-wms',
+    sourceTabWms: 'visualise.source-tab-wms',
     map: 'visualise.map',
     modeSwitcher: 'visualise.mode-switcher',
     help: 'visualise.help',
@@ -43,6 +53,7 @@ export const TOUR = {
     expandRight: 'visualise.expand-right',
     timeline: 'visualise.timeline',
     timelineStatic: 'visualise.timeline-static',
+    projection: 'visualise.projection',
   },
 } as const
 

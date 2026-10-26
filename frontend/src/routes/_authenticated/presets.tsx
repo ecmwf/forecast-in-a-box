@@ -9,8 +9,18 @@
  */
 
 import { createFileRoute } from '@tanstack/react-router'
+import { z } from 'zod'
 import { PresetsPage } from '@/features/dashboard/components/PresetsPage'
+
+/** `filter` preselects a tab, e.g. the Overview's "View all templates" link. */
+const searchSchema = z.object({
+  filter: z
+    .enum(['all', 'bookmarked', 'templates'])
+    .optional()
+    .catch(undefined),
+})
 
 export const Route = createFileRoute('/_authenticated/presets')({
   component: PresetsPage,
+  validateSearch: searchSchema,
 })

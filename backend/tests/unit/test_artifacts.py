@@ -7,6 +7,7 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
+import errno
 import importlib.metadata
 import json
 import subprocess
@@ -35,6 +36,7 @@ from forecastbox.domain.artifact.io import (
     list_storage,
 )
 from forecastbox.utility.config import ArtifactStoreConfig, ArtifactStoresConfig
+from forecastbox.utility.http_pools import HttpProfile
 from forecastbox.utility.tunnel import CommandHandle
 
 
@@ -98,6 +100,26 @@ def tmpdir_path() -> Generator[Path, None, None]:
         yield Path(tmpdir)
 
 
+@pytest.fixture
+def mock_catalog_http_client(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
+    client = MagicMock()
+    monkeypatch.setattr("forecastbox.domain.artifact.catalog.get_sync", lambda _profile: client)
+    return client
+
+
+@pytest.fixture
+def mock_download_http_client(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
+    client = MagicMock()
+    client.is_closed = False
+
+    def get_sync(profile: HttpProfile) -> MagicMock:
+        assert profile is HttpProfile.Download
+        return client
+
+    monkeypatch.setattr("forecastbox.domain.artifact.io.get_sync", get_sync)
+    return client
+
+
 def test_composite_artifact_id() -> None:
     """Test CompositeArtifactId creation and hashing"""
     id1 = CompositeArtifactId(artifact_store_id=ArtifactStoreId("store1"), artifact_local_id=ArtifactLocalId("model1"))
@@ -144,7 +166,12 @@ def test_composite_artifact_id_from_str_missing_colon() -> None:
         CoreCompositeArtifactId.from_str("no_colon_here")
 
 
-def test_get_artifacts_catalog(sample_artifact_stores_config: Any, sample_common: Any, sample_checkpoint: Any) -> None:
+def test_get_artifacts_catalog(
+    sample_artifact_stores_config: Any,
+    sample_common: Any,
+    sample_checkpoint: Any,
+    mock_catalog_http_client: MagicMock,
+) -> None:
     """Test getting artifacts catalog from multiple stores"""
     store1_data = {
         "display_name": "Store 1",
@@ -173,36 +200,36 @@ def test_get_artifacts_catalog(sample_artifact_stores_config: Any, sample_common
         },
     }
 
-    with patch("httpx.Client") as mock_client_class:
-        mock_client = MagicMock()
-        mock_client_class.return_value.__enter__.return_value = mock_client
+    mock_responses = []
+    for data in [store1_data, store2_data]:
+        mock_response = MagicMock()
+        mock_response.content = json.dumps(data).encode()
+        mock_response.raise_for_status = MagicMock()
+        mock_responses.append(mock_response)
 
-        mock_responses = []
-        for data in [store1_data, store2_data]:
-            mock_response = MagicMock()
-            mock_response.content = json.dumps(data).encode()
-            mock_response.raise_for_status = MagicMock()
-            mock_responses.append(mock_response)
+    mock_catalog_http_client.get.side_effect = mock_responses
 
-        mock_client.get.side_effect = mock_responses
+    catalog = get_artifacts_catalog(sample_artifact_stores_config)
 
-        catalog = get_artifacts_catalog(sample_artifact_stores_config)
+    assert len(catalog) == 3
+    assert CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1")) in catalog
+    assert CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model2")) in catalog
+    assert CompositeArtifactId(ArtifactStoreId("store2"), ArtifactLocalId("model3")) in catalog
 
-        assert len(catalog) == 3
-        assert CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1")) in catalog
-        assert CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model2")) in catalog
-        assert CompositeArtifactId(ArtifactStoreId("store2"), ArtifactLocalId("model3")) in catalog
-
-        for composite_id, artifact in catalog.items():
-            assert isinstance(artifact, ArtifactResolved)
-            assert artifact.artifact_type == "AnemoiCheckpoint"
-            assert isinstance(artifact.common, CommonArtifactMetadata)
-            assert artifact.common.display_name == "Test Model"
-            assert artifact.is_locally_compatible is True
-            assert artifact.local_compatibility_detail is None
+    for composite_id, artifact in catalog.items():
+        assert isinstance(artifact, ArtifactResolved)
+        assert artifact.artifact_type == "AnemoiCheckpoint"
+        assert isinstance(artifact.common, CommonArtifactMetadata)
+        assert artifact.common.display_name == "Test Model"
+        assert artifact.is_locally_compatible is True
+        assert artifact.local_compatibility_detail is None
 
 
-def test_get_artifacts_catalog_from_git_tag(sample_common: Any, sample_checkpoint: Any) -> None:
+def test_get_artifacts_catalog_from_git_tag(
+    sample_common: Any,
+    sample_checkpoint: Any,
+    mock_catalog_http_client: MagicMock,
+) -> None:
     """Test that gittag stores fetch artifacts from the highest c-tag."""
     store_data = {
         "display_name": "Store 1",
@@ -234,17 +261,14 @@ def test_get_artifacts_catalog_from_git_tag(sample_common: Any, sample_checkpoin
     else:
         mock_versions.append(f"v{core_version.major - 1}.{core_version.minor}.{core_version.micro}.0")
         expected_version = mock_versions[1]
-    with patch("httpx.Client") as mock_client_class:
-        mock_client = MagicMock()
-        mock_client_class.return_value.__enter__.return_value = mock_client
-        with patch("forecastbox.domain.artifact.catalog.get_all_repo_tags", return_value=iter(mock_versions)):
-            with patch("forecastbox.domain.artifact.catalog.fetch_content") as mock_fetch:
-                mock_fetch.return_value = json.dumps(store_data).encode()
+    with patch("forecastbox.domain.artifact.catalog.get_all_repo_tags", return_value=iter(mock_versions)):
+        with patch("forecastbox.domain.artifact.catalog.fetch_content") as mock_fetch:
+            mock_fetch.return_value = json.dumps(store_data).encode()
 
-                catalog = get_artifacts_catalog(config)
+            catalog = get_artifacts_catalog(config)
 
     expected_url = f"https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/tags/{expected_version}/install/artifacts.json"
-    mock_fetch.assert_called_once_with(expected_url, mock_client)
+    mock_fetch.assert_called_once_with(expected_url, mock_catalog_http_client)
     assert len(catalog) == 1
     composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1"))
     assert composite_id in catalog
@@ -258,17 +282,14 @@ def test_artifact_store_config_requires_placeholder_for_gittag() -> None:
         )
 
 
-def test_get_artifacts_catalog_with_error(sample_artifact_stores_config: Any) -> None:
+def test_get_artifacts_catalog_with_error(sample_artifact_stores_config: Any, mock_catalog_http_client: MagicMock) -> None:
     """Test get_artifacts_catalog raises when there's a network error"""
-    with patch("httpx.Client") as mock_client_class:
-        mock_client = MagicMock()
-        mock_client_class.return_value.__enter__.return_value = mock_client
-        mock_client.get.side_effect = httpx.HTTPError("Network error")
-        with pytest.raises(httpx.HTTPError):
-            get_artifacts_catalog(sample_artifact_stores_config)
+    mock_catalog_http_client.get.side_effect = httpx.HTTPError("Network error")
+    with pytest.raises(httpx.HTTPError):
+        get_artifacts_catalog(sample_artifact_stores_config)
 
 
-def test_get_artifacts_catalog_unsupported_method() -> None:
+def test_get_artifacts_catalog_unsupported_method(mock_catalog_http_client: MagicMock) -> None:
     """Test get_artifacts_catalog with unsupported store method raises"""
     from typing import Literal, cast
 
@@ -285,7 +306,12 @@ def test_get_artifacts_catalog_unsupported_method() -> None:
         get_artifacts_catalog(config)
 
 
-def test_get_artifacts_catalog_from_local_file(tmpdir_path: Path, sample_common: Any, sample_checkpoint: Any) -> None:
+def test_get_artifacts_catalog_from_local_file(
+    tmpdir_path: Path,
+    sample_common: Any,
+    sample_checkpoint: Any,
+    mock_catalog_http_client: MagicMock,
+) -> None:
     """Test that get_artifacts_catalog loads from a local JSON file when the URL is a valid file path"""
     store_data = {
         "display_name": "Local Store",
@@ -453,102 +479,235 @@ def test_get_artifact_local_path_invalid_characters() -> None:
             get_artifact_local_path(invalid_id, tmpdir_url)
 
 
-def test_download_artifact_success(tmpdir_path: Path, sample_artifact: Any) -> None:
+def test_download_artifact_success(tmpdir_path: Path, sample_artifact: Any, mock_download_http_client: MagicMock) -> None:
     """Test successful artifact download"""
     composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
-
     mock_content = b"fake checkpoint data"
+    mock_response = MagicMock()
+    mock_response.headers = {"Content-Length": str(len(mock_content))}
+    mock_response.iter_bytes.return_value = [mock_content]
+    mock_response.raise_for_status = MagicMock()
+    mock_download_http_client.stream.return_value.__enter__.return_value = mock_response
 
-    with patch("httpx.Client") as mock_client_class:
-        mock_client = MagicMock()
-        mock_response = MagicMock()
-        mock_response.headers = {"Content-Length": str(len(mock_content))}
-        mock_response.iter_bytes.return_value = [mock_content]
-        mock_response.raise_for_status = MagicMock()
+    download_artifact(composite_id, sample_artifact, f"file://{tmpdir_path}")
 
-        mock_client.__enter__.return_value = mock_client
-        mock_client.stream.return_value.__enter__.return_value = mock_response
-        mock_client_class.return_value = mock_client
-
-        download_artifact(composite_id, sample_artifact, f"file://{tmpdir_path}")
-
-        # Verify the file was downloaded
-        artifact_path = get_artifact_local_path(composite_id, f"file://{tmpdir_path}")
-
-        assert artifact_path.exists()
-        assert artifact_path.read_bytes() == mock_content
+    artifact_path = get_artifact_local_path(composite_id, f"file://{tmpdir_path}")
+    assert artifact_path.exists()
+    assert artifact_path.read_bytes() == mock_content
+    mock_download_http_client.stream.assert_called_once_with("GET", sample_artifact.common.url)
 
 
-def test_download_artifact_creates_directory(tmpdir_path: Path, sample_artifact: Any) -> None:
+def test_download_artifact_creates_directory(tmpdir_path: Path, sample_artifact: Any, mock_download_http_client: MagicMock) -> None:
     """Test download_artifact creates necessary parent directory"""
     composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
-
     mock_content = b"fake checkpoint data"
+    mock_response = MagicMock()
+    mock_response.headers = {"Content-Length": str(len(mock_content))}
+    mock_response.iter_bytes.return_value = [mock_content]
+    mock_response.raise_for_status = MagicMock()
+    mock_download_http_client.stream.return_value.__enter__.return_value = mock_response
 
-    with patch("httpx.Client") as mock_client_class:
-        mock_client = MagicMock()
-        mock_response = MagicMock()
-        mock_response.headers = {"Content-Length": str(len(mock_content))}
-        mock_response.iter_bytes.return_value = [mock_content]
-        mock_response.raise_for_status = MagicMock()
+    download_artifact(composite_id, sample_artifact, f"file://{tmpdir_path}")
 
-        mock_client.__enter__.return_value = mock_client
-        mock_client.stream.return_value.__enter__.return_value = mock_response
-        mock_client_class.return_value = mock_client
-
-        download_artifact(composite_id, sample_artifact, f"file://{tmpdir_path}")
-
-        artifact_path = get_artifact_local_path(composite_id, f"file://{tmpdir_path}")
-        assert artifact_path.exists()
-        assert artifact_path.is_file()
-        assert artifact_path.parent.is_dir()
+    artifact_path = get_artifact_local_path(composite_id, f"file://{tmpdir_path}")
+    assert artifact_path.exists()
+    assert artifact_path.is_file()
+    assert artifact_path.parent.is_dir()
 
 
-def test_download_artifact_http_error(tmpdir_path: Path, sample_artifact: Any) -> None:
+def test_download_artifact_http_error(tmpdir_path: Path, sample_artifact: Any, mock_download_http_client: MagicMock) -> None:
     """Test download_artifact handles HTTP errors"""
     composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
+    mock_response = MagicMock()
+    mock_response.raise_for_status.side_effect = httpx.HTTPStatusError("404 Not Found", request=MagicMock(), response=MagicMock())
+    mock_download_http_client.stream.return_value.__enter__.return_value = mock_response
 
-    with patch("httpx.Client") as mock_client_class:
-        mock_client = MagicMock()
-        mock_response = MagicMock()
-        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError("404 Not Found", request=MagicMock(), response=MagicMock())
-
-        mock_client.__enter__.return_value = mock_client
-        mock_client.stream.return_value.__enter__.return_value = mock_response
-        mock_client_class.return_value = mock_client
-
-        with pytest.raises(httpx.HTTPStatusError):
-            download_artifact(composite_id, sample_artifact, f"file://{tmpdir_path}")
-
-
-def test_download_artifact_chunked_download(tmpdir_path: Path, sample_artifact: Any) -> None:
-    """Test download_artifact handles chunked downloads"""
-    composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
-
-    # Simulate chunked download
-    chunk1 = b"chunk1"
-    chunk2 = b"chunk2"
-    chunk3 = b"chunk3"
-    total_content = chunk1 + chunk2 + chunk3
-
-    with patch("httpx.Client") as mock_client_class:
-        mock_client = MagicMock()
-        mock_response = MagicMock()
-        mock_response.headers = {"Content-Length": str(len(total_content))}
-        mock_response.iter_bytes.return_value = [chunk1, chunk2, chunk3]
-        mock_response.raise_for_status = MagicMock()
-
-        mock_client.__enter__.return_value = mock_client
-        mock_client.stream.return_value.__enter__.return_value = mock_response
-        mock_client_class.return_value = mock_client
-
+    with pytest.raises(httpx.HTTPStatusError):
         download_artifact(composite_id, sample_artifact, f"file://{tmpdir_path}")
 
-        # Verify all chunks were written
-        artifact_path = get_artifact_local_path(composite_id, f"file://{tmpdir_path}")
 
-        assert artifact_path.exists()
-        assert artifact_path.read_bytes() == total_content
+def test_download_artifact_cleans_up_when_client_closes(
+    tmpdir_path: Path,
+    sample_artifact: Any,
+    mock_download_http_client: MagicMock,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test a shutdown-closing HTTP client cancels the download and removes its temporary file."""
+    composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
+    real_named_temporary_file = tempfile.NamedTemporaryFile
+    temporary_paths: list[Path] = []
+
+    def named_temporary_file(*args: Any, **kwargs: Any) -> Any:
+        kwargs["dir"] = tmpdir_path
+        temporary_file = real_named_temporary_file(*args, **kwargs)
+        temporary_paths.append(Path(temporary_file.name))
+        return temporary_file
+
+    monkeypatch.setattr("forecastbox.domain.artifact.io.tempfile.NamedTemporaryFile", named_temporary_file)
+    mock_download_http_client.is_closed = True
+    mock_download_http_client.stream.side_effect = httpx.ReadError("client closed")
+    caplog.set_level("INFO")
+
+    with pytest.raises(httpx.ReadError, match="client closed"):
+        download_artifact(composite_id, sample_artifact, f"file://{tmpdir_path}")
+
+    assert len(temporary_paths) == 1
+    assert not temporary_paths[0].exists()
+    assert "Artifact download cancelled because the HTTP client closed" in caplog.text
+
+
+def test_download_artifact_chunked_download(tmpdir_path: Path, sample_artifact: Any, mock_download_http_client: MagicMock) -> None:
+    """Test download_artifact handles chunked downloads"""
+    composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
+    chunks = [b"chunk1", b"chunk2", b"chunk3"]
+    total_content = b"".join(chunks)
+    mock_response = MagicMock()
+    mock_response.headers = {"Content-Length": str(len(total_content))}
+    mock_response.iter_bytes.return_value = chunks
+    mock_response.raise_for_status = MagicMock()
+    mock_download_http_client.stream.return_value.__enter__.return_value = mock_response
+
+    download_artifact(composite_id, sample_artifact, f"file://{tmpdir_path}")
+
+    artifact_path = get_artifact_local_path(composite_id, f"file://{tmpdir_path}")
+    assert artifact_path.exists()
+    assert artifact_path.read_bytes() == total_content
+
+
+# ---------------------------------------------------------------------------
+# file:// local copy tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def local_file_sample_common(tmpdir_path: Path) -> CommonArtifactMetadata:
+    """Common artifact metadata pointing at a local file:// source, with the source file created"""
+    source_path = tmpdir_path / "source.ckpt"
+    source_path.write_bytes(b"local checkpoint data")
+    return CommonArtifactMetadata(
+        url=f"file://{source_path}",
+        display_name="Test Model",
+        display_author="Test Author",
+        display_description="Test Description",
+        disk_size_bytes=1024,
+        supported_platforms=["linux"],
+        comment="",
+    )
+
+
+@pytest.fixture
+def local_file_artifact(
+    local_file_sample_common: CommonArtifactMetadata,
+    sample_checkpoint: AnemoiCheckpoint,
+) -> ArtifactResolved:
+    """ArtifactResolved whose source url is a local file:// path"""
+    return ArtifactResolved(
+        artifact_type="AnemoiCheckpoint",
+        common=local_file_sample_common,
+        specific=sample_checkpoint,
+        is_locally_compatible=True,
+        local_compatibility_detail=None,
+    )
+
+
+def test_download_local_artifact_hardlink(
+    tmpdir_path: Path,
+    local_file_artifact: ArtifactResolved,
+) -> None:
+    """Successful hardlink: target exists, progress callback called, no exception"""
+    composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
+    progress: list[int] = []
+
+    download_artifact(composite_id, local_file_artifact, f"file://{tmpdir_path}", progress_callback=progress.append)
+
+    artifact_path = get_artifact_local_path(composite_id, f"file://{tmpdir_path}")
+    assert artifact_path.exists()
+    assert artifact_path.read_bytes() == b"local checkpoint data"
+    assert progress == [100]
+
+
+def test_download_local_artifact_exdev_fallback_to_copy(
+    tmpdir_path: Path,
+    local_file_artifact: ArtifactResolved,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """os.link raising EXDEV falls back to shutil.copy"""
+    composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
+
+    def fake_link(src: Any, dst: Any) -> None:
+        raise OSError(errno.EXDEV, "Invalid cross-device link")
+
+    monkeypatch.setattr("forecastbox.domain.artifact.io.os.link", fake_link)
+
+    download_artifact(composite_id, local_file_artifact, f"file://{tmpdir_path}")
+
+    artifact_path = get_artifact_local_path(composite_id, f"file://{tmpdir_path}")
+    assert artifact_path.exists()
+    assert artifact_path.read_bytes() == b"local checkpoint data"
+
+
+def test_download_local_artifact_link_error_raises(
+    tmpdir_path: Path,
+    local_file_artifact: ArtifactResolved,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """os.link raising a non-EXDEV OSError: call raises, no progress callback, no target file"""
+    composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
+    progress: list[int] = []
+
+    def fake_link(src: Any, dst: Any) -> None:
+        raise OSError(errno.EACCES, "Permission denied")
+
+    monkeypatch.setattr("forecastbox.domain.artifact.io.os.link", fake_link)
+
+    with pytest.raises(OSError, match="Permission denied"):
+        download_artifact(composite_id, local_file_artifact, f"file://{tmpdir_path}", progress_callback=progress.append)
+
+    artifact_path = get_artifact_local_path(composite_id, f"file://{tmpdir_path}")
+    assert not artifact_path.exists()
+    assert progress == []
+
+
+def test_download_local_artifact_missing_source_raises(
+    tmpdir_path: Path,
+    local_file_artifact: ArtifactResolved,
+) -> None:
+    """Missing source file: call raises"""
+    composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
+    source_path = Path(local_file_artifact.common.url.removeprefix("file://"))
+    source_path.unlink()
+
+    with pytest.raises(FileNotFoundError):
+        download_artifact(composite_id, local_file_artifact, f"file://{tmpdir_path}")
+
+    artifact_path = get_artifact_local_path(composite_id, f"file://{tmpdir_path}")
+    assert not artifact_path.exists()
+
+
+def test_download_local_artifact_copy_failure_removes_partial(
+    tmpdir_path: Path,
+    local_file_artifact: ArtifactResolved,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """EXDEV fallback where shutil.copy writes a partial file then fails: call raises and partial is removed"""
+    composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
+
+    def fake_link(src: Any, dst: Any) -> None:
+        raise OSError(errno.EXDEV, "Invalid cross-device link")
+
+    def fake_copy(src: Any, dst: Any) -> None:
+        Path(dst).write_bytes(b"partial")
+        raise OSError(errno.ENOSPC, "No space left on device")
+
+    monkeypatch.setattr("forecastbox.domain.artifact.io.os.link", fake_link)
+    monkeypatch.setattr("forecastbox.domain.artifact.io.shutil.copy", fake_copy)
+
+    with pytest.raises(OSError, match="No space left on device"):
+        download_artifact(composite_id, local_file_artifact, f"file://{tmpdir_path}")
+
+    artifact_path = get_artifact_local_path(composite_id, f"file://{tmpdir_path}")
+    assert not artifact_path.exists()
 
 
 # ---------------------------------------------------------------------------

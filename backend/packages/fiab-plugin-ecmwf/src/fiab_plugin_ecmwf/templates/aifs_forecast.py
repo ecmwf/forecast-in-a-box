@@ -49,12 +49,13 @@ template = BlueprintTemplate(
             factory_id=BlockFactoryId("mapPlotSink"),
             instance=BlockInstance(
                 configuration_values={
-                    ConfigurationOptionId("param"): "2t,msl",
+                    ConfigurationOptionId("param"): "167,151",
                     ConfigurationOptionId("domain"): "${area}",
                     ConfigurationOptionId("format"): "${plotFormat}",
                     ConfigurationOptionId("groupby"): "none",
                     # Splitting by param is valid only because two are selected.
                     ConfigurationOptionId("splitby"): "step,param",
+                    ConfigurationOptionId("style"): "ECMWF",
                 },
                 input_ids={
                     "dataset": BlockInstanceId("source"),

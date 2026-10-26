@@ -1,0 +1,77 @@
+{
+  "skipped": "too slow to run at the moment, to be troubleshot",
+  "blocks": {
+    "source": {
+      "factory_id": "operationalForecastSource",
+      "instance": {
+        "configuration_values": {
+          "source": "opendata",
+          "forecast": "ifs-ens",
+          "base_time": "2026-01-01T00:00:00"
+        },
+        "input_ids": {}
+      }
+    },
+    "selectParam": {
+      "factory_id": "select",
+      "instance": {
+        "configuration_values": {
+          "dimension": "param",
+          "values": "167"
+        },
+        "input_ids": {
+          "dataset": "source"
+        }
+      }
+    },
+    "selectStep": {
+      "factory_id": "select",
+      "instance": {
+        "configuration_values": {
+          "dimension": "step",
+          "values": "72"
+        },
+        "input_ids": {
+          "dataset": "selectParam"
+        }
+      }
+    },
+    "ensembleStatistic": {
+      "factory_id": "ensembleStatistics",
+      "instance": {
+        "configuration_values": {
+          "statistic": "mean"
+        },
+        "input_ids": {
+          "dataset": "selectStep"
+        }
+      }
+    },
+    "mapPlot": {
+      "factory_id": "mapPlotSink",
+      "instance": {
+        "configuration_values": {
+          "param": "167",
+          "domain": "global",
+          "format": "png",
+          "groupby": "none",
+          "splitby": "none"
+        },
+        "input_ids": {
+          "dataset": "ensembleStatistic"
+        }
+      }
+    },
+    "gribSink": {
+      "factory_id": "gribSink",
+      "instance": {
+        "configuration_values": {
+          "path": "/tmp/outputRoot/[shortName].grib"
+        },
+        "input_ids": {
+          "dataset": "ensembleStatistic"
+        }
+      }
+    }
+  }
+}

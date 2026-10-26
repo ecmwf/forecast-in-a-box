@@ -23,6 +23,10 @@ Glyph routes:
  - GET  glyphs/functions — list all custom interpolation functions (filters and globals)
  - POST glyphs/global/post    — create or update a global glyph
  - POST glyphs/global/delete  — delete a global glyph by id
+
+Also contains:
+ - POST options/resolveDisplay — resolve cryptic configuration option values (artifact ids,
+   parameter ids) into display strings
 """
 
 import datetime as dt
@@ -42,6 +46,7 @@ from fiab_core.fable import (
 
 from forecastbox.domain.auth.users import get_auth_context
 from forecastbox.domain.blueprint import db, service
+from forecastbox.domain.blueprint.display import ResolvableValue, configOption2display
 from forecastbox.domain.blueprint.exceptions import (
     BlueprintAccessDenied,
     BlueprintNotFound,
@@ -650,3 +655,43 @@ async def delete_global_glyph(
     )
     if row is None:
         raise HTTPException(status_code=404, detail=f"GlobalGlyph {request.global_glyph_id!r} not found or not accessible.")
+
+
+# ---------------------------------------------------------------------------
+# Configuration option display resolution
+# ---------------------------------------------------------------------------
+
+
+class ResolveDisplayRequest(FiabBaseModel):
+    elements: list[ResolvableValue]
+
+
+class ResolvedValue(FiabBaseModel):
+    typeName: str
+    value: str
+    display: str | None
+
+
+class ResolveDisplayResponse(FiabBaseModel):
+    elements: list[ResolvedValue]
+
+
+@router.post("/options/resolveDisplay")
+async def resolve_display(request: ResolveDisplayRequest) -> ResolveDisplayResponse:
+    """Resolve configuration option values into display strings.
+
+    Each element's ``typeName`` is parsed as a Fable type expression. Artifact ids are looked
+    up in the artifact catalog and resolved to their display name; parameter ids are resolved
+    via the Metkit param database. Any other valid type resolves to a None display. Returns
+    404 if any element's ``typeName`` is not a valid Fable type expression.
+    """
+    try:
+        displays = configOption2display(request.elements)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return ResolveDisplayResponse(
+        elements=[
+            ResolvedValue(typeName=element.typeName, value=element.value, display=display)
+            for element, display in zip(request.elements, displays)
+        ]
+    )

@@ -29,7 +29,7 @@ import pathlib
 import sys
 import zipfile
 from datetime import datetime as _dt
-from typing import Any, get_args
+from typing import Any, cast, get_args
 
 import cloudpickle
 import httpx
@@ -49,9 +49,14 @@ def _config(values: dict[str, str]) -> dict[ConfigurationOptionId, str]:
     return {ConfigurationOptionId(key): value for key, value in values.items()}
 
 
-def ensure_completed_v2(backend_client: httpx.Client, job_id: str, sleep: float = 0.5, attempts: int = 20) -> None:
+def ensure_completed_v2(
+    backend_client: httpx.Client, job_id: str, sleep: float = 0.5, attempts: int = 20, attempt_count: int | None = None
+) -> None:
     def do_action() -> Any:
-        response = backend_client.get("/run/get", params={"run_id": job_id}, timeout=10)
+        params = {"run_id": job_id}
+        if attempt_count is not None:
+            params["attempt_count"] = attempt_count
+        response = backend_client.get("/run/get", params=params, timeout=10)
         assert response.is_success, response.text
         return response.json()
 
@@ -500,6 +505,7 @@ def test_blueprint_expand(tmpdir: Any, backend_client_user: httpx.Client) -> Non
             },
             {"plugin": {"store": "localTest", "local": "single"}, "factory": "product_join", "restrictions": {}},
             {"plugin": {"store": "localTest", "local": "single"}, "factory": "sink_file", "restrictions": {}},
+            {"plugin": {"store": "localTest", "local": "single"}, "factory": "sink_filetree", "restrictions": {}},
             {"plugin": {"store": "localTest", "local": "single"}, "factory": "sink_image", "restrictions": {}},
         ]
     }
@@ -524,6 +530,7 @@ def test_blueprint_expand(tmpdir: Any, backend_client_user: httpx.Client) -> Non
         },
         {"plugin": {"store": "localTest", "local": "single"}, "factory": "product_join", "restrictions": {}},
         {"plugin": {"store": "localTest", "local": "single"}, "factory": "sink_file", "restrictions": {}},
+        {"plugin": {"store": "localTest", "local": "single"}, "factory": "sink_filetree", "restrictions": {}},
         {"plugin": {"store": "localTest", "local": "single"}, "factory": "sink_image", "restrictions": {}},
     ]
 
@@ -611,7 +618,10 @@ def test_blueprint_expand(tmpdir: Any, backend_client_user: httpx.Client) -> Non
 
     builder = BlueprintBuilder(blocks=blocks)
     response = backend_client_user.request(url="/blueprint/expand", method="put", json=builder.model_dump())
-    expected_expansion = [{"factory": "sink_file", "plugin": {"local": "single", "store": "localTest"}, "restrictions": {}}]
+    expected_expansion = [
+        {"factory": "sink_file", "plugin": {"local": "single", "store": "localTest"}, "restrictions": {}},
+        {"factory": "sink_filetree", "plugin": {"local": "single", "store": "localTest"}, "restrictions": {}},
+    ]
     # NOTE this looks odd but sink_file produces the url of the file, and that url is a text which can again be written to a file
     assert response.json()["possible_expansions"]["sink_file"] == expected_expansion, "sink_file should expand only to sink_file"
     assert len(response.json()["block_errors"]) == 0
@@ -892,8 +902,8 @@ def test_blueprint_expand_missing_glyph_warnings(tmpdir: Any, backend_client_use
     assert logs_resp.is_success, logs_resp.text
     assert "zip" in logs_resp.headers["content-type"]
     with zipfile.ZipFile(io.BytesIO(logs_resp.content), "r") as zf:
-        # NOTE dbEntity, gwState, gateway, controller, host0, host0.dsr, host0.shm, (host0.w1, host0.w2) x (logs, stdout, stderr)
-        expected_log_count = 13
+        # NOTE dbEntity, gwState, backend, gateway, controller, host0, host0.dsr, host0.shm, (host0.w1, host0.w2) x (logs, stdout, stderr)
+        expected_log_count = 14
         assert len(zf.namelist()) == expected_log_count or os.getenv("FIAB_LOGSTDOUT", "nay") == "yea"
 
     # Clean up: delete the global glyph created in this test
@@ -1633,6 +1643,35 @@ def test_blueprint_nullable_option(tmpdir: Any, backend_client_user: httpx.Clien
 # ---------------------------------------------------------------------------
 
 
+def _make_builder_sleeper() -> BlueprintBuilder:
+    """A source sleeping for 30s, followed by a sink."""
+    sleeper = RoutableBlock(
+        instance_id=BlockInstanceId("sleeper"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("source_sleep"),
+        instance=BlockInstance(
+            configuration_values=_config({"text": "hello", "duration": "30"}),
+            input_ids={},
+        ),
+    )
+    sink = RoutableBlock(
+        instance_id=BlockInstanceId("sink"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("sink_file"),
+        instance=BlockInstance(
+            configuration_values=_config({"fname": "/dev/null"}),
+            input_ids={"data": BlockInstanceId("sleeper")},
+        ),
+    )
+    builder = BlueprintBuilder(
+        blocks=[
+            sleeper,
+            sink.model_copy(update={"instance_id": BlockInstanceId("sleeper_sink")}),
+        ]
+    )
+    return builder
+
+
 def _make_builder_source_and_sink(tmpdir: str) -> BlueprintBuilder:
     """Minimal two-block blueprint: source_42 → sink_file.
 
@@ -1665,8 +1704,10 @@ def _make_builder_source_and_sink(tmpdir: str) -> BlueprintBuilder:
     )
 
 
-def _make_builder_source_and_two_sinks(tmpdir: str) -> BlueprintBuilder:
-    """Blueprint with source_42 → sink_file and source_42 → sink_image."""
+def _make_builder_source_and_two_sinks(tmpdir: str, images: int = 1, filetree: bool = False) -> BlueprintBuilder:
+    """Blueprint with source_42 → sink_file and source_42 → sink_image, the latter producing `images` outputs.
+
+    With `filetree`, a sink_filetree block is added as well."""
     source_42 = RoutableBlock(
         instance_id=BlockInstanceId("source_42"),
         plugin=testPluginId,
@@ -1690,7 +1731,16 @@ def _make_builder_source_and_two_sinks(tmpdir: str) -> BlueprintBuilder:
         plugin=testPluginId,
         factory=BlockFactoryId("sink_image"),
         instance=BlockInstance(
-            configuration_values={},
+            configuration_values=_config({"images": str(images)}),
+            input_ids={"data": BlockInstanceId("source_42")},
+        ),
+    )
+    sink_filetree = RoutableBlock(
+        instance_id=BlockInstanceId("my_tree_sink"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("sink_filetree"),
+        instance=BlockInstance(
+            configuration_values=_config({"path_root": f"{tmpdir}/tree_${{runId}}", "depth": "2"}),
             input_ids={"data": BlockInstanceId("source_42")},
         ),
     )
@@ -1699,6 +1749,7 @@ def _make_builder_source_and_two_sinks(tmpdir: str) -> BlueprintBuilder:
             source_42,
             sink_file.model_copy(update={"instance_id": BlockInstanceId("my_sink")}),
             sink_image.model_copy(update={"instance_id": BlockInstanceId("my_image_sink")}),
+            *([sink_filetree] if filetree else []),
         ]
     )
 
@@ -1707,22 +1758,6 @@ def test_run_delete_not_found(backend_client_user: httpx.Client) -> None:
     """POST /run/delete with a non-existent run_id returns 404."""
     resp = backend_client_user.post("/run/delete", json={"run_id": "nonexistent-run-id", "attempt_count": 1})
     assert resp.status_code == 404
-
-
-def test_run_delete_attempt_conflict(backend_client_user: httpx.Client) -> None:
-    """POST /run/delete with a mismatched attempt_count returns 409."""
-    builder = _make_builder_source_only()
-    save_resp = backend_client_user.post("/blueprint/create", json=BlueprintSaveCommand(builder=builder).model_dump())
-    assert save_resp.is_success, save_resp.text
-    blueprint_id = save_resp.json()["blueprint_id"]
-
-    run_resp = backend_client_user.post("/run/create", json={"blueprint_id": blueprint_id})
-    assert run_resp.is_success, run_resp.text
-    run_id = run_resp.json()["run_id"]
-    attempt_count = run_resp.json()["attempt_count"]
-
-    del_resp = backend_client_user.post("/run/delete", json={"run_id": run_id, "attempt_count": attempt_count + 1})
-    assert del_resp.status_code == 409
 
 
 def test_run_restart_attempt_conflict(backend_client_user: httpx.Client) -> None:
@@ -1741,38 +1776,55 @@ def test_run_restart_attempt_conflict(backend_client_user: httpx.Client) -> None
     assert restart_resp.status_code == 409
 
 
-def test_run_delete_ok(tmpdir: Any, backend_client_user: httpx.Client) -> None:
-    """Create a run, wait for completion, delete it, verify it disappears."""
-    builder = _make_builder_source_and_sink(tmpdir)
-    save_resp = backend_client_user.post("/blueprint/create", json=BlueprintSaveCommand(builder=builder).model_dump())
-    assert save_resp.is_success, save_resp.text
-    blueprint_id = save_resp.json()["blueprint_id"]
+def test_delete_stop_ok(tmpdir: Any, backend_client_user: httpx.Client) -> None:
+    """Delete and stop of runs, on a short task that completes and on a long task that is stopped."""
 
-    run_resp = backend_client_user.post("/run/create", json={"blueprint_id": blueprint_id})
-    assert run_resp.is_success, run_resp.text
-    run_id = run_resp.json()["run_id"]
-    attempt_count = run_resp.json()["attempt_count"]
+    def assert_gone(run_id: str) -> None:
+        assert backend_client_user.get("/run/get", params={"run_id": run_id}, timeout=30).status_code == 404
+        listed = backend_client_user.get("/run/list", timeout=30).raise_for_status().json()
+        assert run_id not in [r["run_id"] for r in listed["runs"]]
 
+    # --- a) short-task: a completed run cannot be stopped, but can be deleted ---
+    run_id, attempt_count = _create_run(backend_client_user, _make_builder_source_and_sink(tmpdir))
     ensure_completed_v2(backend_client_user, run_id, sleep=1, attempts=120)
 
-    total_before = backend_client_user.get("/run/list").raise_for_status().json()["total"]
+    refused = backend_client_user.post("/run/stop", json={"run_id": run_id, "attempt_count": attempt_count})
+    assert refused.status_code == 409, refused.text
+    assert _ensure_run_status(backend_client_user, run_id, {"completed"}) == "completed"
 
     del_resp = backend_client_user.post("/run/delete", json={"run_id": run_id, "attempt_count": attempt_count})
     assert del_resp.is_success, del_resp.text
+    assert_gone(run_id)
 
-    # Deleted run is no longer accessible
-    get_resp = backend_client_user.get("/run/get", params={"run_id": run_id})
-    assert get_resp.status_code == 404
+    missing = backend_client_user.post("/run/stop", json={"run_id": run_id, "attempt_count": attempt_count})
+    assert missing.status_code == 404, missing.text
 
-    # And no longer appears in the list
-    list_after = backend_client_user.get("/run/list").raise_for_status().json()
-    assert list_after["total"] == total_before - 1
-    assert run_id not in [r["run_id"] for r in list_after["runs"]]
+    # --- b) long-task: a running run cannot be deleted, is stopped (idempotently), retained, and then can be deleted ---
+    # NOTE we dont care whether the stop is applied at compile or at submitted time
+    run_id, attempt_count = _create_run(backend_client_user, _make_builder_sleeper())
+
+    refused = backend_client_user.post("/run/delete", json={"run_id": run_id, "attempt_count": attempt_count})
+    assert refused.status_code == 409, refused.text
+
+    stop_resp = backend_client_user.post("/run/stop", json={"run_id": run_id, "attempt_count": attempt_count})
+    assert stop_resp.is_success, stop_resp.text
+    assert _ensure_run_status(backend_client_user, run_id, {"stopped"}) == "stopped"
+
+    again = backend_client_user.post("/run/stop", json={"run_id": run_id, "attempt_count": attempt_count})
+    assert again.is_success, again.text
+    assert _ensure_run_status(backend_client_user, run_id, {"stopped"}) == "stopped"
+
+    listed = backend_client_user.get("/run/list", timeout=30).raise_for_status().json()["runs"]
+    assert [r["status"] for r in listed if r["run_id"] == run_id] == ["stopped"]
+
+    del_resp = backend_client_user.post("/run/delete", json={"run_id": run_id, "attempt_count": attempt_count}, timeout=30)
+    assert del_resp.is_success, del_resp.text
+    assert_gone(run_id)
 
 
 def test_run_output_content(tmpdir: Any, backend_client_user: httpx.Client) -> None:
     """Execute a run, wait for completion, then retrieve output content via outputContent."""
-    builder = _make_builder_source_and_two_sinks(tmpdir)
+    builder = _make_builder_source_and_two_sinks(tmpdir, images=3, filetree=True)
     save_resp = backend_client_user.post("/blueprint/create", json=BlueprintSaveCommand(builder=builder).model_dump())
     assert save_resp.is_success, save_resp.text
     blueprint_id = save_resp.json()["blueprint_id"]
@@ -1794,21 +1846,28 @@ def test_run_output_content(tmpdir: Any, backend_client_user: httpx.Client) -> N
     # Cascade only exposes sink tasks as ext_outputs; our blueprint has two sinks.
     # Task IDs encode the runtime function name: fiab_plugin_test.runtime.sink_file:<hash>
     # and fiab_plugin_test.runtime.sink_image:<hash>
-    sink_file_tasks = [t for t in available_tasks if "sink_file" in t]
+    sink_file_tasks = [t for t in available_tasks if "sink_file" in t and "sink_filetree" not in t]
     assert len(sink_file_tasks) == 1, f"Expected exactly one sink_file task, got: {available_tasks}"
     sink_file_task_id = sink_file_tasks[0]
 
     sink_image_tasks = [t for t in available_tasks if "sink_image" in t]
-    assert len(sink_image_tasks) == 1, f"Expected exactly one sink_image task, got: {available_tasks}"
-    sink_image_task_id = sink_image_tasks[0]
+    assert len(sink_image_tasks) == 3, f"Expected exactly three sink_image tasks, got: {available_tasks}"
 
     # Verify original_block points to the correct block instance IDs from the blueprint
     assert output_entries[sink_file_task_id]["original_block"] == "my_sink"
-    assert output_entries[sink_image_task_id]["original_block"] == "my_image_sink"
+    for task_id in sink_image_tasks:
+        assert output_entries[task_id]["original_block"] == "my_image_sink"
 
     # Verify declared mime_type matches the actual content-type returned by outputContent
     assert output_entries[sink_file_task_id]["mime_type"] == "text/plain"
-    assert output_entries[sink_image_task_id]["mime_type"] == "image/png"
+    for task_id in sink_image_tasks:
+        assert output_entries[task_id]["mime_type"] == "image/png"
+
+    # Verify display_name and dimension_kvs declared by the plugin are propagated
+    assert output_entries[sink_file_task_id]["display_name"] == "The Display Name"
+    assert output_entries[sink_file_task_id]["dimension_kvs"] == [["dimOne", "valOne"]]
+    image_labels = sorted((output_entries[t]["display_name"], output_entries[t]["dimension_kvs"]) for t in sink_image_tasks)
+    assert image_labels == [(f"Image #{idx}", [["idx", str(idx)]]) for idx in range(3)]
 
     content_resp = backend_client_user.get(
         "/run/outputContent",
@@ -1827,13 +1886,36 @@ def test_run_output_content(tmpdir: Any, backend_client_user: httpx.Client) -> N
         assert content_resp2.headers.get("content-type", "").startswith("text/plain")
         assert content_resp2.content.decode("ascii").startswith("file://")
 
-    image_resp = backend_client_user.get(
-        "/run/outputContent",
-        params={"run_id": run_id, "dataset_id": sink_image_task_id},
-    )
-    assert image_resp.is_success, image_resp.text
-    assert image_resp.headers.get("content-type", "").startswith("image/png")
-    assert len(image_resp.content) > 0
+    image_contents = set()
+    for task_id in sink_image_tasks:
+        image_resp = backend_client_user.get(
+            "/run/outputContent",
+            params={"run_id": run_id, "dataset_id": task_id},
+        )
+        assert image_resp.is_success, image_resp.text
+        assert image_resp.headers.get("content-type", "").startswith("image/png")
+        assert len(image_resp.content) > 0
+        image_contents.add(image_resp.content)
+    # Each task index yields a distinct grayscale value
+    assert len(image_contents) == 3
+
+    # Fetchable output is returned as a zip preserving relative paths
+    tree_tasks = [t for t in available_tasks if "sink_filetree" in t]
+    assert len(tree_tasks) == 1, f"Expected exactly one sink_filetree task, got: {available_tasks}"
+    zip_resp = backend_client_user.get("/run/outputZipped", params={"run_id": run_id, "dataset_id": tree_tasks[0]})
+    assert zip_resp.is_success, zip_resp.text
+    assert zip_resp.headers.get("content-type", "").startswith("application/zip")
+    with zipfile.ZipFile(io.BytesIO(zip_resp.content)) as zf:
+        assert zf.testzip() is None
+        root = f"tree_{run_id}"
+        assert f"{root}/d1/d2/file" in zf.namelist()
+        assert zf.read(f"{root}/d1/d2/file").decode() == "42"
+        assert zip_resp.headers["content-disposition"].endswith(f'{root}.zip"')
+
+    # Non-fetchable outputs are refused
+    for task_id in (sink_file_task_id, sink_image_tasks[0]):
+        refused = backend_client_user.get("/run/outputZipped", params={"run_id": run_id, "dataset_id": task_id})
+        assert refused.status_code == 400, refused.text
 
 
 def _wait_until_running(client: httpx.Client, run_id: str, sleep: float = 1.0, attempts: int = 60) -> None:
@@ -1851,7 +1933,35 @@ def _wait_until_running(client: httpx.Client, run_id: str, sleep: float = 1.0, a
     retry_until(do_action, verify_ok, attempts=attempts, sleep=sleep, error_msg=f"Run {run_id} never reached 'running'")
 
 
-@pytest.mark.skip("leaves hanging process behind")
+def _ensure_run_status(client: httpx.Client, run_id: str, wanted: set[str], sleep: float = 1.0, attempts: int = 60) -> str:
+    """Poll until the run reports one of the wanted statuses.
+
+    While the gateway is busy with a stop, the polls may time out in the gateway and report `unknown`
+    which is a transient state here and is thus retried.
+    """
+
+    def do_action() -> Any:
+        resp = client.get("/run/get", params={"run_id": run_id}, timeout=30)
+        assert resp.is_success, resp.text
+        return resp.json()
+
+    def verify_ok(data: Any) -> str | None:
+        return data["status"] if data["status"] in wanted else None
+
+    return cast(
+        str, retry_until(do_action, verify_ok, attempts=attempts, sleep=sleep, error_msg=f"Run {run_id} never reached any of {wanted}")
+    )
+
+
+def _create_run(client: httpx.Client, builder: BlueprintBuilder) -> tuple[str, int]:
+    save_resp = client.post("/blueprint/create", json=BlueprintSaveCommand(builder=builder).model_dump())
+    assert save_resp.is_success, save_resp.text
+    run_resp = client.post("/run/create", json={"blueprint_id": save_resp.json()["blueprint_id"]})
+    assert run_resp.is_success, run_resp.text
+    return run_resp.json()["run_id"], run_resp.json()["attempt_count"]
+
+
+# @pytest.mark.skip("leaves hanging process behind")
 def test_gateway_restart_with_in_progress_job(tmpdir: Any, backend_client_user: httpx.Client) -> None:
     """Kill the gateway while a job is active; verify the expected status transitions.
 
@@ -1888,30 +1998,7 @@ def test_gateway_restart_with_in_progress_job(tmpdir: Any, backend_client_user: 
     assert content_resp.content.decode("utf-8").startswith("file://")
 
     # --- Step 2: submit a long-running sleeper job ---
-    sleeper = RoutableBlock(
-        instance_id=BlockInstanceId("sleeper"),
-        plugin=testPluginId,
-        factory=BlockFactoryId("source_sleep"),
-        instance=BlockInstance(
-            configuration_values=_config({"text": "hello", "duration": "30"}),
-            input_ids={},
-        ),
-    )
-    sink = RoutableBlock(
-        instance_id=BlockInstanceId("sink"),
-        plugin=testPluginId,
-        factory=BlockFactoryId("sink_file"),
-        instance=BlockInstance(
-            configuration_values=_config({"fname": "/dev/null"}),
-            input_ids={"data": BlockInstanceId("sleeper")},
-        ),
-    )
-    builder = BlueprintBuilder(
-        blocks=[
-            sleeper,
-            sink.model_copy(update={"instance_id": BlockInstanceId("sleeper_sink")}),
-        ]
-    )
+    builder = _make_builder_sleeper()
     save_resp = backend_client_user.post("/blueprint/create", json=BlueprintSaveCommand(builder=builder).model_dump())
     assert save_resp.is_success, save_resp.text
     blueprint_id = save_resp.json()["blueprint_id"]
@@ -1923,9 +2010,19 @@ def test_gateway_restart_with_in_progress_job(tmpdir: Any, backend_client_user: 
     _wait_until_running(backend_client_user, run_id)
 
     # --- Step 3: kill the gateway ---
-    # TODO this leaves the workers hanging. We need some solution to collect them properly
-    kill_resp = backend_client_user.post("/gateway/kill")
-    assert kill_resp.is_success, kill_resp.text
+    # NOTE the kill is processed in the background, and blocks the gateway for a while
+    with connect_notification_websocket(backend_client_user) as websocket:
+        kill_resp = backend_client_user.post("/gateway/kill")
+        assert kill_resp.is_success, kill_resp.text
+        notification, _ = wait_next_notification(websocket, "gateway", "gatewayStopped", total_timeout=60)
+        assert notification.text == "Gateway stopped successfully"
+        assert notification.detailRoute == "/api/v1/gateway/status"
+        assert notification.refreshRoutes == ["/api/v1/gateway/status"]
+
+        # Confirm the notification is consistent with the gateway status endpoint.
+        status_resp = backend_client_user.get("/gateway/status", timeout=10)
+        assert status_resp.is_success, status_resp.text
+        assert status_resp.json() == "not started"
 
     # Polling while the gateway is down returns "unknown"
     status_resp = backend_client_user.get("/run/get", params={"run_id": run_id}, timeout=30)
@@ -2048,3 +2145,13 @@ def test_blueprint_artifact_execute(tmpdir: Any, backend_client_user: httpx.Clie
     assert detail_resp.is_success, detail_resp.text
     detail = CompilationDetailResponse.model_validate(detail_resp.json())
     assert len(detail.tasks) == 2, f"Expected 2 tasks, got {len(detail.tasks)}: {detail.tasks}"
+
+    # Verify the artifact id resolves to its catalog display name
+    resolve_resp = backend_client_user.post(
+        "/blueprint/options/resolveDisplay",
+        json={"elements": [{"typeName": "artifact", "value": checkpoint_composite_id}]},
+    )
+    assert resolve_resp.is_success, resolve_resp.text
+    resolved = resolve_resp.json()["elements"]
+    assert len(resolved) == 1
+    assert resolved[0]["display"] == "Small Test Checkpoint"

@@ -76,10 +76,35 @@ describe('ValidationStatusBadge — issues popover', () => {
     await expect.element(badge).toBeVisible()
 
     await badge.click()
-    await expect.element(screen.getByText('Configuration Issues')).toBeVisible()
+    await expect.element(screen.getByText('Workflow issues')).toBeVisible()
     await expect.element(screen.getByText('Some backend error')).toBeVisible()
     await expect
-      .element(screen.getByText('Unknown glyph: ${dataRoot}'))
+      .element(screen.getByText('Unknown variable: ${dataRoot}'))
+      .toBeVisible()
+  })
+
+  it('adds a fix hint for recognised error shapes', async () => {
+    useFableBuilderStore.getState().setValidationState({
+      ...erroredState,
+      blockStates: {
+        b1: {
+          ...erroredState.blockStates.b1,
+          errors: [
+            "Invalid value for configuration option 'source': expected str",
+          ],
+          missingGlyphs: {},
+        },
+      },
+    })
+    const screen = await renderWithProviders(<ValidationStatusBadge />)
+
+    await screen.getByRole('button', { name: /1 issue/ }).click()
+    await expect
+      .element(
+        screen.getByText(
+          'Open the block and pick a valid value for this option.',
+        ),
+      )
       .toBeVisible()
   })
 
@@ -92,7 +117,14 @@ describe('ValidationStatusBadge — issues popover', () => {
     expect(useFableBuilderStore.getState().selectedBlockId).toBe('b1')
   })
 
-  it('renders the plain Valid badge when there are no issues', async () => {
+  it('keeps a Validating badge while a cleared result awaits the next check', async () => {
+    useFableBuilderStore.getState().setValidationState(null)
+    const screen = await renderWithProviders(<ValidationStatusBadge />)
+
+    await expect.element(screen.getByText('Validating')).toBeVisible()
+  })
+
+  it('renders the Ready to run badge when there are no issues', async () => {
     useFableBuilderStore.getState().setValidationState({
       ...erroredState,
       isValid: true,
@@ -100,6 +132,6 @@ describe('ValidationStatusBadge — issues popover', () => {
     })
     const screen = await renderWithProviders(<ValidationStatusBadge />)
 
-    await expect.element(screen.getByText('Valid')).toBeVisible()
+    await expect.element(screen.getByText('Ready to run')).toBeVisible()
   })
 })

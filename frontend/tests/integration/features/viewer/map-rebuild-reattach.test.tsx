@@ -19,7 +19,6 @@ import { useRef } from 'react'
 import { describe, expect, it } from 'vitest'
 import { render } from 'vitest-browser-react'
 import VectorLayer from 'ol/layer/Vector'
-import VectorSource from 'ol/source/Vector'
 import Feature from 'ol/Feature'
 import Point from 'ol/geom/Point'
 import type OlMap from 'ol/Map'
@@ -30,7 +29,9 @@ import type View from 'ol/View'
 import {
   createViewerView,
   useOlMapBase,
+  whenViewRendered,
 } from '@/features/viewer/hooks/useOlMapBase'
+import { getViewerProjection } from '@/features/viewer/projections'
 import { usePointerReadout } from '@/features/viewer/hooks/usePointerReadout'
 import { useAnnotationLayer } from '@/features/viewer/geo/annotations'
 import { useContextOverlays } from '@/features/viewer/geo/overlays'
@@ -40,7 +41,7 @@ const handlers = { onCreate: noop, onEdit: noop, onMove: noop }
 
 const ANNOTATION: MapAnnotation = {
   id: 'a1',
-  coordinate: [0, 0],
+  lonLat: [0, 0],
   label: '1',
   text: 'pin',
   color: 'slate',
@@ -52,9 +53,7 @@ function makeOverlay(): ContextOverlay {
   return {
     id: 'o1',
     name: 'probe.geojson',
-    source: new VectorSource({
-      features: [new Feature({ geometry: new Point([0, 0]) })],
-    }),
+    features: [new Feature({ geometry: new Point([0, 0]) })],
     visible: true,
     featureCount: 1,
     propertyKeys: [],
@@ -139,5 +138,21 @@ describe('restored-camera floor', () => {
     await render(<Harness resetKey="floor" overlays={[]} view={view} />)
     await expect.poll(() => view.isDef()).toBe(true)
     expect(view.getZoom()).toBeGreaterThanOrEqual(1)
+  })
+})
+
+describe('whenViewRendered', () => {
+  it('waits for a map on the View, then for its complete render', async () => {
+    const view = createViewerView(getViewerProjection('geo'))
+    let rendered = false
+    void whenViewRendered(view).then(() => {
+      rendered = true
+    })
+    // No map on the View yet: nothing has drawn it.
+    await new Promise((r) => setTimeout(r, 100))
+    expect(rendered).toBe(false)
+
+    await render(<Harness resetKey="rendered" overlays={[]} view={view} />)
+    await expect.poll(() => rendered, { timeout: 5000 }).toBe(true)
   })
 })

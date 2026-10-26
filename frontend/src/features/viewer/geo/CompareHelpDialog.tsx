@@ -34,14 +34,17 @@ type ShortcutId =
   | 'sidebars'
   | 'modes'
   | 'pan'
+  | 'zoom'
   | 'annotate'
   | 'fit'
+  | 'projection'
   | 'copy'
   | 'export'
   | 'flicker'
   | 'loupe'
   | 'swipe'
   | 'help'
+  | 'badges'
 
 const SHORTCUTS: ReadonlyArray<{
   keys: ReadonlyArray<string>
@@ -57,14 +60,17 @@ const SHORTCUTS: ReadonlyArray<{
     id: 'modes',
   },
   { keys: COMPARE_KEYS.pan.map(keyLabel), id: 'pan' },
+  { keys: COMPARE_KEYS.zoom, id: 'zoom' },
   { keys: [keyLabel(COMPARE_KEYS.annotate)], id: 'annotate' },
   { keys: [keyLabel(COMPARE_KEYS.fit)], id: 'fit' },
+  { keys: [keyLabel(COMPARE_KEYS.projection)], id: 'projection' },
   { keys: [keyLabel(COMPARE_KEYS.copy)], id: 'copy' },
   { keys: [keyLabel(COMPARE_KEYS.export)], id: 'export' },
   { keys: [keyLabel('Space')], id: 'flicker' },
   { keys: ['Z'], id: 'loupe' },
   { keys: [keyLabel('ArrowLeft'), keyLabel('ArrowRight')], id: 'swipe' },
   { keys: [keyLabel(COMPARE_KEYS.help)], id: 'help' },
+  { keys: [COMPARE_KEYS.badges], id: 'badges' },
 ]
 
 export function CompareHelpDialog({
@@ -145,7 +151,7 @@ export function CompareHelpDialog({
                               …
                             </span>
                           ) : (
-                            <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">
+                            <kbd className="rounded-md border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">
                               {k}
                             </kbd>
                           )}
@@ -159,9 +165,6 @@ export function CompareHelpDialog({
                 ))}
               </tbody>
             </table>
-            <P className="mt-1.5 text-xs text-muted-foreground">
-              {t('help.shortcuts.revealHint', { key: keyLabel('Mod') })}
-            </P>
           </section>
         </div>
       </DialogContent>

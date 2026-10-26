@@ -10,18 +10,9 @@
 
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from '@tanstack/react-router'
-import { PresetPicker } from './PresetPicker'
-import {
-  BlocksIllustration,
-  DashboardIllustration,
-  ExecutionIllustration,
-  ViewerIllustration,
-  WelcomeIllustration,
-} from './StepIllustrations'
-import { useStarterTemplates } from '@/features/dashboard/hooks/useStarterTemplates'
-import { templateConfigureSearch } from '@/features/dashboard/hooks/useTemplatePresets'
+import { WelcomeIllustration } from './WelcomeIllustration'
 import { useOnboardingStore } from '@/stores/onboardingStore'
+import { useTutorialsStore } from '@/stores/tutorialsStore'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
@@ -32,25 +23,10 @@ import {
   DialogFooter,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { cn } from '@/lib/utils'
 
-const STEPS = [
-  'welcome',
-  'dashboard',
-  'blocks',
-  'execution',
-  'viewer',
-  'activate',
-] as const
-
-/** Six-step welcome tour: what FIAB is, how it works, and a real start. */
+/** Welcome card; "Take the tour" hands over to the guided tour. */
 export function WelcomeDialog() {
   const { t } = useTranslation('onboarding')
-  const navigate = useNavigate()
-  const { starters, isLoading } = useStarterTemplates()
-
-  const [step, setStep] = useState(0)
-  const [selectedPreset, setSelectedPreset] = useState(0)
   const [dontShowAgain, setDontShowAgain] = useState(false)
 
   const status = useOnboardingStore((state) => state.status)
@@ -60,90 +36,25 @@ export function WelcomeDialog() {
 
   const close = () => useOnboardingStore.getState().closeWelcome(dontShowAgain)
 
-  const stepId = STEPS[step]
-  const isLast = step === STEPS.length - 1
-
-  const primaryLabel = !isLast
-    ? step === 0
-      ? t('welcome.takeTour')
-      : t('welcome.continue')
-    : t('activate.openConfigure')
-
-  const primaryAction = () => {
-    if (!isLast) {
-      setStep(step + 1)
-      return
-    }
-    useOnboardingStore.getState().startForecast()
-    if (starters.length === 0) {
-      void navigate({ to: '/configure', search: { fresh: true } })
-      return
-    }
-    const template = starters[Math.min(selectedPreset, starters.length - 1)]
-    void navigate({
-      to: '/configure',
-      search: templateConfigureSearch(template),
-    })
+  // The card's snooze/skip is decided now; the tour runs independently.
+  const takeTour = () => {
+    close()
+    useTutorialsStore.getState().start('welcome-tour')
   }
 
   return (
     <Dialog open onOpenChange={(open) => !open && close()}>
       <DialogContent className="flex flex-col gap-0 overflow-hidden p-0 sm:max-w-155">
-        {/* Illustration area — only this frame swaps between steps */}
         <div className="relative h-58 shrink-0 overflow-hidden border-b bg-gradient-to-b from-[#eaf3f9] to-[#f6fafc] dark:from-primary/15 dark:to-muted/20">
-          <div
-            key={stepId}
-            className="absolute inset-0 animate-in duration-300 fade-in-0 slide-in-from-bottom-1 motion-reduce:animate-none"
-          >
-            {stepId === 'welcome' && <WelcomeIllustration />}
-            {stepId === 'dashboard' && <DashboardIllustration />}
-            {stepId === 'blocks' && <BlocksIllustration />}
-            {stepId === 'execution' && <ExecutionIllustration />}
-            {stepId === 'viewer' && <ViewerIllustration />}
-            {stepId === 'activate' && (
-              <PresetPicker
-                starters={starters}
-                isLoading={isLoading}
-                selected={selectedPreset}
-                onSelect={setSelectedPreset}
-              />
-            )}
-          </div>
+          <WelcomeIllustration />
         </div>
 
-        {/* Text area — fixed height so the dialog never resizes between steps */}
-        <div className="flex min-h-47 flex-col gap-2 px-7 pt-6 pb-5">
-          <div className="flex items-center gap-2.5">
-            <span className="font-mono text-[11px] text-muted-foreground">
-              {t('welcome.stepCounter', {
-                current: step + 1,
-                total: STEPS.length,
-              })}
-            </span>
-            <div className="flex gap-[5px]">
-              {STEPS.map((id, index) => (
-                <button
-                  key={id}
-                  type="button"
-                  aria-label={t('dots.goTo', { step: index + 1 })}
-                  aria-current={index === step ? 'step' : undefined}
-                  onClick={() => setStep(index)}
-                  className={cn(
-                    'h-1.5 rounded-full transition-all duration-200',
-                    index === step
-                      ? 'w-[18px] bg-primary'
-                      : 'w-1.5 bg-border hover:bg-muted-foreground/50',
-                  )}
-                />
-              ))}
-            </div>
-          </div>
-
-          <DialogTitle className="mt-1 text-xl font-semibold tracking-[-0.01em]">
-            {t(`steps.${stepId}.title`)}
+        <div className="flex flex-col gap-2 px-7 pt-6 pb-5">
+          <DialogTitle className="text-xl font-semibold tracking-[-0.01em]">
+            {t('steps.welcome.title')}
           </DialogTitle>
           <DialogDescription className="text-sm leading-[1.55] text-pretty">
-            {t(`steps.${stepId}.body`)}
+            {t('steps.welcome.body')}
           </DialogDescription>
         </div>
 
@@ -164,27 +75,16 @@ export function WelcomeDialog() {
             </span>
           )}
           <div className="flex items-center gap-2">
-            {!isLast && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-muted-foreground"
-                onClick={close}
-              >
-                {firstVisit ? t('welcome.skip') : t('welcome.close')}
-              </Button>
-            )}
-            {step > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setStep(step - 1)}
-              >
-                {t('welcome.back')}
-              </Button>
-            )}
-            <Button size="sm" onClick={primaryAction}>
-              {primaryLabel}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground"
+              onClick={close}
+            >
+              {firstVisit ? t('welcome.skip') : t('welcome.close')}
+            </Button>
+            <Button size="sm" onClick={takeTour}>
+              {t('welcome.takeTour')}
             </Button>
           </div>
         </DialogFooter>

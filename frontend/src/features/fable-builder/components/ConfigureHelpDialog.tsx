@@ -126,7 +126,7 @@ export function ConfigureHelpDialog({
                 {SHORTCUTS.map(({ keys, id }) => (
                   <tr key={id} className="border-b border-border/60">
                     <td className="w-24 py-1 pr-3 whitespace-nowrap">
-                      <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">
+                      <kbd className="rounded-md border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">
                         {keys}
                       </kbd>
                     </td>

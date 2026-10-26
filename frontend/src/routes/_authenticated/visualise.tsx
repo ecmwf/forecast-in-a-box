@@ -11,6 +11,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 import { VisualisePage } from '@/features/visualise/components/VisualisePage'
+import { PROJECTION_IDS } from '@/features/viewer/projection-ids'
 
 /**
  * Visualisation URL state — the shareable projection of a view.
@@ -26,9 +27,12 @@ import { VisualisePage } from '@/features/visualise/components/VisualisePage'
  *
  * The slim view state rides along so the copied URL reproduces the view,
  * not just the pair (encode/decode in view-url-state.ts): `la`/`lb`
- * active layer stacks (comma-joined names, top-first), `ul` unlinked
+ * active layer stacks (comma-joined names, top-first), `sa`/`sb` their
+ * chosen styles (aligned, empty = default), `ra`/`rb` pinned model runs
+ * (aligned, empty = latest), `ul` unlinked
  * selection, `t` valid time (epoch ms), `tl`/`dt` time-link policy,
- * `cam` camera (lon,lat,zoom), `bm` basemap. Excluded by design:
+ * `cam` camera (lon,lat,zoom — zoom relative to `p`), `bm` basemap, `p`
+ * map projection. Excluded by design:
  * annotations/overlays (unbounded — file export flows), opacities, the
  * time clip, independent-mode per-side instants. Every field `.catch`es
  * to absent — a malformed param degrades instead of failing the route.
@@ -42,12 +46,17 @@ const visualiseSearchSchema = z.object({
     .catch(undefined),
   la: z.string().max(2000).optional().catch(undefined),
   lb: z.string().max(2000).optional().catch(undefined),
+  sa: z.string().max(2000).optional().catch(undefined),
+  sb: z.string().max(2000).optional().catch(undefined),
+  ra: z.string().max(2000).optional().catch(undefined),
+  rb: z.string().max(2000).optional().catch(undefined),
   ul: z.literal(true).optional().catch(undefined),
   t: z.number().int().optional().catch(undefined),
   tl: z.enum(['nearest', 'offset', 'independent']).optional().catch(undefined),
   dt: z.number().int().optional().catch(undefined),
   cam: z.string().max(64).optional().catch(undefined),
   bm: z.string().max(64).optional().catch(undefined),
+  p: z.enum(PROJECTION_IDS).optional().catch(undefined),
   /** Plain-link tour launch (help surfaces, welcome tour); stripped on start. */
   tour: z.enum(['first-map']).optional().catch(undefined),
 })

@@ -22,12 +22,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { HttpResponse, http } from 'msw'
 import { renderWithRouter } from '@tests/utils/render'
 import { worker } from '@tests/test-extend'
+import { mockCommunityNews } from '../../../../mocks/handlers/news.handlers'
 import type { AuthContextValue } from '@/features/auth/AuthContext'
 import { CommunityNewsCard } from '@/features/dashboard/components/CommunityNewsCard'
 import { GettingStartedSection } from '@/features/dashboard/components/GettingStartedSection'
+import { useTemplateBookmarksStore } from '@/stores/templateBookmarksStore'
 import { WelcomeCard } from '@/features/dashboard/components/WelcomeCard'
 import { AuthContext } from '@/features/auth/AuthContext'
-import { API_ENDPOINTS } from '@/api/endpoints'
+import { API_ENDPOINTS, STATIC_FILES } from '@/api/endpoints'
 import { STORAGE_KEYS } from '@/lib/storage-keys'
 
 // Mock useMedia to simulate desktop layout
@@ -72,7 +74,7 @@ describe('Dashboard', () => {
         </AuthContext.Provider>,
       )
 
-      await expect.element(screen.getByText('System Status')).toBeVisible()
+      await expect.element(screen.getByText('System status')).toBeVisible()
     })
 
     it('renders quick action buttons', async () => {
@@ -82,16 +84,10 @@ describe('Dashboard', () => {
         </AuthContext.Provider>,
       )
 
-      await expect.element(screen.getByText('Manage Plugins')).toBeVisible()
-      await expect
-        .element(screen.getByText('Manage Job Executions'))
-        .toBeVisible()
-      await expect
-        .element(screen.getByText('Manage Configuration Presets'))
-        .toBeVisible()
-      await expect
-        .element(screen.getByText('Manage Scheduled Forecasts'))
-        .toBeVisible()
+      await expect.element(screen.getByText('Manage plugins')).toBeVisible()
+      await expect.element(screen.getByText('Manage runs')).toBeVisible()
+      await expect.element(screen.getByText('Manage workflows')).toBeVisible()
+      await expect.element(screen.getByText('Manage schedules')).toBeVisible()
     })
 
     it('shows error status when status API fails', async () => {
@@ -124,16 +120,14 @@ describe('Dashboard', () => {
     it('renders getting started section', async () => {
       const screen = await renderSection()
 
-      await expect
-        .element(screen.getByText('Getting Started Presets'))
-        .toBeVisible()
+      await expect.element(screen.getByText('Workflow templates')).toBeVisible()
     })
 
     it('offers the blank canvas plus three plugin templates', async () => {
       const screen = await renderSection()
 
       await expect
-        .element(screen.getByRole('button', { name: 'Start from Scratch' }))
+        .element(screen.getByRole('button', { name: 'Start from scratch' }))
         .toBeVisible()
       // MSW seeds four; the fourth must not reach the dashboard.
       await expect
@@ -162,11 +156,44 @@ describe('Dashboard', () => {
         screen.container.querySelectorAll('[role="button"] h3'),
       ).map((node) => node.textContent)
       expect(titles).toEqual([
-        'Start from Scratch',
+        'Start from scratch',
         'testTyped',
         'testBasic',
         'testThird',
       ])
+    })
+
+    it('shows bookmarked templates first and drops the bookmark hint', async () => {
+      useTemplateBookmarksStore.setState({
+        keys: ['ecmwf:ecmwf-base::testFourth'],
+      })
+      const screen = await renderSection()
+
+      await expect
+        .element(screen.getByRole('button', { name: 'testFourth' }))
+        .toBeVisible()
+      const titles = Array.from(
+        screen.container.querySelectorAll('[role="button"] h3'),
+      ).map((node) => node.textContent)
+      expect(titles).toEqual([
+        'Start from scratch',
+        'testFourth',
+        'testTyped',
+        'testBasic',
+      ])
+      await expect
+        .element(screen.getByText(/Bookmark templates on the Workflows page/))
+        .not.toBeInTheDocument()
+      useTemplateBookmarksStore.setState({ keys: [] })
+    })
+
+    it('hints at bookmarking while no template is bookmarked', async () => {
+      useTemplateBookmarksStore.setState({ keys: [] })
+      const screen = await renderSection()
+
+      await expect
+        .element(screen.getByText(/Bookmark templates on the Workflows page/))
+        .toBeVisible()
     })
 
     it('renders the plugin-authored tags as chips', async () => {
@@ -201,12 +228,12 @@ describe('Dashboard', () => {
       const screen = await renderSection()
 
       await expect
-        .element(screen.getByText('No plugin templates available'))
+        .element(screen.getByText('No workflow templates available'))
         .toBeVisible()
       await expect.element(screen.getByText('Manage plugins')).toBeVisible()
       // The one card that needs no backend stays.
       await expect
-        .element(screen.getByRole('button', { name: 'Start from Scratch' }))
+        .element(screen.getByRole('button', { name: 'Start from scratch' }))
         .toBeVisible()
     })
 
@@ -226,16 +253,37 @@ describe('Dashboard', () => {
   })
 
   describe('CommunityNewsCard', () => {
-    it('renders community news section', async () => {
+    it('renders the links from the news file', async () => {
       const screen = await renderWithRouter(
         <AuthContext.Provider value={anonymousAuth}>
           <CommunityNewsCard />
         </AuthContext.Provider>,
       )
 
-      // Should render the card with a heading
       const heading = screen.getByRole('heading', { level: 2 })
       await expect.element(heading).toBeVisible()
+      for (const list of Object.values(mockCommunityNews)) {
+        for (const item of list) {
+          await expect
+            .element(screen.getByRole('link', { name: item.title }))
+            .toHaveAttribute('href', item.url)
+        }
+      }
+    })
+
+    it('says so when the news file cannot be loaded', async () => {
+      worker.use(
+        http.get(STATIC_FILES.communityNews, () => HttpResponse.error()),
+      )
+      const screen = await renderWithRouter(
+        <AuthContext.Provider value={anonymousAuth}>
+          <CommunityNewsCard />
+        </AuthContext.Provider>,
+      )
+
+      await expect
+        .element(screen.getByText('The news list could not be loaded.'))
+        .toBeVisible()
     })
   })
 })

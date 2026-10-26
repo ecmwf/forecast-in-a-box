@@ -8,19 +8,17 @@
  * does it submit to any jurisdiction.
  */
 
-/**
- * Source picker for the basket — the "Add source" dialog body. Sections:
- *  1. recent runs with stored (GRIB-dir) outputs (RunSourceList)
- *  2. running lens servers, matched back to outputs by path
- *  3. external data: host GRIB directory + external WMS endpoint
- */
+/** "Manage sources" body: tabbed catalogue left, the collection right. */
 
 import { useState } from 'react'
-import { FolderInput, Rows3 } from 'lucide-react'
+import { FolderInput, Globe, Rows3 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { entryRef } from '../entry-ref'
 import { useRemoveComparisonSource } from '../hooks/useRemoveComparisonSource'
-import { useComparisonStore } from '../stores/comparisonStore'
+import {
+  MAX_COMPARISON_ENTRIES,
+  useComparisonStore,
+} from '../stores/comparisonStore'
 import { CompareBasketChip } from './CompareBasketChip'
 import { CuratedWmsList } from './sources/CuratedWmsList'
 import { RunningLensList } from './sources/RunningLensList'
@@ -28,93 +26,104 @@ import { HostPathForm } from './sources/HostPathForm'
 import { RunSourceList } from './sources/RunSourceList'
 import { WmsUrlForm } from './sources/WmsUrlForm'
 import { Input } from '@/components/ui/input'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { P } from '@/components/base/typography'
+import { cn } from '@/lib/utils'
+import { TOUR, tourAttr } from '@/features/tutorials/anchors'
+
+type SourceTab = 'runs' | 'wms' | 'folder'
+
+/** Tab panel: scrolls inside the fixed-height body on sm+. */
+const PANE = 'space-y-4 pt-4 sm:min-h-0 sm:flex-1 sm:overflow-y-auto sm:pr-1'
 
 export function SourcePicker() {
   const { t } = useTranslation('visualise')
+  const [tab, setTab] = useState<SourceTab>('runs')
   const [search, setSearch] = useState('')
 
   const query = search.trim().toLowerCase()
 
   return (
-    // min-w-0: as a dialog-grid item the picker must not let unbreakable
-    // path strings dictate its track width (grid items min-width:auto).
-    // Two columns: find-and-add on the left; the collection (a live
-    // dedupe reference while adding) + external entry on the right.
-    <div className="grid min-w-0 gap-x-8 gap-y-5 sm:grid-cols-2">
-      <div className="min-w-0 space-y-5">
-        <Input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={t('picker.searchPlaceholder')}
-          className="h-9"
-        />
-
-        <RunningLensList query={query} />
-
-        {/* Recent runs */}
-        <section className="space-y-1">
-          <SectionLabel icon={<Rows3 className="h-3.5 w-3.5" />}>
-            {t('picker.recentRuns')}
-          </SectionLabel>
+    // min-w-0: long path strings must not widen this grid track.
+    // Fixed sm+ height: panes scroll, so tab switches never re-centre it.
+    <div className="grid min-w-0 gap-x-8 gap-y-5 sm:h-[min(60vh,36rem)] sm:grid-cols-2">
+      <Tabs
+        value={tab}
+        onValueChange={(value) => setTab(value as SourceTab)}
+        className="flex min-w-0 flex-col sm:min-h-0"
+      >
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="runs">
+            <Rows3 className="h-4 w-4" />
+            {t('picker.tabs.runs')}
+          </TabsTrigger>
+          {/* Anchored so the map tour can hop to this tab before pressing Add. */}
+          <TabsTrigger value="wms" {...tourAttr(TOUR.visualise.sourceTabWms)}>
+            <Globe className="h-4 w-4" />
+            {t('picker.tabs.wms')}
+          </TabsTrigger>
+          <TabsTrigger value="folder">
+            <FolderInput className="h-4 w-4" />
+            {t('picker.tabs.folder')}
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="runs" className={PANE}>
+          <Input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t('picker.searchPlaceholder')}
+            className="h-9"
+          />
+          <RunningLensList query={query} />
           <RunSourceList query={query} />
-        </section>
-      </div>
-
-      <div className="min-w-0 space-y-5">
-        <CollectedSources />
-
-        {/* External data — host path + external WMS endpoint */}
-        <section className="space-y-3">
-          <SectionLabel icon={<FolderInput className="h-3.5 w-3.5" />}>
-            {t('picker.external')}
-          </SectionLabel>
+        </TabsContent>
+        <TabsContent value="wms" className={cn(PANE, 'space-y-5')}>
           <WmsUrlForm />
           <CuratedWmsList />
+        </TabsContent>
+        <TabsContent value="folder" className={PANE}>
           <HostPathForm />
-        </section>
-      </div>
+        </TabsContent>
+      </Tabs>
+
+      <CollectedSources />
     </div>
   )
 }
 
-function SectionLabel({
-  icon,
-  children,
-}: {
-  icon: React.ReactNode
-  children: React.ReactNode
-}) {
-  return (
-    <P className="flex items-center gap-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-      {icon}
-      {children}
-    </P>
-  )
-}
-
-/** Manage what's already in the basket (rename path/wms, remove). */
+/** What is in the basket (rename path/wms, remove), with an empty hint. */
 function CollectedSources() {
   const { t } = useTranslation('visualise')
   const entries = useComparisonStore((s) => s.entries)
   const removeSource = useRemoveComparisonSource()
-  if (entries.length === 0) return null
   return (
-    <section className="space-y-1.5">
-      <P className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-        {t('picker.collected')}
+    <section className="flex min-w-0 flex-col gap-1.5 sm:min-h-0">
+      <P className="flex shrink-0 items-baseline justify-between text-xs font-medium tracking-wide text-muted-foreground uppercase">
+        <span>{t('picker.collected')}</span>
+        <span className="font-mono normal-case">
+          {t('picker.collectedCount', {
+            count: entries.length,
+            max: MAX_COMPARISON_ENTRIES,
+          })}
+        </span>
       </P>
-      <div className="flex flex-col gap-1.5">
-        {entries.map((entry) => (
-          <CompareBasketChip
-            key={entryRef(entry)}
-            entry={entry}
-            slot={null}
-            onRemove={() => removeSource(entry)}
-          />
-        ))}
-      </div>
+      {entries.length === 0 ? (
+        <P className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+          {t('picker.collectedEmpty')}
+        </P>
+      ) : (
+        <div className="flex flex-col gap-1.5 sm:min-h-0 sm:flex-1 sm:overflow-y-auto sm:pr-1">
+          {entries.map((entry) => (
+            <CompareBasketChip
+              key={entryRef(entry)}
+              entry={entry}
+              slot={null}
+              onRemove={() => removeSource(entry)}
+            />
+          ))}
+        </div>
+      )}
     </section>
   )
 }

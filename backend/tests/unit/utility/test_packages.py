@@ -14,6 +14,7 @@ from datetime import UTC
 from types import ModuleType
 from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
 from packaging.version import Version
 
@@ -623,28 +624,28 @@ def _make_pypi_response(releases: dict) -> MagicMock:
 
 def test_get_package_versions_returns_all_releases() -> None:
     releases = {"1.0.0": [], "1.1.0": [], "2.0.0": []}
-    with patch("httpx.Client.get", return_value=_make_pypi_response(releases)):
-        result = list(get_package_versions("some-plugin"))
+    with httpx.Client() as client, patch("httpx.Client.get", return_value=_make_pypi_response(releases)):
+        result = list(get_package_versions("some-plugin", client))
     assert set(result) == {"1.0.0", "1.1.0", "2.0.0"}
 
 
 def test_get_package_versions_empty_releases() -> None:
-    with patch("httpx.Client.get", return_value=_make_pypi_response({})):
-        result = list(get_package_versions("some-plugin"))
+    with httpx.Client() as client, patch("httpx.Client.get", return_value=_make_pypi_response({})):
+        result = list(get_package_versions("some-plugin", client))
     assert result == []
 
 
 def test_get_package_versions_non_200_returns_empty() -> None:
     mock_resp = MagicMock()
     mock_resp.status_code = 404
-    with patch("httpx.Client.get", return_value=mock_resp):
-        result = list(get_package_versions("nonexistent-plugin"))
+    with httpx.Client() as client, patch("httpx.Client.get", return_value=mock_resp):
+        result = list(get_package_versions("nonexistent-plugin", client))
     assert result == []
 
 
 def test_get_package_versions_network_error_returns_empty() -> None:
-    with patch("httpx.Client.get", side_effect=Exception("network failure")):
-        result = list(get_package_versions("some-plugin"))
+    with httpx.Client() as client, patch("httpx.Client.get", side_effect=Exception("network failure")):
+        result = list(get_package_versions("some-plugin", client))
     assert result == []
 
 
@@ -652,15 +653,15 @@ def test_get_package_versions_bad_json_returns_empty() -> None:
     mock_resp = MagicMock()
     mock_resp.status_code = 200
     mock_resp.json.side_effect = ValueError("not JSON")
-    with patch("httpx.Client.get", return_value=mock_resp):
-        result = list(get_package_versions("some-plugin"))
+    with httpx.Client() as client, patch("httpx.Client.get", return_value=mock_resp):
+        result = list(get_package_versions("some-plugin", client))
     assert result == []
 
 
 def test_get_package_versions_is_iterator() -> None:
     releases = {"1.0.0": [], "2.0.0": []}
-    with patch("httpx.Client.get", return_value=_make_pypi_response(releases)):
-        result = get_package_versions("some-plugin")
+    with httpx.Client() as client, patch("httpx.Client.get", return_value=_make_pypi_response(releases)):
+        result = get_package_versions("some-plugin", client)
     import inspect
 
     assert inspect.isgenerator(result)

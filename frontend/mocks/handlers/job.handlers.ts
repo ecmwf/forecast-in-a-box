@@ -21,6 +21,7 @@ import {
   getExecution,
   mockBlobForMime,
   restartExecution,
+  stopExecution,
 } from '../data/job.data'
 import type {
   JobExecuteRequest,
@@ -260,6 +261,29 @@ export const jobHandlers = [
     })
   }),
 
+  http.post(API_ENDPOINTS.job.stop, async ({ request }) => {
+    await delay(200)
+
+    const body = (await request.json()) as {
+      run_id: string
+      attempt_count: number
+    }
+    const result = stopExecution(body.run_id)
+    if (result === 'notFound') {
+      return HttpResponse.json(
+        { detail: `Run ${body.run_id} not found.` },
+        { status: 404 },
+      )
+    }
+    if (result === 'notStoppable') {
+      return HttpResponse.json(
+        { detail: `Run ${body.run_id} cannot be stopped.` },
+        { status: 409 },
+      )
+    }
+    return new HttpResponse(null, { status: 200 })
+  }),
+
   http.post(API_ENDPOINTS.job.delete, async ({ request }) => {
     await delay(200)
 
@@ -273,6 +297,16 @@ export const jobHandlers = [
       return HttpResponse.json(
         { detail: 'Missing run_id parameter' },
         { status: 400 },
+      )
+    }
+
+    const status = getExecution(executionId)?.status
+    if (status && !['completed', 'failed', 'stopped'].includes(status)) {
+      return HttpResponse.json(
+        {
+          detail: `Run ${executionId} has status '${status}', only completed, failed or stopped runs can be deleted.`,
+        },
+        { status: 409 },
       )
     }
 

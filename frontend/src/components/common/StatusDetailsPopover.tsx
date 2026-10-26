@@ -82,12 +82,19 @@ interface ComponentRowProps {
   component: StatusComponent
   status?: ComponentStatus
   isLoading?: boolean
+  /** Replaces the generic status label, e.g. plugins still loading. */
+  labelKey?: 'status.componentInitializing'
 }
 
 /**
  * Renders a single component status row
  */
-function ComponentRow({ component, status, isLoading }: ComponentRowProps) {
+function ComponentRow({
+  component,
+  status,
+  isLoading,
+  labelKey,
+}: ComponentRowProps) {
   const { t } = useTranslation('common')
   const isActive = status ? status !== 'off' : true
 
@@ -121,7 +128,7 @@ function ComponentRow({ component, status, isLoading }: ComponentRowProps) {
               )}
             />
             <span className={cn('text-sm', statusTextColors[status])}>
-              {t(statusLabelKeys[status])}
+              {t(labelKey ?? statusLabelKeys[status])}
             </span>
           </>
         ) : null}
@@ -136,8 +143,14 @@ export function StatusDetailsPopover({
   side = 'bottom',
 }: StatusDetailsPopoverProps) {
   const { t } = useTranslation('common')
-  const { componentDetails, version, refetch, isFetching, isLoading } =
-    useStatus()
+  const {
+    status: systemStatus,
+    componentDetails,
+    version,
+    refetch,
+    isFetching,
+    isLoading,
+  } = useStatus()
 
   // Show loading state when status is not yet determined
   const showLoading = isLoading && componentDetails.length === 0
@@ -184,6 +197,12 @@ export function StatusDetailsPopover({
                 key={component}
                 component={component}
                 status={status}
+                labelKey={
+                  component === 'plugins' &&
+                  systemStatus?.plugins === 'initializing'
+                    ? 'status.componentInitializing'
+                    : undefined
+                }
               />
             ))}
       </div>

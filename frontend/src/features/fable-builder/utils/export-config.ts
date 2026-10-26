@@ -23,7 +23,7 @@ export function downloadFableJson(fable: FableBuilderV1, name: string): void {
     getAppTimeZone(),
     "yyyy-MM-dd'T'HH-mm-ss",
   )
-  a.download = `${name.replace(/\s+/g, '_').toLowerCase()}_${date}_config.json`
+  a.download = `${name.replace(/\s+/g, '_').toLowerCase()}_${date}_workflow.json`
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)

@@ -1,0 +1,19 @@
+# [backend]
+# uvicorn_port = 8000
+# allow_scheduler = true
+# launch_browser = false
+
+[external]
+default_plugins = ["localPluginTest:single", "localPluginEcmwf:single"]
+
+[external.plugin_stores.localPluginTest]
+url = "-e file://./packages/fiab-plugin-test"
+method = "localSingle"
+
+[external.plugin_stores.localPluginEcmwf]
+url = "-e file://./packages/fiab-plugin-ecmwf"
+method = "localSingle"
+
+[external.artifact_stores.ecmwf]
+url = "file://./../install/artifacts.json"
+method = "file"

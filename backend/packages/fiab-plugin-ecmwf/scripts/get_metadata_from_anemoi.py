@@ -1,11 +1,19 @@
 #!/usr/bin/env -S uv run
 # /// script
 # dependencies = [
-#    "earthkit-workflows-anemoi",
+#    "earthkit-workflows>=0.9.0",
+#    "earthkit-workflows-anemoi>=0.7.2",
 #    "qubed",
 #    "anemoi-inference",
+#    "metkitlib",
+#    "pymetkit",
+#    "qubed",
 #    "fire",
+#    "fiab-core",
 # ]
+#
+# [tool.uv.sources]
+# fiab-core = { path = "../../fiab-core", editable = true }
 # ///
 
 """
@@ -17,14 +25,16 @@ Usage:
 """
 
 from functools import lru_cache
-from typing import Any
+from typing import Any, cast, get_args
 
-from qubed import Qube
+from fiab_core.artifacts import AnemoiCheckpoint, CommonArtifactMetadata, Platform
+
+extra_output_keys = {"class": "ai", "type": "fc", "stream": "oper"}
 
 
 @lru_cache(maxsize=None)
-def open_checkpoint(checkpoint_path: str) -> "Checkpoint":  # type: ignore
-    from anemoi.inference.checkpoint import Checkpoint  # type: ignore
+def open_checkpoint(checkpoint_path: str) -> "Checkpoint":  # ty: ignore[unresolved-reference]
+    from anemoi.inference.checkpoint import Checkpoint  # ty: ignore[unresolved-import]
 
     return Checkpoint(checkpoint_path)
 
@@ -35,6 +45,9 @@ def get_qubes(checkpoint_path: str) -> dict[str, Any]:
     variables_metadata = metadata.typed_variables
 
     from earthkit.workflows.plugins.anemoi.utils import _expansion_qube
+    from pymetkit.paramdb import ParamDB
+    from qubed import Qube
+    from qubed.value_types import QEnum
 
     in_variables = metadata.select_variables(include=["prognostic", "forcing", "constant"], has_mars_requests=False)
     out_variables = metadata.select_variables(include=["diagnostic", "prognostic"], has_mars_requests=False)
@@ -42,25 +55,52 @@ def get_qubes(checkpoint_path: str) -> dict[str, Any]:
 
     in_qube = _expansion_qube(in_variables, variables_metadata, model_step, 6).remove_by_key("step")
     out_qube = _expansion_qube(out_variables, variables_metadata, model_step, 6).remove_by_key("step")
+    out_qube.to_json()
 
+    def _shortname_to_param_id(node: Qube) -> None:
+        if node.key == "param":
+            paramdb = ParamDB()
+            new_values = [str(paramdb.shortname_to_param_id(x, context={"class": "ai"}, access="dissemination")) for x in node.values]
+            node.values = QEnum(new_values)
+
+    out_qube.walk(_shortname_to_param_id)
     return {"input_qube": in_qube.to_json(), "output_qube": out_qube.to_json()}
 
 
 def get_package_versions(checkpoint_path: str) -> list[str]:
     checkpoint = open_checkpoint(checkpoint_path)
+    module_versions = checkpoint._metadata.provenance_training()["module_versions"]
 
     deps = ["anemoi.models", "anemoi-graphs", "torch", "torch_geometric"]
-    return [
-        f"{dep}=={checkpoint._metadata.provenance_training()['module_versions'][dep]}"
-        for dep in deps
-        if dep in checkpoint._metadata.provenance_training()["module_versions"]
-    ]
+    result = []
+    for dep in deps:
+        if dep not in module_versions:
+            continue
+        version = module_versions[dep]
+        # non-registry installs (editable/git) report a DotDict with 'version' and 'source' instead of a plain string
+        if hasattr(version, "version"):
+            version = version.version
+        result.append(f"{dep}=={version}")
+    return result
 
 
 def get_bytes_on_disk(checkpoint_path: str) -> int:
     import os
 
     return os.path.getsize(checkpoint_path)
+
+
+def parse_platforms(supported_platforms: str) -> list[Platform]:
+    valid: set[str] = set(get_args(Platform))
+    result: list[Platform] = []
+    for raw in supported_platforms.split(","):
+        platform = raw.strip()
+        if not platform:
+            continue
+        if platform not in valid:
+            raise ValueError(f"unsupported platform {platform!r}, expected one of {sorted(valid)}")
+        result.append(cast(Platform, platform))
+    return result
 
 
 def get_timestep(checkpoint_path: str) -> str:
@@ -101,30 +141,37 @@ def generate_artifact_entry(
 
     qubes = get_qubes(checkpoint_path)
 
+    # Build the fiab-core pydantic models rather than raw dicts: this validates the payload at
+    # generation time and lets `ty` catch any drift from the schema before it lands in main.
+    common = CommonArtifactMetadata(
+        url=url,
+        display_name=display_name,
+        display_author=display_author,
+        display_description=display_description,
+        comment=comment,
+        disk_size_bytes=get_bytes_on_disk(checkpoint_path),
+        supported_platforms=parse_platforms(supported_platforms),
+    )
+    specific = AnemoiCheckpoint(
+        minimum_gpu_memory_mib=minimum_gpu_memory_mib,
+        pip_package_constraints=get_package_versions(checkpoint_path),
+        input_characteristics=[c.strip() for c in input_characteristics.split(",") if c.strip()],
+        input_qube=qubes["input_qube"],
+        output_qube=qubes["output_qube"],
+        extra_output_keys=extra_output_keys,
+        timestep=get_timestep(checkpoint_path),
+    )
+
     artifact_entry: dict[str, Any] = {
         "artifact_type": "AnemoiCheckpoint",
-        "store_info": {
-            "url": url,
-            "display_name": display_name,
-            "display_author": display_author,
-            "display_description": display_description,
-            "comment": comment,
-            "disk_size_bytes": get_bytes_on_disk(checkpoint_path),
-            "minimum_gpu_memory_mib": minimum_gpu_memory_mib,
-            "pip_package_constraints": get_package_versions(checkpoint_path),
-            "supported_platforms": [p.strip() for p in supported_platforms.split(",") if p.strip()],
-            "input_characteristics": [c.strip() for c in input_characteristics.split(",") if c.strip()],
-            "input_qube": qubes["input_qube"],
-            "output_qube": qubes["output_qube"],
-            "input_options": {},
-            "timestep": get_timestep(checkpoint_path),
-        },
+        "common": common.model_dump(),
+        "specific": specific.model_dump(),
     }
 
     print(json.dumps(artifact_entry, indent=2))
 
 
 if __name__ == "__main__":
-    import fire
+    import fire  # ty: ignore[unresolved-import]
 
     fire.Fire(generate_artifact_entry)

@@ -10,11 +10,20 @@
 
 import { Eye } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { outputFileName } from './actions/download'
+import { isFetchableMime } from './mime'
+import { OutputZipButton } from './OutputZipButton'
 import type { OutputAdapter, OutputItem } from './types'
 import { useExecutionHoverStore } from '@/features/executions/stores/executionHoverStore'
 import { Button } from '@/components/ui/button'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { P } from '@/components/base/typography'
 import { cn } from '@/lib/utils'
+import { BlockName } from '@/features/fable-builder/components/shared/BlockName'
 
 interface OutputCardProps {
   item: OutputItem
@@ -26,7 +35,7 @@ export function OutputCard({ item, adapter, onOpenViewer }: OutputCardProps) {
   const { t } = useTranslation('executions')
   const { Thumbnail, Viewer, icon: Icon, actions } = adapter
   const shortLabel = (adapter.shortLabel ?? adapter.label)(t)
-  const filename = `${item.originalBlock}.${adapter.extension}`
+  const filename = outputFileName(item, adapter.extension)
 
   // Read-only cross-panel highlight: outputs of the focused block lift,
   // the rest fade. Card click still opens the viewer as usual.
@@ -66,7 +75,7 @@ export function OutputCard({ item, adapter, onOpenViewer }: OutputCardProps) {
         {Thumbnail ? (
           <Thumbnail item={item} adapter={adapter} />
         ) : (
-          <div className="flex aspect-video items-center justify-center rounded bg-muted">
+          <div className="flex aspect-video items-center justify-center rounded-md bg-muted">
             <Icon className="h-8 w-8 text-muted-foreground" />
           </div>
         )}
@@ -75,7 +84,7 @@ export function OutputCard({ item, adapter, onOpenViewer }: OutputCardProps) {
             per adapter so users can scan formats at a glance. */}
         <span
           className={cn(
-            'pointer-events-none absolute top-2 left-2 rounded px-1.5 py-0.5 font-mono text-xs font-semibold',
+            'pointer-events-none absolute top-2 left-2 rounded-md px-1.5 py-0.5 font-mono text-sm font-semibold',
             adapter.chipClass,
           )}
         >
@@ -84,15 +93,30 @@ export function OutputCard({ item, adapter, onOpenViewer }: OutputCardProps) {
       </div>
 
       <div className="space-y-0.5">
-        <P className="truncate font-medium" title={filename}>
-          {filename}
+        <P className="truncate font-medium" title={item.blockName}>
+          <BlockName name={item.blockName} />
         </P>
-        <P
-          className="truncate font-mono text-xs text-muted-foreground/70"
-          title={item.taskId}
-        >
-          {item.originalBlock}
-        </P>
+        {item.subtitle ? (
+          <P className="truncate font-mono text-sm text-muted-foreground">
+            {item.subtitleFull && item.subtitleFull !== item.subtitle ? (
+              <Tooltip>
+                <TooltipTrigger render={<span />}>
+                  {item.subtitle}
+                </TooltipTrigger>
+                <TooltipContent>{item.subtitleFull}</TooltipContent>
+              </Tooltip>
+            ) : (
+              item.subtitle
+            )}
+          </P>
+        ) : (
+          <P
+            className="truncate font-mono text-sm text-muted-foreground/70"
+            title={item.taskId}
+          >
+            {filename}
+          </P>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-1.5">
@@ -122,6 +146,14 @@ export function OutputCard({ item, adapter, onOpenViewer }: OutputCardProps) {
             </Button>
           )
         })}
+        {item.isAvailable && isFetchableMime(item.mimeType) && (
+          <OutputZipButton
+            jobId={item.jobId}
+            taskId={item.taskId}
+            ready
+            compact
+          />
+        )}
       </div>
     </div>
   )

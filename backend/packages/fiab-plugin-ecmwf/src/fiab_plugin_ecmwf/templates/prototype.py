@@ -47,7 +47,7 @@ template = BlueprintTemplate(
             instance=BlockInstance(
                 configuration_values={
                     ConfigurationOptionId("dimension"): "param",
-                    ConfigurationOptionId("values"): "2t,msl",
+                    ConfigurationOptionId("values"): "167,151",
                 },
                 input_ids={
                     "dataset": BlockInstanceId("source"),
@@ -82,12 +82,13 @@ template = BlueprintTemplate(
             factory_id=BlockFactoryId("mapPlotSink"),
             instance=BlockInstance(
                 configuration_values={
-                    ConfigurationOptionId("param"): "2t,msl",
+                    ConfigurationOptionId("param"): "167,151",
                     ConfigurationOptionId("domain"): "${area}",
                     ConfigurationOptionId("format"): "${plotFormat}",
                     ConfigurationOptionId("groupby"): "none",
                     # A single step leaves nothing else to split on.
                     ConfigurationOptionId("splitby"): "param",
+                    ConfigurationOptionId("style"): "ECMWF",
                 },
                 input_ids={
                     "dataset": BlockInstanceId("selectStep"),

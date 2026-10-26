@@ -21,6 +21,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { drawCompositedViewport } from '../map-export'
 import type { RefObject } from 'react'
+import type { ViewportDraw } from '../globe/engine'
 
 const DEFAULT_LOUPE_SIZE_PX = 180
 const DEFAULT_LOUPE_ZOOM = 2
@@ -35,6 +36,7 @@ export function LoupeOverlay({
   sizePx = DEFAULT_LOUPE_SIZE_PX,
   zoom = DEFAULT_LOUPE_ZOOM,
   latched = false,
+  drawSource,
 }: {
   containerRef: RefObject<HTMLDivElement | null>
   /** Sibling panel's cursor fraction — mirrors the loupe onto this map
@@ -46,6 +48,8 @@ export function LoupeOverlay({
   zoom?: number
   /** Keep the loupe on without holding Z (keyboard/touch path). */
   latched?: boolean
+  /** Draws the magnified region; default composites the OL layer canvases. */
+  drawSource?: (ctx: CanvasRenderingContext2D, opts: ViewportDraw) => void
 }) {
   const [zHeld, setZHeld] = useState(false)
   const active = latched || zHeld
@@ -143,11 +147,13 @@ export function LoupeOverlay({
         ctx.setTransform(1, 0, 0, 1, 0, 0)
         ctx.fillStyle = '#ffffff'
         ctx.fillRect(0, 0, loupe.width, loupe.height)
-        drawCompositedViewport(container, ctx, {
+        const region = {
           originX: drawX - sourceSize / 2,
           originY: drawY - sourceSize / 2,
           scale: loupe.width / sourceSize,
-        })
+        }
+        if (drawSource) drawSource(ctx, region)
+        else drawCompositedViewport(container, ctx, region)
         // Crosshair through the magnified centre — 0.5 CSS px hairline.
         ctx.strokeStyle = 'rgba(15, 23, 42, 0.55)'
         ctx.lineWidth = dpr / 2
@@ -162,7 +168,7 @@ export function LoupeOverlay({
     }
     raf = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(raf)
-  }, [active, drawX, drawY, sizePx, sourceSize, containerRef])
+  }, [active, drawX, drawY, sizePx, sourceSize, containerRef, drawSource])
 
   if (!active) return null
   return (

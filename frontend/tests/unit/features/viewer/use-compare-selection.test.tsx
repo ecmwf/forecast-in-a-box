@@ -112,3 +112,206 @@ describe('useCompareSelection identity stability', () => {
     expect(orders.at(-1)).toEqual(['2t'])
   })
 })
+
+describe('useCompareSelection styles', () => {
+  const styled = (name: string, styles: Array<string>) => ({
+    name,
+    title: name,
+    styles: styles.map((s) => ({ name: s })),
+  })
+  const PAIRS_WITH_STYLES: ReadonlyArray<PairedLayer> = [
+    {
+      key: 'p@sfc',
+      title: '2 m temperature',
+      subtitle: null,
+      level: null,
+      levelUnit: null,
+      perSource: {
+        a: styled('2t', ['sh_x', 'sh_y']),
+        b: styled('t2m', ['sh_x']),
+      },
+    },
+  ]
+  function StyleProbe({
+    onRender,
+  }: {
+    onRender: (selection: CompareSelection) => void
+  }) {
+    const selection = useCompareSelection(PAIRS_WITH_STYLES)
+    onRender(selection)
+    return (
+      <>
+        <button type="button" onClick={() => selection.togglePair('p@sfc')}>
+          toggle
+        </button>
+        <button
+          type="button"
+          onClick={() => selection.setPairStyle('p@sfc', 'sh_y')}
+        >
+          style-y
+        </button>
+        <button type="button" onClick={() => selection.setLinkMode('unlinked')}>
+          unlink
+        </button>
+        <button type="button" onClick={() => selection.setLinkMode('linked')}>
+          link
+        </button>
+        <button
+          type="button"
+          onClick={() => selection.setLayerStyle('b', 't2m', 'sh_x')}
+        >
+          b-style
+        </button>
+      </>
+    )
+  }
+
+  it('applies a pair style only to sides that advertise it, across modes', async () => {
+    let latest!: CompareSelection
+    const screen = await render(
+      <StyleProbe
+        onRender={(s) => {
+          latest = s
+        }}
+      />,
+    )
+    await screen.getByRole('button', { name: 'toggle' }).click()
+    await screen.getByRole('button', { name: 'style-y' }).click()
+    expect(latest.pairStyle('p@sfc')).toBe('sh_y')
+    expect(latest.settingsFor('a').get('2t')?.style).toBe('sh_y')
+    // B lacks sh_y → keeps its default (no entry).
+    expect(latest.settingsFor('b').get('t2m')).toBeUndefined()
+
+    // Unlinked copies the projection; per-side edits then stay per side.
+    await screen.getByRole('button', { name: 'unlink' }).click()
+    expect(latest.layerStyle('a', '2t')).toBe('sh_y')
+    await screen.getByRole('button', { name: 'b-style' }).click()
+    expect(latest.layerStyle('b', 't2m')).toBe('sh_x')
+    expect(latest.settingsFor('a').get('2t')?.style).toBe('sh_y')
+
+    // Relinking keeps A's choice for the pair.
+    await screen.getByRole('button', { name: 'link', exact: true }).click()
+    expect(latest.pairStyle('p@sfc')).toBe('sh_y')
+  })
+})
+
+describe('useCompareSelection default styles', () => {
+  const PAIR: ReadonlyArray<PairedLayer> = [
+    {
+      key: 'p@sfc',
+      title: '2 m temperature',
+      subtitle: null,
+      level: null,
+      levelUnit: null,
+      perSource: {
+        a: { name: '2t', title: '2t', styles: [{ name: 'x' }, { name: 'y' }] },
+      },
+    },
+  ]
+  function SeedProbe({
+    onRender,
+  }: {
+    onRender: (selection: CompareSelection) => void
+  }) {
+    const selection = useCompareSelection(PAIR, {
+      defaultStyle: (slot, name) =>
+        slot === 'a' && name === '2t' ? 'y' : null,
+    })
+    onRender(selection)
+    return (
+      <>
+        <button type="button" onClick={() => selection.togglePair('p@sfc')}>
+          toggle
+        </button>
+        <button
+          type="button"
+          onClick={() => selection.setPairStyle('p@sfc', null)}
+        >
+          reset
+        </button>
+      </>
+    )
+  }
+
+  it('seeds a newly activated pair with the pinned style, once', async () => {
+    let latest!: CompareSelection
+    const screen = await render(
+      <SeedProbe
+        onRender={(s) => {
+          latest = s
+        }}
+      />,
+    )
+    await screen.getByRole('button', { name: 'toggle' }).click()
+    expect(latest.pairStyle('p@sfc')).toBe('y')
+    // An explicit "back to default" is respected while the pair stays on.
+    await screen.getByRole('button', { name: 'reset' }).click()
+    expect(latest.pairStyle('p@sfc')).toBeNull()
+    // Re-activating seeds again.
+    await screen.getByRole('button', { name: 'toggle' }).click()
+    await screen.getByRole('button', { name: 'toggle' }).click()
+    expect(latest.pairStyle('p@sfc')).toBe('y')
+  })
+})
+
+describe('useCompareSelection dimensions', () => {
+  function DimProbe({
+    onRender,
+  }: {
+    onRender: (selection: CompareSelection) => void
+  }) {
+    const selection = useCompareSelection(PAIRS)
+    onRender(selection)
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => selection.togglePair('2 m temperature@sfc')}
+        >
+          toggle
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            selection.setLayerDim(
+              'b',
+              '2t',
+              'reference_time',
+              '2026-09-04T00:00:00Z',
+            )
+          }
+        >
+          run-b
+        </button>
+        <button type="button" onClick={() => selection.onSlotsSwapped()}>
+          swap
+        </button>
+      </>
+    )
+  }
+
+  it('keeps dimension values per side, in linked mode too, and follows a swap', async () => {
+    let latest!: CompareSelection
+    const screen = await render(
+      <DimProbe
+        onRender={(s) => {
+          latest = s
+        }}
+      />,
+    )
+    await screen.getByRole('button', { name: 'toggle' }).click()
+    await screen.getByRole('button', { name: 'run-b' }).click()
+    expect(latest.settingsFor('b').get('2t')?.dims).toEqual({
+      reference_time: '2026-09-04T00:00:00Z',
+    })
+    expect(latest.settingsFor('a').get('2t')?.dims).toBeUndefined()
+    expect(latest.layerDim('b', '2t', 'reference_time')).toBe(
+      '2026-09-04T00:00:00Z',
+    )
+    await screen.getByRole('button', { name: 'swap' }).click()
+    expect(latest.layerDim('a', '2t', 'reference_time')).toBe(
+      '2026-09-04T00:00:00Z',
+    )
+    expect(latest.layerDim('b', '2t', 'reference_time')).toBeNull()
+  })
+})

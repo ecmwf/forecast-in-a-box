@@ -9,6 +9,8 @@
  */
 
 import { Download } from 'lucide-react'
+import { outputTitle } from '../dims'
+import { isFetchableMime } from '../mime'
 import { fetchJobResultBlob } from '../useJobResult'
 import type { ActionContext, OutputAction, OutputItem } from '../types'
 import { createLogger } from '@/lib/logger'
@@ -17,6 +19,16 @@ import { queryClient } from '@/lib/queryClient'
 import { showToast } from '@/lib/toast'
 
 const log = createLogger('OutputAction.download')
+
+/** Download name from the output's title, e.g. "map_plot_2t_step_6.png". */
+export function outputFileName(item: OutputItem, extension: string): string {
+  const base = outputTitle(item)
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '_')
+    .replace(/^_+|_+$/g, '')
+  return `${base || item.originalBlock}.${extension}`
+}
 
 async function runDownload(
   item: OutputItem,
@@ -29,7 +41,7 @@ async function runDownload(
       item.jobId,
       item.taskId,
     )
-    downloadBlob(blob, `${item.originalBlock}.${ctx.resolvedAdapter.extension}`)
+    downloadBlob(blob, outputFileName(item, ctx.resolvedAdapter.extension))
   } catch (err) {
     log.error('Failed to download output', {
       jobId: item.jobId,
@@ -45,6 +57,7 @@ export const downloadAction: OutputAction = {
   label: (t) => t('outputs.actions.download'),
   icon: Download,
   variant: 'outline',
-  isAvailable: (item) => item.isAvailable,
+  // Fetchable payloads are paths; the card offers the zip.
+  isAvailable: (item) => item.isAvailable && !isFetchableMime(item.mimeType),
   run: runDownload,
 }

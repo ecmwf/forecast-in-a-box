@@ -253,7 +253,7 @@ test.describe('Plugin Detail Page', () => {
   }) => {
     await navigateTo(page, '/admin/plugins')
 
-    // Find a "View Details" button on an installed plugin
+    // Find a "View details" button on an installed plugin
     const viewDetailsButtons = page.getByRole('button', {
       name: /view details/i,
     })
@@ -322,9 +322,9 @@ test.describe('Plugin Detail Page', () => {
         await expect(statusBadge.first()).toBeVisible()
       }
 
-      // Block factory cards should have "Use ... in Configuration" buttons
+      // Block factory cards should have "Use ... in a Workflow" buttons
       const configButtons = page.getByRole('button', {
-        name: /in Configuration/i,
+        name: /in a Workflow/i,
       })
       const configCount = await configButtons.count()
       if (configCount > 0) {
@@ -352,7 +352,7 @@ test.describe('Plugin Detail Page', () => {
 
       // Source buttons should be enabled
       const sourceButtons = page.getByRole('button', {
-        name: /Use Source in Configuration/i,
+        name: /Use Source in a Workflow/i,
       })
       if (
         await sourceButtons
@@ -365,7 +365,7 @@ test.describe('Plugin Detail Page', () => {
 
       // Product/Sink buttons should be disabled
       const productButtons = page.getByRole('button', {
-        name: /Use Product in Configuration/i,
+        name: /Use Product in a Workflow/i,
       })
       if (
         await productButtons
@@ -378,7 +378,7 @@ test.describe('Plugin Detail Page', () => {
     }
   })
 
-  test('Back to Plugins button navigates back to plugin list', async ({
+  test('Back to plugins button navigates back to plugin list', async ({
     page,
   }) => {
     await navigateTo(page, '/admin/plugins')
@@ -395,7 +395,7 @@ test.describe('Plugin Detail Page', () => {
       await viewDetailsButtons.first().click()
       await page.waitForTimeout(2000)
 
-      // Click "Back to Plugins"
+      // Click "Back to plugins"
       const backButton = page.getByRole('link', { name: /back to plugins/i })
       if (await backButton.isVisible({ timeout: 5000 }).catch(() => false)) {
         await backButton.click()
@@ -404,7 +404,7 @@ test.describe('Plugin Detail Page', () => {
         // Should be back on the plugins list page
         expect(page.url()).toMatch(/\/admin\/plugins\/?$/)
 
-        // Plugin Store heading should be visible
+        // Plugins heading should be visible
         const heading = page.getByRole('heading', { name: /plugin/i })
         if (
           await heading

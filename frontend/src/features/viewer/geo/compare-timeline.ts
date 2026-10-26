@@ -92,19 +92,27 @@ export function locateEpoch(
 /** [first, last] index where the source has data; null when it never does. */
 export function availabilityRange(
   availability: ReadonlyArray<boolean>,
+  /** Not-served marks per cell, trimmed off the edges. */
+  failed?: ReadonlyArray<ReadonlyArray<string>>,
 ): [number, number] | null {
-  const first = availability.indexOf(true)
+  let first = availability.indexOf(true)
   if (first === -1) return null
-  return [first, availability.lastIndexOf(true)]
+  let last = availability.lastIndexOf(true)
+  const dead = (i: number) => !availability[i] || (failed?.[i]?.length ?? 0) > 0
+  while (first <= last && dead(first)) first++
+  while (last >= first && dead(last)) last--
+  return first <= last ? [first, last] : null
 }
 
 /** Window where BOTH sources have data somewhere; null when disjoint. */
 export function overlapRange(
   a: ReadonlyArray<boolean>,
   b: ReadonlyArray<boolean>,
+  failedA?: ReadonlyArray<ReadonlyArray<string>>,
+  failedB?: ReadonlyArray<ReadonlyArray<string>>,
 ): [number, number] | null {
-  const ra = availabilityRange(a)
-  const rb = availabilityRange(b)
+  const ra = availabilityRange(a, failedA)
+  const rb = availabilityRange(b, failedB)
   if (!ra || !rb) return null
   const start = Math.max(ra[0], rb[0])
   const end = Math.min(ra[1], rb[1])

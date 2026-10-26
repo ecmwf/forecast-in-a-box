@@ -17,9 +17,11 @@
  * - Error state for nonexistent jobs
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
+import { userEvent } from 'vitest/browser'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { HttpResponse, http } from 'msw'
 import { I18nextProvider } from 'react-i18next'
 import {
   Outlet,
@@ -30,16 +32,21 @@ import {
   createRouter,
 } from '@tanstack/react-router'
 import {
+  getExecution,
   injectMockExecution,
   mixedAvailabilityExecution,
   opaqueMimeExecution,
   resetJobsState,
   resolvedConfigExecution,
+  splitPlotExecution,
 } from '@tests/../mocks/data/job.data'
+import { worker } from '@tests/test-extend'
 import type { AuthContextValue } from '@/features/auth/AuthContext'
+import { API_ENDPOINTS } from '@/api/endpoints'
 import { AuthContext } from '@/features/auth/AuthContext'
 import { RunDetailPage } from '@/features/executions/components/RunDetailPage'
 import i18n from '@/lib/i18n'
+import { showToast } from '@/lib/toast'
 
 vi.mock('@/hooks/useMedia', () => ({
   useMedia: () => true,
@@ -124,9 +131,9 @@ describe('RunDetailPage Integration', () => {
         .toBeVisible()
     })
 
-    it('renders Untitled Job when fable lookup fails', async () => {
+    it('renders Untitled run when fable lookup fails', async () => {
       const screen = await renderDetailPage('job-completed-001')
-      await expect.element(screen.getByText('Untitled Job')).toBeVisible()
+      await expect.element(screen.getByText('Untitled run')).toBeVisible()
     })
   })
 
@@ -165,17 +172,143 @@ describe('RunDetailPage Integration', () => {
     })
   })
 
+  describe('stop (ecmwf#770)', () => {
+    // Unstyled browser tests: keep the dialog above Base UI's fixed backdrop.
+    beforeAll(() => {
+      const style = document.createElement('style')
+      style.textContent =
+        '[data-slot="alert-dialog-content"]{position:fixed;z-index:50}'
+      document.head.appendChild(style)
+    })
+
+    async function confirmStop(
+      screen: Awaited<ReturnType<typeof renderDetailPage>>,
+    ) {
+      await screen.getByRole('button', { name: 'Stop', exact: true }).click()
+      await expect
+        .element(
+          screen
+            .getByRole('alertdialog')
+            .getByText(/Outputs produced so far are kept/),
+        )
+        .toBeVisible()
+      await screen.getByRole('button', { name: 'Stop run' }).click()
+    }
+
+    it('stops a running run and settles on Stopped', async () => {
+      const screen = await renderDetailPage('job-running-002')
+      await confirmStop(screen)
+
+      // Transparent at once: the status and the button say it is stopping.
+      await expect
+        .element(screen.getByText('Stopping', { exact: true }))
+        .toBeVisible()
+      await expect
+        .element(screen.getByRole('button', { name: 'Stopping…' }))
+        .toBeDisabled()
+
+      // Settled: neutral notice, and the run can be restarted.
+      await expect
+        .element(screen.getByText('Stopped', { exact: true }))
+        .toBeVisible()
+      await expect
+        .element(screen.getByText(/Outputs produced before the stop are kept/))
+        .toBeVisible()
+      await expect
+        .element(screen.getByRole('button', { name: 'Restart' }))
+        .toBeVisible()
+    })
+
+    it('keeps Stopping while the busy gateway reads it as unknown', async () => {
+      const screen = await renderDetailPage('job-running-002')
+      await confirmStop(screen)
+      await expect
+        .element(screen.getByText('Stopping', { exact: true }))
+        .toBeVisible()
+
+      // The backend answers `unknown` while the gateway executes the stop.
+      const run = getExecution('job-running-002')!
+      injectMockExecution({ ...run, status: 'unknown' })
+      await new Promise((resolve) => setTimeout(resolve, 3500))
+      await expect
+        .element(screen.getByText('Stopping', { exact: true }))
+        .toBeVisible()
+      expect(
+        screen.getByText('Unknown', { exact: true }).elements(),
+      ).toHaveLength(0)
+
+      injectMockExecution({ ...run, status: 'stopped' })
+      await expect
+        .element(screen.getByText('Stopped', { exact: true }))
+        .toBeVisible()
+    })
+
+    it('offers no Stop on a finished run', async () => {
+      const screen = await renderDetailPage('job-completed-001')
+      await expect
+        .element(screen.getByRole('button', { name: 'Restart' }))
+        .toBeVisible()
+      expect(
+        screen.getByRole('button', { name: 'Stop', exact: true }).elements(),
+      ).toHaveLength(0)
+    })
+
+    it('offers no Delete on an active run', async () => {
+      const screen = await renderDetailPage('job-running-002')
+      await screen.getByRole('button', { name: 'More options' }).click()
+      await expect
+        .element(screen.getByRole('menuitem', { name: 'Edit workflow' }))
+        .toBeInTheDocument()
+      expect(
+        screen.getByRole('menuitem', { name: 'Delete' }).elements(),
+      ).toHaveLength(0)
+      await userEvent.keyboard('{Escape}')
+    })
+
+    it('keeps Delete on a finished run', async () => {
+      const screen = await renderDetailPage('job-completed-001')
+      await screen.getByRole('button', { name: 'More options' }).click()
+      await expect
+        .element(screen.getByRole('menuitem', { name: 'Delete' }))
+        .toBeInTheDocument()
+      await userEvent.keyboard('{Escape}')
+    })
+
+    it('reports calmly when the run finished before the stop', async () => {
+      const info = vi.spyOn(showToast, 'info')
+      const error = vi.spyOn(showToast, 'error')
+      const screen = await renderDetailPage('job-running-002')
+      await screen.getByRole('button', { name: 'Stop', exact: true }).click()
+      // It completes while the dialog is open: the backend answers 409.
+      injectMockExecution({
+        ...getExecution('job-running-002')!,
+        status: 'completed',
+      })
+      await screen.getByRole('button', { name: 'Stop run' }).click()
+
+      await expect
+        .poll(() => info.mock.calls.flat())
+        .toContain('The run had already finished.')
+      expect(error).not.toHaveBeenCalled()
+      await expect
+        .element(screen.getByText('Completed', { exact: true }))
+        .toBeVisible()
+      info.mockRestore()
+      error.mockRestore()
+    })
+  })
+
   describe('error state', () => {
     it('shows error message for nonexistent job', async () => {
       const screen = await renderDetailPage('nonexistent-job-id')
       await expect
-        .element(screen.getByText('The requested job could not be found.'))
+        .element(screen.getByText('The requested run could not be found.'))
         .toBeVisible()
     })
 
     it('shows back to executions button on error', async () => {
       const screen = await renderDetailPage('nonexistent-job-id')
-      await expect.element(screen.getByText('Back to Executions')).toBeVisible()
+      await expect.element(screen.getByText('Back to runs')).toBeVisible()
     })
   })
 
@@ -251,6 +384,211 @@ describe('RunDetailPage Integration', () => {
       const screen = await renderDetailPage('job-running-002')
       await expect.element(screen.getByText(/Pending: 1/)).toBeVisible()
       await expect.element(screen.getByText('Group by')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('split outputs (#798)', () => {
+    const subtitles = (screen: Awaited<ReturnType<typeof renderDetailPage>>) =>
+      screen
+        .getByText(/step \d+$/)
+        .elements()
+        .map((el) => el.textContent)
+
+    it('orders outputs by coordinates, keeping pending slots in place', async () => {
+      injectMockExecution(splitPlotExecution)
+      const screen = await renderDetailPage('job-split-007')
+      await expect.element(screen.getByText('2t · step 36')).toBeVisible()
+      expect(subtitles(screen)).toEqual([
+        'msl · step 0',
+        'msl · step 12',
+        'msl · step 24',
+        'map_plot · msl · step 36',
+        '2t · step 0',
+        '2t · step 12',
+        '2t · step 24',
+        '2t · step 36',
+      ])
+    })
+
+    it('groups by a coordinate with full parameter names', async () => {
+      injectMockExecution(splitPlotExecution)
+      const screen = await renderDetailPage(
+        'job-split-007',
+        '?groupBy=dim:param',
+      )
+      await expect
+        .element(screen.getByText('Mean sea level pressure [Pa] (msl)'))
+        .toBeVisible()
+      await expect
+        .element(screen.getByText('2 metre temperature [K] (2t)'))
+        .toBeVisible()
+    })
+
+    it('filters by a coordinate from its menu', async () => {
+      injectMockExecution(splitPlotExecution)
+      const screen = await renderDetailPage('job-split-007')
+      await expect.element(screen.getByText('msl · step 0')).toBeVisible()
+      await screen.getByText('Parameter: All').click()
+      await screen
+        .getByRole('option', { name: '2 metre temperature [K] (2t)' })
+        .click()
+      await expect
+        .element(screen.getByText('msl · step 0'))
+        .not.toBeInTheDocument()
+      await expect.element(screen.getByText('2t · step 12')).toBeVisible()
+    })
+
+    it('filters steps with the day by hour checkboxes', async () => {
+      injectMockExecution(splitPlotExecution)
+      const screen = await renderDetailPage('job-split-007')
+      await expect.element(screen.getByText('2t · step 12')).toBeVisible()
+      await screen.getByText('Step: All').click()
+
+      await screen.getByRole('checkbox', { name: '+12 h' }).click()
+      // Steps 0 and 24 share the 0h row and remain.
+      await expect.element(screen.getByText('Step: 0 h')).toBeVisible()
+      expect(subtitles(screen)).toEqual([
+        'msl · step 0',
+        'msl · step 24',
+        '2t · step 0',
+        '2t · step 24',
+      ])
+
+      await screen.getByRole('checkbox', { name: 'All steps' }).click()
+      await expect.element(screen.getByText('Step: All')).toBeVisible()
+      await screen.getByRole('checkbox', { name: 'All steps' }).click()
+      await expect.element(screen.getByText('Step: None')).toBeVisible()
+      await expect
+        .element(screen.getByText('No outputs match the current filter.'))
+        .toBeVisible()
+
+      // Unstyled, an unchecked box has no size.
+      ;(
+        screen.getByRole('checkbox', { name: 'Day 1' }).element() as HTMLElement
+      ).click()
+      await expect
+        .element(screen.getByText('Step: day 1', { exact: true }))
+        .toBeVisible()
+      await expect
+        .element(screen.getByRole('checkbox', { name: 'All steps' }))
+        .toHaveAttribute('aria-checked', 'mixed')
+    })
+
+    it('restores a step filter from the URL', async () => {
+      injectMockExecution(splitPlotExecution)
+      const screen = await renderDetailPage('job-split-007', '?dims=step=24')
+      await expect.element(screen.getByText('2t · step 24')).toBeVisible()
+      expect(subtitles(screen)).toEqual(['msl · step 24', '2t · step 24'])
+      await expect
+        .element(screen.getByText('Step: day 1 · 0 h', { exact: true }))
+        .toBeVisible()
+    })
+
+    it('steps across parameters and through time in the viewer', async () => {
+      injectMockExecution(splitPlotExecution)
+      const screen = await renderDetailPage('job-split-007')
+      await expect.element(screen.getByText('msl · step 0')).toBeVisible()
+      await screen.getByRole('button', { name: 'View' }).first().click()
+      const header = (label: string) =>
+        screen.getByText(`map_plot · ${label}`, { exact: true })
+      await expect.element(header('msl · step 0')).toBeVisible()
+
+      await userEvent.keyboard('{ArrowDown}')
+      await expect.element(header('2t · step 0')).toBeVisible()
+      await userEvent.keyboard('{Shift>}{ArrowRight}{/Shift}')
+      await expect.element(header('2t · step 24')).toBeVisible()
+      await userEvent.keyboard('{End}')
+      await expect.element(header('2t · step 36')).toBeVisible()
+      await userEvent.keyboard('{Home}')
+      await expect.element(header('2t · step 0')).toBeVisible()
+
+      await userEvent.keyboard(' ')
+      await expect
+        .element(header('2t · step 12'), { timeout: 3000 })
+        .toBeVisible()
+    })
+  })
+
+  describe('validated option types on the canvas', () => {
+    const block = (
+      id: string,
+      factory: string,
+      values: Record<string, string>,
+      inputs: Record<string, string> = {},
+    ) => ({
+      instance_id: id,
+      plugin: { store: 'ecmwf', local: 'ecmwf-base' },
+      factory,
+      instance: { configuration_values: values, input_ids: inputs },
+    })
+
+    it('labels params a Select narrows to params, and leaves steps raw', async () => {
+      worker.use(
+        http.get(API_ENDPOINTS.fable.get, () =>
+          HttpResponse.json({
+            blueprint_id: 'select-labels',
+            version: 1,
+            builder: {
+              blocks: [
+                block('src', 'operationalForecastSource', {}),
+                block(
+                  'selParam',
+                  'select',
+                  { dimension: 'param', values: '167,151' },
+                  { dataset: 'src' },
+                ),
+                block(
+                  'selStep',
+                  'select',
+                  { dimension: 'step', values: '24,0,3,6' },
+                  { dataset: 'selParam' },
+                ),
+              ],
+            },
+            display_name: 'Select labels',
+            display_description: '',
+            tags: [],
+            parent_id: null,
+            created_at: '2026-10-17T00:00:00+00:00',
+            updated_at: '2026-10-17T00:00:00+00:00',
+          }),
+        ),
+        http.put(API_ENDPOINTS.fable.expand, () =>
+          HttpResponse.json({
+            global_errors: [],
+            block_errors: {},
+            possible_sources: [],
+            possible_expansions: {},
+            configuration_restrictions: {
+              selParam: { values: "list[enumClosed[param]('151','167')]" },
+              selStep: { values: "list[enumClosed[str]('0','24','3','6')]" },
+            },
+          }),
+        ),
+        // Resolves any id, so a wrong lookup would show.
+        http.post(API_ENDPOINTS.fable.resolveDisplay, async ({ request }) => {
+          const { elements } = (await request.json()) as {
+            elements: Array<{ typeName: string; value: string }>
+          }
+          return HttpResponse.json({
+            elements: elements.map((e) => ({
+              ...e,
+              display: `Param ${e.value} [K] (p${e.value})`,
+            })),
+          })
+        }),
+      )
+      injectMockExecution({
+        ...resolvedConfigExecution,
+        run_id: 'job-select-011',
+        blueprint_id: 'select-labels',
+        resolution: null,
+      })
+      const screen = await renderDetailPage('job-select-011')
+
+      await expect.element(screen.getByText('p167, p151')).toBeVisible()
+      await expect.element(screen.getByText('24,0,3,6')).toBeVisible()
+      await expect.element(screen.getByText(/p24/)).not.toBeInTheDocument()
     })
   })
 

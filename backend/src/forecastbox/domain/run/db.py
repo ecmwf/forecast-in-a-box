@@ -183,14 +183,37 @@ def get_run(
     return dto
 
 
-def update_run_runtime(run_id: RunId, attempt_count: int, **kwargs: object) -> None:
+def get_run_unchecked(run_id: RunId, attempt_count: int) -> RunRecord | None:
+    """Return a specific non-deleted attempt of a Run, or None if it does not exist. No actor-level auth."""
+    query = select(Run).where(Run.run_id == run_id, Run.attempt_count == attempt_count, Run.is_deleted.is_(False))
+    row = querySingle(query, _jobs_module.sync_session_maker)
+    return None if row is None else _to_run_record(row)
+
+
+def update_run_runtime(run_id: RunId, attempt_count: int, *, expected_status: RunStatus | None = None, **kwargs: object) -> bool:
     """Update mutable runtime fields on a specific Run attempt.
 
     No actor-level auth; this is an internal system operation called during execution.
+    Any update of the ``status`` field must supply ``expected_status``, which is then part of the
+    where clause (compare-and-swap). Returns whether a row was updated; always True when
+    ``expected_status`` is not supplied and the row exists. On False the caller is expected to
+    re-read the Run and decide anew.
     """
+    if "status" in kwargs and expected_status is None:
+        raise ValueError("updating status requires expected_status")
     ref_time = current_time("dbref")
-    stmt = update(Run).where(Run.run_id == run_id, Run.attempt_count == attempt_count).values(updated_at=ref_time, **kwargs)
-    executeAndCommit(stmt, _jobs_module.sync_session_maker)
+    conditions = [Run.run_id == run_id, Run.attempt_count == attempt_count]
+    if expected_status is not None:
+        conditions.append(Run.status == expected_status)
+    stmt = update(Run).where(*conditions).values(updated_at=ref_time, **kwargs)
+
+    def function(i: int) -> bool:
+        with _jobs_module.sync_session_maker() as session:
+            result = session.execute(stmt)
+            session.commit()
+            return cast(Any, result).rowcount == 1
+
+    return dbRetry(function)
 
 
 def list_runs(*, auth_context: AuthContext, offset: int = 0, limit: int | None = None) -> Iterable[RunRecord]:
@@ -241,17 +264,29 @@ def count_runs(*, auth_context: AuthContext) -> int:
     return dbRetry(function)
 
 
-def soft_delete_run(run_id: RunId, *, auth_context: AuthContext) -> None:
-    """Mark all attempts of a Run as deleted.
+def soft_delete_run(run_id: RunId, attempt_count: int, *, expected_status: RunStatus, also_hide_statuses: Iterable[RunStatus]) -> bool:
+    """Mark a specific attempt of a Run as deleted if it has the expected status, in a single transaction.
 
-    Raises ``RunNotFound`` if the execution does not exist.
-    Raises ``RunAccessDenied`` if the actor is an authenticated non-admin
-    who does not own the execution.
+    Other attempts of the same Run whose status is among ``also_hide_statuses`` are marked deleted as well.
+    Returns whether the specific attempt was updated; if not, nothing is changed. No actor-level auth.
     """
-    # get_run raises if not found or access denied; ownership is already checked.
-    get_run(run_id, auth_context=auth_context)
-    stmt = update(Run).where(Run.run_id == run_id).values(is_deleted=True)
-    executeAndCommit(stmt, _jobs_module.sync_session_maker)
+    stmt = (
+        update(Run)
+        .where(Run.run_id == run_id, Run.attempt_count == attempt_count, Run.status == expected_status, Run.is_deleted.is_(False))
+        .values(is_deleted=True)
+    )
+    others = update(Run).where(Run.run_id == run_id, Run.status.in_(list(also_hide_statuses))).values(is_deleted=True)
+
+    def function(i: int) -> bool:
+        with _jobs_module.sync_session_maker() as session:
+            if cast(Any, session.execute(stmt)).rowcount != 1:
+                session.rollback()
+                return False
+            session.execute(others)
+            session.commit()
+            return True
+
+    return dbRetry(function)
 
 
 def list_runs_by_experiment(

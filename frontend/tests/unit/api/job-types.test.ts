@@ -9,7 +9,10 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { JobExecutionDetailSchema } from '@/api/types/job.types'
+import {
+  JobExecutionDetailSchema,
+  isTerminalStatus,
+} from '@/api/types/job.types'
 
 const baseDetail = {
   run_id: 'run-1',
@@ -80,6 +83,15 @@ describe('JobExecutionDetailSchema', () => {
     })
   })
 
+  it('accepts a null as-run value for an explicitly null option (ecmwf#691)', () => {
+    const result = JobExecutionDetailSchema.parse({
+      ...baseDetail,
+      status: 'completed',
+      resolution: { block_source_1: { text: null } },
+    })
+    expect(result.resolution).toEqual({ block_source_1: { text: null } })
+  })
+
   it('accepts absent and null resolution (pre-#640 backends and old runs)', () => {
     expect(
       JobExecutionDetailSchema.parse(baseDetail).resolution,
@@ -97,5 +109,27 @@ describe('JobExecutionDetailSchema', () => {
         completed_block_ids: 'not-an-array',
       }),
     ).toThrow()
+  })
+})
+
+describe('run status (ecmwf#770)', () => {
+  it('accepts stopping and stopped', () => {
+    for (const status of ['stopping', 'stopped']) {
+      expect(
+        JobExecutionDetailSchema.parse({ ...baseDetail, status }).status,
+      ).toBe(status)
+    }
+  })
+
+  it('reads a status it does not know as unknown instead of failing', () => {
+    expect(
+      JobExecutionDetailSchema.parse({ ...baseDetail, status: 'paused' })
+        .status,
+    ).toBe('unknown')
+  })
+
+  it('treats stopped as finished and stopping as still active', () => {
+    expect(isTerminalStatus('stopped')).toBe(true)
+    expect(isTerminalStatus('stopping')).toBe(false)
   })
 })

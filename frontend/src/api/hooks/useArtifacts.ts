@@ -26,8 +26,14 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  useMutation,
+  useMutationState,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { create } from 'zustand'
+import { useShallow } from 'zustand/react/shallow'
 import i18n from 'i18next'
 import type {
   ArtifactInfo,
@@ -36,6 +42,7 @@ import type {
   MlModelOverview,
 } from '@/api/types/artifacts.types'
 import {
+  artifactLabels,
   decodeArtifactId,
   encodeArtifactId,
   toArtifactInfo,
@@ -76,6 +83,7 @@ export const artifactKeys = {
   list: () => [...artifactKeys.all, 'list'] as const,
   detail: (compositeId: CompositeArtifactId) =>
     [...artifactKeys.all, 'detail', compositeId] as const,
+  delete: () => [...artifactKeys.all, 'delete'] as const,
 }
 
 /**
@@ -100,6 +108,26 @@ export function useArtifacts() {
   }
 }
 
+function toArtifactLabels(
+  models: Array<MlModelOverview>,
+): ReadonlyMap<string, string> {
+  return artifactLabels(models.map(toArtifactInfo))
+}
+
+const NO_ARTIFACT_LABELS: ReadonlyMap<string, string> = new Map()
+
+/** Catalogue label per artifact wire id; shares the `useArtifacts` query. */
+export function useArtifactLabels(enabled = true): ReadonlyMap<string, string> {
+  const { data } = useQuery({
+    queryKey: artifactKeys.list(),
+    queryFn: listModels,
+    staleTime: 60 * 1000,
+    enabled,
+    select: toArtifactLabels,
+  })
+  return data ?? NO_ARTIFACT_LABELS
+}
+
 /**
  * Hook to get model detail
  */
@@ -118,6 +146,8 @@ export interface DownloadProgress {
   /** 0-100 */
   progress: number
   status: string
+  /** Set when the download failed. */
+  error?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -202,7 +232,8 @@ export function wakeDownloadPolling(compositeId: CompositeArtifactId): void {
  */
 async function startDownloadPolling(
   compositeId: CompositeArtifactId,
-  onComplete?: () => void,
+  onComplete?: () => Promise<unknown>,
+  retry = false,
 ) {
   const key = encodeArtifactId(compositeId)
 
@@ -215,18 +246,25 @@ async function startDownloadPolling(
   // Persist to localStorage so we can resume after page refresh
   savePendingDownload(key)
 
-  useDownloadStore
-    .getState()
-    .setProgress(key, { compositeId, progress: 0, status: 'submitting' })
+  const store = useDownloadStore.getState()
+  store.setProgress(key, { compositeId, progress: 0, status: 'submitting' })
 
+  // Only the first request retries; polls just read.
+  let retryNext = retry
   try {
     const response = await createPollingTask({
-      poll: () => downloadModel(compositeId),
+      poll: () => {
+        const withRetry = retryNext
+        retryNext = false
+        return downloadModel(compositeId, withRetry)
+      },
       until: (r) => r.status === 'available',
       interval: DOWNLOAD_POLL_INTERVAL,
       signal: controller.signal,
       onProgress: (r) => {
-        useDownloadStore.getState().setProgress(key, {
+        // Ignore a response landing after abort.
+        if (controller.signal.aborted) return
+        store.setProgress(key, {
           compositeId,
           progress: r.progress ?? 0,
           status: r.status,
@@ -234,18 +272,45 @@ async function startDownloadPolling(
       },
       onWake: (wake) => downloadWakers.set(key, wake),
     })
-    onComplete?.()
+    // Keep the progress entry until the list shows the model as downloaded.
+    await onComplete?.()
+    store.removeProgress(key)
     return response
+  } catch (error) {
+    // A newer poll owns this key (after a reset).
+    if (abortControllers.get(key) !== controller) throw error
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      store.removeProgress(key)
+    } else {
+      const last = useDownloadStore.getState().downloads[key] as
+        DownloadProgress | undefined
+      store.setProgress(key, {
+        compositeId,
+        progress: last?.progress ?? 0,
+        status: 'failed',
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+    throw error
   } finally {
-    abortControllers.delete(key)
-    downloadWakers.delete(key)
-    removePendingDownload(key)
-    useDownloadStore.getState().removeProgress(key)
+    if (abortControllers.get(key) === controller) {
+      abortControllers.delete(key)
+      downloadWakers.delete(key)
+      removePendingDownload(key)
+    }
   }
 }
 
+/** Abort all download polls and clear the store (tests only). */
+export function resetDownloadState(): void {
+  for (const controller of abortControllers.values()) controller.abort()
+  abortControllers.clear()
+  downloadWakers.clear()
+  useDownloadStore.setState({ downloads: {} })
+}
+
 /**
- * Download action callbacks (start / cancel).
+ * Download action callbacks.
  *
  * Subscribes to *no* store slice, so a consumer that only triggers downloads
  * never re-renders on a progress tick. Also resumes any pending downloads on
@@ -267,33 +332,36 @@ export function useDownloadActions() {
       if (!compositeId.artifact_store_id || !compositeId.artifact_local_id)
         continue
 
-      startDownloadPolling(compositeId, () => {
-        queryClient.invalidateQueries({ queryKey: artifactKeys.list() })
-        queryClient.invalidateQueries({
-          queryKey: artifactKeys.detail(compositeId),
-        })
-      }).catch(handleDownloadError)
+      startDownloadPolling(compositeId, () =>
+        Promise.all([
+          queryClient.invalidateQueries({ queryKey: artifactKeys.list() }),
+          queryClient.invalidateQueries({
+            queryKey: artifactKeys.detail(compositeId),
+          }),
+        ]),
+      ).catch(handleDownloadError)
     }
   }, [queryClient])
 
+  // A click retries a failed download; resumes don't.
   const mutate = useCallback(
     (compositeId: CompositeArtifactId) => {
-      startDownloadPolling(compositeId, () => {
-        queryClient.invalidateQueries({ queryKey: artifactKeys.list() })
-        queryClient.invalidateQueries({
-          queryKey: artifactKeys.detail(compositeId),
-        })
-      }).catch(handleDownloadError)
+      startDownloadPolling(
+        compositeId,
+        () =>
+          Promise.all([
+            queryClient.invalidateQueries({ queryKey: artifactKeys.list() }),
+            queryClient.invalidateQueries({
+              queryKey: artifactKeys.detail(compositeId),
+            }),
+          ]),
+        true,
+      ).catch(handleDownloadError)
     },
     [queryClient],
   )
 
-  const cancel = useCallback((compositeId: CompositeArtifactId) => {
-    const key = encodeArtifactId(compositeId)
-    abortControllers.get(key)?.abort()
-  }, [])
-
-  return { mutate, cancel }
+  return { mutate }
 }
 
 /**
@@ -308,9 +376,21 @@ export function useDownloadProgress(compositeId: CompositeArtifactId) {
     key in state.downloads ? state.downloads[key] : undefined,
   )
   return {
-    isDownloading: entry !== undefined,
+    isDownloading: entry !== undefined && entry.error === undefined,
     progress: entry?.progress,
+    error: entry?.error,
   }
+}
+
+/** Encoded ids of downloading models; stable across progress ticks. */
+export function useDownloadingKeys(): Array<string> {
+  return useDownloadStore(
+    useShallow((state) =>
+      Object.keys(state.downloads).filter(
+        (key) => state.downloads[key].error === undefined,
+      ),
+    ),
+  )
 }
 
 /**
@@ -325,13 +405,22 @@ export function useDownloadProgress(compositeId: CompositeArtifactId) {
  * `useDownloadActions`, to avoid re-rendering on every progress tick.
  */
 export function useDownloadModel() {
-  const { mutate, cancel } = useDownloadActions()
+  const { mutate } = useDownloadActions()
   const downloads = useDownloadStore((state) => state.downloads)
 
   const isDownloading = useCallback(
     (compositeId: CompositeArtifactId): boolean => {
-      return encodeArtifactId(compositeId) in downloads
+      const entry = downloads[encodeArtifactId(compositeId)] as
+        DownloadProgress | undefined
+      return entry !== undefined && entry.error === undefined
     },
+    [downloads],
+  )
+
+  const getError = useCallback(
+    (compositeId: CompositeArtifactId): string | undefined =>
+      (downloads[encodeArtifactId(compositeId)] as DownloadProgress | undefined)
+        ?.error,
     [downloads],
   )
 
@@ -348,7 +437,7 @@ export function useDownloadModel() {
     mutate,
     isDownloading,
     getProgress,
-    cancel,
+    getError,
     downloads,
   }
 }
@@ -360,12 +449,24 @@ export function useDeleteModel() {
   const queryClient = useQueryClient()
 
   return useMutation({
+    mutationKey: artifactKeys.delete(),
     mutationFn: deleteModel,
-    onSuccess: (_data, compositeId) => {
-      queryClient.invalidateQueries({ queryKey: artifactKeys.list() })
-      queryClient.invalidateQueries({
-        queryKey: artifactKeys.detail(compositeId),
-      })
-    },
+    // Awaited: stays pending until the list reflects the delete.
+    onSuccess: (_data, compositeId) =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: artifactKeys.list() }),
+        queryClient.invalidateQueries({
+          queryKey: artifactKeys.detail(compositeId),
+        }),
+      ]),
+  })
+}
+
+/** Encoded ids of models being deleted. */
+export function useDeletingKeys(): Array<string> {
+  return useMutationState({
+    filters: { mutationKey: artifactKeys.delete(), status: 'pending' },
+    select: (mutation) =>
+      encodeArtifactId(mutation.state.variables as CompositeArtifactId),
   })
 }

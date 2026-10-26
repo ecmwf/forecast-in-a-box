@@ -71,6 +71,14 @@ const queryCache = new QueryCache({
  */
 const mutationCache = new MutationCache({
   onError: (error, _variables, _context, mutation) => {
+    // Outcomes the mutation reports itself (e.g. stopping a finished run).
+    if (
+      error instanceof ApiClientError &&
+      Array.isArray(mutation.meta?.expectedErrorStatuses) &&
+      mutation.meta.expectedErrorStatuses.includes(error.status)
+    ) {
+      return
+    }
     log.error('Mutation failed:', {
       mutationKey: mutation.options.mutationKey,
       error: error instanceof Error ? error.message : error,

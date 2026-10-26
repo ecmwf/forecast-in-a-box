@@ -21,12 +21,17 @@
  */
 
 import ImageLayer from 'ol/layer/Image'
+import { HALF_SIZE } from 'ol/proj/epsg3857'
 import ImageWMS from 'ol/source/ImageWMS'
-import { fromLonLat } from 'ol/proj'
 import { toWmsEndpoint } from './wms-capabilities'
 import type { LoadFunction } from 'ol/Image'
+import type { Extent } from 'ol/extent'
+import type LayerGroup from 'ol/layer/Group'
+import type Projection from 'ol/proj/Projection'
 import type VectorTileLayer from 'ol/layer/VectorTile'
+import type { ViewerProjection } from './projections'
 import {
+  CARTO_DARK_MATTER_STYLE_URL,
   CARTO_POSITRON_STYLE_URL,
   makeVectorBasemapLayer,
 } from '@/lib/map/ol-basemap'
@@ -39,10 +44,13 @@ export interface ExternalBasemapOption {
   // Mapbox-style JSON URL; ol-mapbox-style fetches it, builds the
   // source from its `sources` block, and applies styling.
   styleUrl: string
+  /** Dark-theme variant; absent = `styleUrl` in both themes. */
+  darkStyleUrl?: string
 }
 
 /** `visualise`-namespace keys — resolved with `t()` at render. */
-type BasemapLabelKey = 'basemaps.cartoPositron' | 'basemaps.skinnywms'
+type BasemapLabelKey =
+  'basemaps.cartoPositron' | 'basemaps.outline' | 'basemaps.skinnywms'
 
 // SkinnyWMS's own map — `background` as the base, borders overlaid.
 export interface SkinnyWmsBasemapOption {
@@ -51,7 +59,23 @@ export interface SkinnyWmsBasemapOption {
   labelKey: BasemapLabelKey
 }
 
-export type BasemapOption = ExternalBasemapOption | SkinnyWmsBasemapOption
+// Bundled coast/border strokes + graticule — any projection, offline.
+export interface OutlineBasemapOption {
+  type: 'outline'
+  id: string
+  labelKey: BasemapLabelKey
+}
+
+export type BasemapOption =
+  ExternalBasemapOption | OutlineBasemapOption | SkinnyWmsBasemapOption
+
+/** Web-Mercator tile basemaps need a Mercator view. */
+export function basemapFitsProjection(
+  opt: BasemapOption,
+  projection: ViewerProjection,
+): boolean {
+  return opt.type !== 'vector' || projection.mercator
+}
 
 // Satellite-imagery basemaps removed pending licensing review — the
 // wms-image machinery lives in git history.
@@ -61,6 +85,7 @@ export const BASEMAPS: ReadonlyArray<ExternalBasemapOption> = [
     id: 'carto-positron-vector',
     labelKey: 'basemaps.cartoPositron',
     styleUrl: CARTO_POSITRON_STYLE_URL,
+    darkStyleUrl: CARTO_DARK_MATTER_STYLE_URL,
   },
 ]
 
@@ -71,32 +96,39 @@ export const SKINNYWMS_BASEMAP: SkinnyWmsBasemapOption = {
   labelKey: 'basemaps.skinnywms',
 }
 
+export const OUTLINE_BASEMAP: OutlineBasemapOption = {
+  type: 'outline',
+  id: 'outline',
+  labelKey: 'basemaps.outline',
+}
+
 export const DEFAULT_BASEMAP_ID = BASEMAPS[0].id
 export const DEFAULT_LAYER_OPACITY = 0.85
 // SkinnyWMS border overlay sits above every data layer.
 export const REFERENCE_OVERLAY_Z = 1000
 
-// Standard Web Mercator world extent (projection asymptotes at ±85.0511°);
-// constrains panning to the basemap's coverage.
-export const WEB_MERCATOR_EXTENT: [number, number, number, number] = [
-  ...fromLonLat([-180, -85.0511]),
-  ...fromLonLat([180, 85.0511]),
-] as [number, number, number, number]
-
-// Initial fit target — full longitude, latitude biased north so Antarctica
-// is cropped and Scandinavia gets proper screen real estate. "Fit to
-// globe" toolbar button overrides with the full WMS bbox.
-export const INITIAL_VIEW_BBOX_WGS84: [number, number, number, number] = [
-  -180, -55, 180, 85,
-]
+/** What a freshly built map mounts: Carto, or Outline off-Mercator. */
+export function defaultBasemapFor(projection: ViewerProjection): BasemapOption {
+  return projection.mercator ? BASEMAPS[0] : OUTLINE_BASEMAP
+}
 
 export type ExternalBasemapLayer = VectorTileLayer
-export type BasemapLayer = ExternalBasemapLayer | ImageLayer<ImageWMS>
+export type BasemapLayer =
+  ExternalBasemapLayer | LayerGroup | ImageLayer<ImageWMS>
+
+/** The style URL for the app theme. */
+export function vectorStyleUrl(
+  opt: ExternalBasemapOption,
+  theme: 'light' | 'dark',
+): string {
+  return theme === 'dark' ? (opt.darkStyleUrl ?? opt.styleUrl) : opt.styleUrl
+}
 
 export function makeBasemapLayer(
   opt: ExternalBasemapOption,
+  theme: 'light' | 'dark',
 ): ExternalBasemapLayer {
-  return makeVectorBasemapLayer(opt.styleUrl)
+  return makeVectorBasemapLayer(vectorStyleUrl(opt, theme))
 }
 
 /**
@@ -130,6 +162,94 @@ export function loadWasAborted(img: unknown): boolean {
   return img instanceof HTMLImageElement && img.dataset.fiabAborted === '1'
 }
 
+/** BBOX bounds per CRS as [minX, minY, maxX, maxY] in request axis order. */
+function crsBounds(
+  crs: string,
+  version: string,
+): [number, number, number, number] | null {
+  switch (crs.toUpperCase()) {
+    case 'EPSG:3857':
+    case 'EPSG:900913':
+      return [-HALF_SIZE, -HALF_SIZE, HALF_SIZE, HALF_SIZE]
+    case 'EPSG:4326':
+      return version.startsWith('1.3')
+        ? [-90, -180, 90, 180]
+        : [-180, -90, 180, 90]
+    case 'CRS:84':
+      return [-180, -90, 180, 90]
+    default:
+      return null
+  }
+}
+
+/** Trims a GetMap BBOX to its CRS bounds; whole-pixel rounding can push a
+ *  world-clamped box past +-180, which SkinnyWMS draws wrapped or blank. */
+export function clampGetMapBbox(src: string): string {
+  const param = (name: string) =>
+    new RegExp(`([?&]${name}=)([^&]*)`, 'i').exec(src)
+  const bbox = param('BBOX')
+  const crs = param('CRS') ?? param('SRS')
+  if (!bbox || !crs) return src
+  const version = decodeURIComponent(param('VERSION')?.[2] ?? '1.3.0')
+  const bounds = crsBounds(decodeURIComponent(crs[2]), version)
+  const values = decodeURIComponent(bbox[2]).split(',').map(Number)
+  if (!bounds || values.length !== 4 || !values.every(Number.isFinite)) {
+    return src
+  }
+  const clamped = values.map((v, i) =>
+    Math.min(Math.max(v, bounds[i % 2]), bounds[(i % 2) + 2]),
+  )
+  if (clamped.every((v, i) => v === values[i])) return src
+  return (
+    src.slice(0, bbox.index) +
+    bbox[1] +
+    encodeURIComponent(clamped.join(',')) +
+    src.slice(bbox.index + bbox[0].length)
+  )
+}
+
+/** Transient proxy answers worth another try. */
+const RETRY_STATUSES: ReadonlySet<number> = new Set([502, 503, 504])
+/** Backoff before each GetMap retry. */
+const RETRY_DELAYS_MS = [300, 1000] as const
+
+function abortableDelay(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      reject(signal.reason)
+      return
+    }
+    const timer = window.setTimeout(resolve, ms)
+    signal.addEventListener(
+      'abort',
+      () => {
+        window.clearTimeout(timer)
+        reject(signal.reason)
+      },
+      { once: true },
+    )
+  })
+}
+
+/** Retries network errors and transient statuses until superseded. */
+async function fetchWithRetry(
+  url: string,
+  signal: AbortSignal,
+): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    const retriesLeft = attempt < RETRY_DELAYS_MS.length
+    try {
+      const res = await fetch(url, { signal })
+      if (res.ok || !RETRY_STATUSES.has(res.status) || !retriesLeft) {
+        return res
+      }
+    } catch (err) {
+      if (signal.aborted || !retriesLeft) throw err
+    }
+    await abortableDelay(RETRY_DELAYS_MS[attempt], signal)
+  }
+}
+
 /** Fetch-based GetMap loader: a superseded request (pan/zoom/scrub) aborts
  *  the previous one — at most one in flight per source, always the latest. */
 export function cancellingImageLoader(): LoadFunction {
@@ -141,7 +261,7 @@ export function cancellingImageLoader(): LoadFunction {
     const img = image.getImage() as HTMLImageElement
     img.dataset.fiabRequestUrl = src
     delete img.dataset.fiabAborted
-    fetch(src, { signal: controller.signal })
+    fetchWithRetry(clampGetMapBbox(src), controller.signal)
       .then(async (res) => {
         if (!res.ok) throw new Error(`GetMap ${res.status}`)
         const blob = await res.blob()
@@ -170,12 +290,15 @@ export function cancellingImageLoader(): LoadFunction {
 export function makeDataLayerSource(
   baseUrl: string,
   params: Record<string, string>,
+  /** Request-side projection twin (BBOX axis order); default: the view's. */
+  projection?: Projection,
 ): ImageWMS {
   return new ImageWMS({
     // OL appends its own params with the correct separator, so full
     // endpoints with an existing query string are safe here.
     url: toWmsEndpoint(baseUrl),
     params,
+    projection,
     serverType: 'mapserver',
     crossOrigin: 'anonymous',
     hidpi: false,
@@ -188,13 +311,21 @@ export function makeDataLayerSource(
 export function makeSkinnyWmsBasemap(
   baseUrl: string,
   backgroundLayerName: string,
+  /** View projection extent — clips out-of-world BBOXes (→ stretched). */
+  extent: Extent | undefined,
+  /** SkinnyWMS reads BBOXes easting-first (see requestProjection). */
+  projection?: Projection,
 ): ImageLayer<ImageWMS> {
-  const source = makeDataLayerSource(baseUrl, {
-    LAYERS: backgroundLayerName,
-    STYLES: '',
-    FORMAT: 'image/png',
-    // Opaque — it's the base layer.
-    TRANSPARENT: 'FALSE',
-  })
-  return new ImageLayer({ source, extent: WEB_MERCATOR_EXTENT })
+  const source = makeDataLayerSource(
+    baseUrl,
+    {
+      LAYERS: backgroundLayerName,
+      STYLES: '',
+      FORMAT: 'image/png',
+      // Opaque — it's the base layer.
+      TRANSPARENT: 'FALSE',
+    },
+    projection,
+  )
+  return new ImageLayer({ source, extent })
 }

@@ -18,37 +18,83 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import OlMap from 'ol/Map'
 import View from 'ol/View'
-import { fromLonLat, transformExtent } from 'ol/proj'
+import LayerGroup from 'ol/layer/Group'
+import { defaults as defaultControls } from 'ol/control/defaults'
+import { fromLonLat } from 'ol/proj'
+import { getCenter, getWidth } from 'ol/extent'
+import { unByKey } from 'ol/Observable'
+import { BASEMAPS, makeBasemapLayer } from '../ol-layers'
 import {
-  BASEMAPS,
-  INITIAL_VIEW_BBOX_WGS84,
-  WEB_MERCATOR_EXTENT,
-  makeBasemapLayer,
-} from '../ol-layers'
+  getViewerProjection,
+  homeExtentFor,
+  polarGraticuleFor,
+  registerViewerProjections,
+  viewerProjectionOf,
+} from '../projections'
 import type { RefObject } from 'react'
+import type { Extent } from 'ol/extent'
+import type { Size } from 'ol/size'
 import type { BasemapLayer } from '../ol-layers'
+import type { ViewerProjection } from '../projections'
+import { makeOutlineBasemapLayer } from '@/lib/map/ol-outline'
 
 // "Auto-fit done" flag on the shared View, so it survives a map remount (mode switch).
 // Exported: a URL-restored camera pre-marks the View as framed.
 export const AUTOFIT_KEY = 'fiab:autoFitted'
 
-/** The default viewer View: Web-Mercator, world-constrained, Europe-framed. */
-export function createViewerView(): View {
+// Maps mounted on a View but not yet completely rendered, and whether one has rendered.
+const LOADING_MAPS_KEY = 'fiab:loadingMaps'
+const RENDERED_KEY = 'fiab:rendered'
+
+/** Resolves once a map on `view` has completely rendered and none is still loading. */
+export function whenViewRendered(view: View): Promise<void> {
+  const done = () =>
+    view.get(RENDERED_KEY) === true && view.get(LOADING_MAPS_KEY) === 0
+  if (done()) return Promise.resolve()
+  return new Promise((resolve) => {
+    const key = view.on('propertychange', () => {
+      if (!done()) return
+      unByKey(key)
+      resolve()
+    })
+  })
+}
+
+const FIT_PADDING = [40, 40, 40, 40]
+
+/** Fit `extent`; Mercator fits stop at the world's width so the window stays filled. */
+export function fitView(view: View, extent: Extent, size: Size) {
+  view.fit(extent, { size, padding: FIT_PADDING })
+  const p = viewerProjectionOf(view)
+  if (!p.mercator) return
+  const widthFill = getWidth(p.extent) / size[0]
+  if ((view.getResolution() ?? 0) > widthFill) view.setResolution(widthFill)
+}
+
+/** A viewer View: extent-constrained, pre-framed on the projection's home. */
+export function createViewerView(
+  projection: ViewerProjection = getViewerProjection('merc'),
+): View {
+  registerViewerProjections()
+  // Pre-fit framing avoids a [0,0] world flash before tryFit() runs.
+  const framing = projection.mercator
+    ? { center: fromLonLat([12, 50]), zoom: 3 }
+    : {
+        center: getCenter(projection.homeExtent),
+        resolution: getWidth(projection.homeExtent) / 1024,
+      }
   return new View({
-    // Pre-fit framing on Europe — avoids a [0,0] world flash before
-    // tryFit() runs.
-    center: fromLonLat([12, 50]),
-    zoom: 3,
-    projection: 'EPSG:3857',
-    // Vector basemap paints nothing below z1; sub-z1 can break the extent.
-    minZoom: 1,
+    ...framing,
+    projection: projection.code,
+    minZoom: projection.minZoom,
     // smoothExtentConstraint: false keeps pans strictly within the
     // world; without it, slight overshoot makes SkinnyWMS return
     // stretched-stripe images for out-of-bounds BBOXes.
-    extent: WEB_MERCATOR_EXTENT,
+    extent: projection.extent,
     smoothExtentConstraint: false,
     constrainResolution: false,
-    // No showFullExtent: wheel fills the window (Maps-style, no void); fit-to-globe still frames the world.
+    // Zooming out may letterbox; fits keep Mercator filling the window (fitView).
+    showFullExtent: true,
   })
 }
 
@@ -61,6 +107,8 @@ export interface OlMapBaseOptions {
   view?: View
   /** Change tears the map down and rebuilds it (single viewer: baseUrl). */
   resetKey: string
+  /** Outline basemap palette when the view is not Web Mercator. */
+  theme?: 'light' | 'dark'
   incLoading: () => void
   decLoading: () => void
 }
@@ -69,10 +117,12 @@ export interface OlMapBase {
   mapRef: RefObject<OlMap | null>
   basemapLayerRef: RefObject<BasemapLayer | null>
   /**
-   * Fit the view: unforced = one-shot initial fit to the Europe-biased
-   * default; forced = fit to the WMS bbox (falls back to the default).
+   * Fit the view: unforced = one-shot initial fit to the projection's
+   * home; forced = fit to the WMS bbox (falls back to the home).
    */
   tryFit: (force?: boolean) => void
+  /** Fit the view to a WGS84 bbox (home when unframeable). */
+  fitBbox: (bbox: [number, number, number, number]) => void
   /** Provide the WMS-advertised bbox used by forced fits; triggers the
    *  initial unforced fit attempt. */
   setFitBbox: (bbox: [number, number, number, number] | null) => void
@@ -84,7 +134,7 @@ export function useOlMapBase(
   containerRef: RefObject<HTMLDivElement | null>,
   options: OlMapBaseOptions,
 ): OlMapBase {
-  const { view, resetKey, incLoading, decLoading } = options
+  const { view, resetKey, theme = 'light', incLoading, decLoading } = options
   const mapRef = useRef<OlMap | null>(null)
   const basemapLayerRef = useRef<BasemapLayer | null>(null)
   const [mapVersion, setMapVersion] = useState(0)
@@ -94,6 +144,8 @@ export function useOlMapBase(
   // stable anyway, but this makes the contract explicit).
   const viewRef = useRef(view)
   viewRef.current = view
+  const themeRef = useRef(theme)
+  themeRef.current = theme
 
   const tryFit = useCallback((force: boolean = false) => {
     const map = mapRef.current
@@ -104,18 +156,23 @@ export function useOlMapBase(
     // Skip while smaller than the fit padding — the fit would go negative.
     const size = map.getSize()
     if (!size || size[0] <= 96 || size[1] <= 96) return
-    // Forced = "Fit to globe" button → full WMS bbox; unforced (initial
-    // auto-fit) → Europe-centric default. Falls back to the default if
-    // the WMS bbox isn't known yet.
-    const targetWgs84 =
-      force && bboxRef.current ? bboxRef.current : INITIAL_VIEW_BBOX_WGS84
+    // Forced ("Fit view") = WMS bbox; unforced = the projection's home.
     olView.set(AUTOFIT_KEY, true, true)
-    const extent = transformExtent(
-      targetWgs84,
-      'EPSG:4326',
-      olView.getProjection(),
+    const extent = homeExtentFor(
+      viewerProjectionOf(olView),
+      force ? bboxRef.current : null,
     )
-    olView.fit(extent, { padding: [40, 40, 40, 40] })
+    fitView(olView, extent, size)
+  }, [])
+
+  const fitBbox = useCallback((bbox: [number, number, number, number]) => {
+    const map = mapRef.current
+    if (!map) return
+    const size = map.getSize()
+    if (!size) return
+    const olView = map.getView()
+    olView.set(AUTOFIT_KEY, true, true)
+    fitView(olView, homeExtentFor(viewerProjectionOf(olView), bbox), size)
   }, [])
 
   const setFitBbox = useCallback(
@@ -129,24 +186,46 @@ export function useOlMapBase(
   useLayoutEffect(() => {
     const container = containerRef.current
     if (!container) return
-    // Mount with default basemap; the basemap-swap effect (useBasemap)
-    // adopts the user's choice afterwards.
-    const basemap = makeBasemapLayer(BASEMAPS[0])
-    const source = basemap.getSource()
-    source?.on('tileloadstart', incLoading)
-    source?.on('tileloadend', decLoading)
-    source?.on('tileloaderror', decLoading)
+    const olView = viewRef.current ?? createViewerView()
+    const projection = viewerProjectionOf(olView)
+    // Mount with the projection's default basemap; the basemap-swap
+    // effect (useBasemap) adopts the user's choice afterwards.
+    const basemap: BasemapLayer = projection.mercator
+      ? makeBasemapLayer(BASEMAPS[0], themeRef.current)
+      : makeOutlineBasemapLayer(
+          projection.code,
+          projection.extent,
+          themeRef.current,
+          polarGraticuleFor(projection),
+        )
+    if (!(basemap instanceof LayerGroup)) {
+      const source = basemap.getSource()
+      source?.on('tileloadstart', incLoading)
+      source?.on('tileloadend', decLoading)
+      source?.on('tileloaderror', decLoading)
+    }
     basemapLayerRef.current = basemap
     const map = new OlMap({
       target: container,
       layers: [basemap],
-      view: viewRef.current ?? createViewerView(),
+      view: olView,
+      // Zoom buttons come from MapNavControls, shared with the globe.
+      controls: defaultControls({ zoom: false }),
       // Default is 1px: a real mouse almost always drifts more than that
       // between press and release, silently swallowing `singleclick`
       // (annotations, feature hits). 6px still pans responsively.
       moveTolerance: 6,
     })
     mapRef.current = map
+    const countLoading = (delta: number) =>
+      olView.set(LOADING_MAPS_KEY, (olView.get(LOADING_MAPS_KEY) ?? 0) + delta)
+    let loading = true
+    countLoading(1)
+    const firstRender = map.once('rendercomplete', () => {
+      loading = false
+      olView.set(RENDERED_KEY, true)
+      countLoading(-1)
+    })
     // Recreation signal for hooks that mount layers on the map — deps on
     // the stable mapRef alone strand them on a replaced instance.
     setMapVersion((v) => v + 1)
@@ -161,13 +240,16 @@ export function useOlMapBase(
     ro.observe(container)
     return () => {
       ro.disconnect()
+      // Unmounted before its first complete render: stop counting it.
+      unByKey(firstRender)
+      if (loading) countLoading(-1)
       map.setTarget(undefined)
       // Detach from the shared View (setView unlistens the old view's
       // listeners) — else every discarded map leaks through it.
-      map.setView(createViewerView())
+      map.setView(createViewerView(projection))
       mapRef.current = null
     }
   }, [containerRef, resetKey, tryFit, incLoading, decLoading])
 
-  return { mapRef, basemapLayerRef, tryFit, setFitBbox, mapVersion }
+  return { mapRef, basemapLayerRef, tryFit, fitBbox, setFitBbox, mapVersion }
 }

@@ -47,7 +47,7 @@ export function ComparePanel({
       <div className="flex items-center gap-2 border-b border-border bg-muted/40 px-3 py-2">
         <span
           className={cn(
-            'flex h-5 w-5 shrink-0 items-center justify-center rounded font-mono text-xs font-bold',
+            'flex h-5 w-5 shrink-0 items-center justify-center rounded-md font-mono text-xs font-bold',
             SLOT_BADGE_CLASS[slot],
           )}
         >
@@ -75,6 +75,16 @@ function PanelBody({ state }: { state: ComparisonSourceState }) {
         <Centered muted>
           <Loader2 className="h-4 w-4 animate-spin" />
           {t('lens.resolving')}
+        </Centered>
+      )
+    case 'waitingForRun':
+      return (
+        <Centered muted>
+          <Loader2 className="h-4 w-4 animate-spin" />
+          {t('lens.waitingForRun', {
+            written: state.written,
+            total: state.total,
+          })}
         </Centered>
       )
     case 'starting':

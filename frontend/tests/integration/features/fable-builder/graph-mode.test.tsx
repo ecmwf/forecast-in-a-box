@@ -8,10 +8,17 @@
  * does it submit to any jurisdiction.
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
+import { HttpResponse, delay, http } from 'msw'
 import { renderWithRouter } from '@tests/utils/render'
-import { mockCatalogue } from '../../../../mocks/data/fable.data'
+import { worker } from '@tests/test-extend'
+import {
+  calculateExpansion,
+  mockCatalogue,
+} from '../../../../mocks/data/fable.data'
 import type { FableBuilderV1 } from '@/api/types/fable.types'
+import { API_ENDPOINTS } from '@/api/endpoints'
+import { FableBuilderV1Schema } from '@/api/types/fable.types'
 import { FableBuilderPage } from '@/features/fable-builder/components/FableBuilderPage'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import {
@@ -67,10 +74,7 @@ function createMultiBlockFable(): FableBuilderV1 {
           plugin: { store: 'ecmwf', local: 'ecmwf-base' },
           factory: 'ensembleStatistics',
         },
-        configuration_values: {
-          param: '2t',
-          statistic: 'mean',
-        },
+        configuration_values: { statistic: 'mean' },
         input_ids: { dataset: 'source1' },
       },
       sink1: {
@@ -81,6 +85,26 @@ function createMultiBlockFable(): FableBuilderV1 {
         configuration_values: { path: '/tmp/output.zarr' },
         input_ids: { dataset: 'product1' },
       },
+    },
+  }
+}
+
+/** source -> select (transform) -> product -> sink. */
+function createTransformChainFable(): FableBuilderV1 {
+  const { source1, product1, sink1 } = createMultiBlockFable().blocks
+  return {
+    blocks: {
+      source1,
+      select1: {
+        factory_id: {
+          plugin: { store: 'ecmwf', local: 'ecmwf-base' },
+          factory: 'select',
+        },
+        configuration_values: { dimension: 'step', values: '6' },
+        input_ids: { dataset: 'source1' },
+      },
+      product1: { ...product1, input_ids: { dataset: 'select1' } },
+      sink1,
     },
   }
 }
@@ -354,7 +378,7 @@ describe('Graph Mode - Builder Integration', () => {
     const screen = await renderWithRouter(<FableBuilderPage />)
 
     // Wait for catalogue to load
-    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
 
     // Set up a fable and select a block
     const store = useFableBuilderStore.getState()
@@ -370,25 +394,43 @@ describe('Graph Mode - Builder Integration', () => {
     await expect.element(screen.getByLabelText('Base time')).toBeVisible()
   })
 
-  it('shows "Select a block to configure" when no block is selected', async () => {
+  it('shows the empty configuration panel when no block is selected', async () => {
     const screen = await renderWithRouter(<FableBuilderPage />)
 
-    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
 
     // Set up a fable but do NOT select a block
     const store = useFableBuilderStore.getState()
     store.setFable(createMultiBlockFable())
 
     // The config panel should show the placeholder
+    await expect.element(screen.getByText('Nothing selected')).toBeVisible()
+  })
+
+  it('"Add a source" opens a canvas picker that adds and selects a source', async () => {
+    const screen = await renderWithRouter(<FableBuilderPage />)
+    await expect.element(screen.getByText('Nothing selected')).toBeVisible()
+
+    await screen.getByRole('button', { name: 'Add a source' }).click()
+    const picker = screen.getByRole('dialog', { name: 'Add a source' })
+    await expect.element(picker).toBeVisible()
     await expect
-      .element(screen.getByText('Select a block to configure'))
+      .element(picker.getByPlaceholder('Search blocks...'))
       .toBeVisible()
+
+    await picker.getByRole('button').first().click()
+
+    await expect.element(picker).not.toBeInTheDocument()
+    expect(
+      Object.keys(useFableBuilderStore.getState().fable.blocks),
+    ).toHaveLength(1)
+    expect(useFableBuilderStore.getState().selectedBlockId).not.toBeNull()
   })
 
   it('shows input connections section for blocks with inputs', async () => {
     const screen = await renderWithRouter(<FableBuilderPage />)
 
-    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
 
     // Set up fable and select the sink (which has an input connection)
     const store = useFableBuilderStore.getState()
@@ -396,16 +438,193 @@ describe('Graph Mode - Builder Integration', () => {
     store.selectBlock('sink1')
 
     // Sink block has Input Connections section
-    await expect.element(screen.getByText('Input Connections')).toBeVisible()
+    await expect.element(screen.getByText('Input connections')).toBeVisible()
 
     // The input name "dataset" should appear as a label
     await expect.element(screen.getByLabelText('dataset')).toBeVisible()
   })
 
+  it('names a connected transform and offers it as an input', async () => {
+    const screen = await renderWithRouter(<FableBuilderPage />)
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
+
+    const store = useFableBuilderStore.getState()
+    store.setFable(createTransformChainFable())
+    store.selectBlock('product1')
+
+    // Qualified: the mock catalogue has two "Select" factories.
+    const trigger = screen.getByLabelText('dataset')
+    await expect.element(trigger.getByText('Select · ecmwf-base')).toBeVisible()
+
+    await trigger.click()
+    await expect
+      .element(screen.getByRole('option', { name: 'Select · ecmwf-base' }))
+      .toBeVisible()
+    await expect
+      .element(
+        screen.getByRole('option', { name: 'Operational forecast source' }),
+      )
+      .toBeVisible()
+  })
+
+  it('labels parameter ids on block badges', async () => {
+    const screen = await renderWithRouter(<FableBuilderPage />)
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
+
+    const fable = createMultiBlockFable()
+    fable.blocks.sink1 = {
+      factory_id: {
+        plugin: { store: 'ecmwf', local: 'ecmwf-base' },
+        factory: 'mapPlotSink',
+      },
+      configuration_values: { param: '167,151' },
+      input_ids: { dataset: 'product1' },
+    }
+    useFableBuilderStore.getState().setFable(fable)
+
+    const badge = screen.getByText('2t, msl', { exact: true })
+    await expect.element(badge).toBeVisible()
+  })
+
+  it('re-centres blocks when a card changes height after layout', async () => {
+    const { layoutDirection } = useFableBuilderStore.getState()
+    onTestFinished(() =>
+      useFableBuilderStore.getState().setLayoutDirection(layoutDirection),
+    )
+    useFableBuilderStore.getState().setLayoutDirection('LR')
+    const screen = await renderWithRouter(<FableBuilderPage />)
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
+    useFableBuilderStore.getState().setFable(createTransformChainFable())
+
+    const handleY = (selector: string) => {
+      const rect = document.querySelector(selector)!.getBoundingClientRect()
+      return Math.round(rect.top + rect.height / 2)
+    }
+    const sourceOut = '[data-nodeid="source1"].react-flow__handle.source'
+    const selectIn = '[data-nodeid="select1"].react-flow__handle.target'
+    await expect
+      .poll(() => document.querySelector(selectIn) !== null)
+      .toBe(true)
+    await expect.poll(() => handleY(sourceOut) - handleY(selectIn)).toBe(0)
+
+    const card = document.querySelector(
+      '[data-id="select1"] [data-block-kind]',
+    )!
+    const filler = document.createElement('div')
+    filler.style.height = '80px'
+    card.appendChild(filler)
+
+    await expect.poll(() => handleY(sourceOut) - handleY(selectIn)).toBe(0)
+    filler.remove()
+  })
+
+  it('shows a failed validation in the header status', async () => {
+    worker.use(
+      http.put(
+        API_ENDPOINTS.fable.expand,
+        () => new HttpResponse('Internal Server Error', { status: 500 }),
+      ),
+    )
+    const screen = await renderWithRouter(<FableBuilderPage />)
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
+    useFableBuilderStore.getState().setFable(createMultiBlockFable())
+
+    const badge = screen.getByRole('button', { name: 'Validation failed' })
+    await expect.element(badge).toBeVisible()
+    await badge.click()
+    await expect
+      .element(
+        screen.getByText(
+          'The server failed while validating this workflow (HTTP 500).',
+        ),
+      )
+      .toBeVisible()
+  })
+
+  it("does not bring an edited block's old errors back while revalidating", async () => {
+    const EMPTY = "Configuration option 'values' cannot be empty"
+    // Empty values fail at once; the fixed workflow validates slowly.
+    worker.use(
+      http.put(API_ENDPOINTS.fable.expand, async ({ request }) => {
+        const fable = FableBuilderV1Schema.parse(await request.json())
+        const empty = !fable.blocks.select1.configuration_values.values
+        if (!empty) await delay(2000)
+        const expansion = calculateExpansion(fable)
+        return HttpResponse.json({
+          ...expansion,
+          block_errors: empty ? { select1: [EMPTY] } : {},
+        })
+      }),
+    )
+    const screen = await renderWithRouter(<FableBuilderPage />)
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
+    const fable = createTransformChainFable()
+    fable.blocks.select1.configuration_values.values = ''
+    useFableBuilderStore.getState().setFable(fable)
+    await expect.element(screen.getByText(EMPTY).first()).toBeVisible()
+
+    useFableBuilderStore.getState().updateBlockConfig('select1', 'values', '6')
+
+    // Past the debounce, the slow check is in flight: the old error stays gone.
+    await new Promise((resolve) => setTimeout(resolve, 800))
+    expect(screen.getByText(EMPTY).elements()).toHaveLength(0)
+  })
+
+  it('keeps the config panel steady while an edited block revalidates', async () => {
+    const EMPTY = "Configuration option 'values' cannot be empty"
+    worker.use(
+      http.put(API_ENDPOINTS.fable.expand, async ({ request }) => {
+        const fable = FableBuilderV1Schema.parse(await request.json())
+        const empty = !fable.blocks.select1.configuration_values.values
+        if (!empty) await delay(2000)
+        const expansion = calculateExpansion(fable)
+        return HttpResponse.json({
+          ...expansion,
+          block_errors: empty ? { select1: [EMPTY] } : {},
+        })
+      }),
+    )
+    const screen = await renderWithRouter(<FableBuilderPage />)
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
+    const fable = createTransformChainFable()
+    fable.blocks.select1.configuration_values.values = ''
+    useFableBuilderStore.getState().setFable(fable)
+    useFableBuilderStore.getState().selectBlock('select1')
+    // The backend message lands on its field in the panel.
+    const fieldError = screen.getByText('Missing required value')
+    await expect.element(fieldError).toBeVisible()
+
+    useFableBuilderStore.getState().updateBlockConfig('select1', 'values', '6')
+    await new Promise((resolve) => setTimeout(resolve, 800))
+
+    // The panel holds its last errors (no layout jump); the canvas drops them.
+    await expect.element(fieldError).toBeInTheDocument()
+    expect(screen.getByText(EMPTY).elements()).toHaveLength(0)
+  })
+
+  it("does not offer a block's own consumers as its input", async () => {
+    const screen = await renderWithRouter(<FableBuilderPage />)
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
+
+    const store = useFableBuilderStore.getState()
+    store.setFable(createTransformChainFable())
+    store.selectBlock('select1')
+
+    await screen.getByLabelText('dataset').click()
+    await expect
+      .element(
+        screen.getByRole('option', { name: 'Operational forecast source' }),
+      )
+      .toBeVisible()
+    expect(
+      screen.getByRole('option', { name: 'Ensemble Statistics' }).elements(),
+    ).toHaveLength(0)
+  })
+
   it('updates block count in header as blocks are added', async () => {
     const screen = await renderWithRouter(<FableBuilderPage />)
 
-    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
 
     // Set up a 3-block fable
     const store = useFableBuilderStore.getState()
@@ -421,20 +640,6 @@ describe('Graph Mode - Store State', () => {
     useFableBuilderStore.getState().reset()
   })
 
-  it('defaults to graph mode', () => {
-    const state = useFableBuilderStore.getState()
-    expect(state.mode).toBe('graph')
-  })
-
-  it('can switch between graph and form modes', () => {
-    const store = useFableBuilderStore.getState()
-    store.setMode('form')
-    expect(useFableBuilderStore.getState().mode).toBe('form')
-
-    useFableBuilderStore.getState().setMode('graph')
-    expect(useFableBuilderStore.getState().mode).toBe('graph')
-  })
-
   it('preserves layout direction preference', () => {
     const store = useFableBuilderStore.getState()
     store.setLayoutDirection('LR')
@@ -444,32 +649,12 @@ describe('Graph Mode - Store State', () => {
     expect(useFableBuilderStore.getState().layoutDirection).toBe('TB')
   })
 
-  it('supports toggling auto-layout', () => {
-    const store = useFableBuilderStore.getState()
-    expect(store.autoLayout).toBe(true) // default
-
-    store.setAutoLayout(false)
-    expect(useFableBuilderStore.getState().autoLayout).toBe(false)
-
-    useFableBuilderStore.getState().setAutoLayout(true)
-    expect(useFableBuilderStore.getState().autoLayout).toBe(true)
-  })
-
   it('supports toggling nodes locked', () => {
     const store = useFableBuilderStore.getState()
     expect(store.nodesLocked).toBe(true) // default
 
     store.setNodesLocked(false)
     expect(useFableBuilderStore.getState().nodesLocked).toBe(false)
-  })
-
-  it('supports edge style changes', () => {
-    const store = useFableBuilderStore.getState()
-    store.setEdgeStyle('smoothstep')
-    expect(useFableBuilderStore.getState().edgeStyle).toBe('smoothstep')
-
-    useFableBuilderStore.getState().setEdgeStyle('step')
-    expect(useFableBuilderStore.getState().edgeStyle).toBe('step')
   })
 
   it('increments fitViewTrigger when triggerFitView is called', () => {

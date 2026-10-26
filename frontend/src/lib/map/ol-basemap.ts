@@ -25,6 +25,10 @@ const log = createLogger('map')
 export const CARTO_POSITRON_STYLE_URL =
   'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'
 
+/** Positron's dark counterpart. */
+export const CARTO_DARK_MATTER_STYLE_URL =
+  'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json'
+
 /** Standard Web Mercator world extent (the projection asymptotes at ±85.0511°). */
 export const WEB_MERCATOR_EXTENT: [number, number, number, number] = [
   ...fromLonLat([-180, -85.0511]),

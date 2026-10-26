@@ -18,8 +18,6 @@ import { Header } from './Header'
 import { AuthenticatedHeader } from './AuthenticatedHeader'
 import { Footer } from './Footer'
 import type { ReactNode } from 'react'
-import { cn } from '@/lib/utils'
-import { useUiStore } from '@/stores/uiStore'
 
 interface AppShellProps {
   children: ReactNode
@@ -40,22 +38,12 @@ export function AppShell({
   useAuthenticatedHeader = false,
   notificationBanner,
 }: AppShellProps) {
-  const layoutMode = useUiStore((state) => state.layoutMode)
-
   return (
     <div className="flex min-h-screen flex-col overflow-x-hidden">
       {notificationBanner}
       {useAuthenticatedHeader ? <AuthenticatedHeader /> : <Header />}
       <div className="flex min-w-0 flex-1">
-        <main
-          className={cn(
-            'min-w-0 flex-1',
-            layoutMode === 'boxed' &&
-              'mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8',
-          )}
-        >
-          {children}
-        </main>
+        <main className="min-w-0 flex-1">{children}</main>
       </div>
       {showFooter && <Footer />}
     </div>

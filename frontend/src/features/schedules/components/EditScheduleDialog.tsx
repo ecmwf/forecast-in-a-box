@@ -73,7 +73,7 @@ export function EditScheduleDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
+      <AlertDialogContent className="data-[size=default]:sm:max-w-xl">
         <AlertDialogHeader>
           <AlertDialogTitle>
             {t('schedules:actions.editSchedule')}

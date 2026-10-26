@@ -1,3 +1,6 @@
+default:
+    @just --list
+
 val:
     uv run ty check src/
     uv run ty check tests/unit
@@ -10,3 +13,45 @@ test:
 
 dev:
     just -f ../justfile dev
+
+perfScripts := "packages/fiab-core/scripts"
+perfArtifacts := "../install/artifacts.json"
+
+# Runs the plugin performance suite over every packages/*/tests/perf, printing a tsv to stdout.
+# If baseline is given, eg `just pluginPerf 5.0.0`, additionally runs against the released plugin wheels of that version.
+pluginPerf baseline="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    export UV_COMPILE_BYTECODE=1
+    export PYTHONPATH={{perfScripts}}
+    artifacts={{perfArtifacts}}
+    tmp=$(mktemp -d)
+    trap 'rm -rf "$tmp"' EXIT
+    if [ -z "{{baseline}}" ]; then
+        printf 'key\twarmup_ms\tmean_ms\tvar_ms2\n'
+    else
+        printf 'key\twarmup_ms\tmean_ms\tvar_ms2\tbase_warmup_ms\tbase_mean_ms\tbase_var_ms2\n'
+    fi
+    for perf_dir in packages/*/tests/perf; do
+        [ -d "$perf_dir" ] || continue
+        plugin_dir=${perf_dir%/tests/perf}
+        dist=$(basename "$plugin_dir")
+        module=${dist//-/_}
+        echo "running perf suite for $dist" >&2
+        uv run --isolated --no-project --with-editable packages/fiab-core --with-editable "$plugin_dir" --with 'pymetkit>=1.21.0.28' \
+            python -m performanceSuite.pluginPerf "$perf_dir" --module "$module" --artifacts "$artifacts" --label "$dist" > "$tmp/current.tsv"
+        if [ -z "{{baseline}}" ]; then
+            cat "$tmp/current.tsv"
+        else
+            echo "running baseline perf suite for $dist=={{baseline}}" >&2
+            uv run --isolated --no-project --with "$dist=={{baseline}}" \
+                python -m performanceSuite.pluginPerf "$perf_dir" --module "$module" --artifacts "$artifacts" --label "$dist" > "$tmp/baseline.tsv"
+            join -t $'\t' -a 1 -e '-' -o auto <(sort -t $'\t' -k1,1 "$tmp/current.tsv") <(sort -t $'\t' -k1,1 "$tmp/baseline.tsv")
+        fi
+    done
+
+# Profiles a single phase of a single block of a perf case, eg `just pluginProf fiab-plugin-test/textSources/sleep/compile`.
+# Runs in the regular venv. Extra args are passed on, eg `--profiler cprofile` (gives call counts), `--warmup`, `--out-dir`.
+# Results are written to profiles/ and their paths printed.
+pluginProf target *args:
+    PYTHONPATH={{perfScripts}} uv run python -m performanceSuite.pluginProf {{target}} --packages-dir packages --artifacts {{perfArtifacts}} {{args}}

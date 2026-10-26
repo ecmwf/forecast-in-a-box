@@ -1,0 +1,43 @@
+{
+  "blocks": {
+    "source": {
+      "factory_id": "anemoiSource",
+      "instance": {
+        "configuration_values": {
+          "checkpoint": "ecmwf:aifs-global-o48",
+          "input_source": "opendata",
+          "lead_time": "72",
+          "base_time": "2026-01-01T00:00:00",
+          "number": "1"
+        },
+        "input_ids": {}
+      }
+    },
+    "mapPlot": {
+      "factory_id": "mapPlotSink",
+      "instance": {
+        "configuration_values": {
+          "param": "167,151",
+          "domain": "europe",
+          "format": "png",
+          "groupby": "none",
+          "splitby": "step,param"
+        },
+        "input_ids": {
+          "dataset": "source"
+        }
+      }
+    },
+    "gribSink": {
+      "factory_id": "gribSink",
+      "instance": {
+        "configuration_values": {
+          "path": "/tmp/outputRoot/[shortName].grib"
+        },
+        "input_ids": {
+          "dataset": "source"
+        }
+      }
+    }
+  }
+}

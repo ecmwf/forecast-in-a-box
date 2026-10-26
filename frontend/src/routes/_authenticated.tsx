@@ -18,7 +18,6 @@
  */
 
 import { Outlet, createFileRoute, redirect } from '@tanstack/react-router'
-import { useTranslation } from 'react-i18next'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { OnboardingController } from '@/features/onboarding/OnboardingController'
 import { TutorialsController } from '@/features/tutorials/TutorialsController'
@@ -52,17 +51,11 @@ function isAnonymousUser(): boolean {
  * Authenticated layout component
  */
 function AuthenticatedLayout() {
-  const { t } = useTranslation('dashboard')
-
   // Server-push notifications live as long as any authenticated page does.
   useNotificationSocket()
 
   return (
-    <DashboardLayout
-      notificationMessage={t('notification.newModels')}
-      notificationLinkText={t('notification.registryLink')}
-      notificationLinkHref="/admin/artifacts"
-    >
+    <DashboardLayout>
       <Outlet />
       <OnboardingController />
       <TutorialsController />

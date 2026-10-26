@@ -10,35 +10,53 @@
 """Gateway lifecycle and URL management for the backend."""
 
 import logging
+import multiprocessing as mp
 import os
+import sys
 import threading
+import time
 import urllib.parse
 import uuid
 from dataclasses import dataclass
 from multiprocessing.process import BaseProcess
-from tempfile import TemporaryDirectory
+from typing import cast
 
 from cascade.deployment.logging import LoggingConfig
-from cascade.executor import platform
 from cascade.gateway import api, client
 from cascade.gateway.server import serve
 from cascade.low.func import Either, assert_never
 
+from forecastbox.domain.gateway.events import GatewayStopFailedEvent, GatewayStoppedEvent
 from forecastbox.domain.gateway.exceptions import (
     GatewayAlreadyRunning,
     GatewayExited,
     GatewayNotRunning,
     GatewayNotStarted,
+    GatewayStopInProgress,
 )
+from forecastbox.entrypoint.bootstrap.config import BACKEND_LOG_DIRECTORY_ENV
 from forecastbox.utility import tunnel
-from forecastbox.utility.config import LocalGateway, RemoteGateway, StatusMessage, UnmanagedGateway, config
+from forecastbox.utility.concurrency.manager import TaskName, execution_manager
+from forecastbox.utility.config import ConcurrentPools, LocalGateway, RemoteGateway, UnmanagedGateway, config
+from forecastbox.utility.dispatcher import Event, EventName, submit_event
 
 logger = logging.getLogger(__name__)
+
+GATEWAY_RUNNING = "running"
+
+
+def _gateway_running(message: str) -> bool:
+    return message == GATEWAY_RUNNING
+
+
+@dataclass(frozen=True, eq=True, slots=True)
+class LogDirectory:
+    name: str
 
 
 @dataclass(frozen=True, eq=True, slots=True)
 class LocalProcess:
-    logs_directory: TemporaryDirectory
+    logs_directory: LogDirectory
     process: BaseProcess
     gateway_url: str
 
@@ -64,6 +82,8 @@ def _initial_connection() -> GatewayConnection | None:
 
 class GatewayConnectionManager:
     lock: threading.Lock = threading.Lock()
+    stop_lock: threading.Lock = threading.Lock()
+    """Held for the duration of a background `stop_gateway`, acquired non-blockingly by `submit_stop_gateway`."""
     gateway_connection: GatewayConnection | None = _initial_connection()
 
 
@@ -90,21 +110,32 @@ def _local_process_entrypoint(cascade_url: str, log_base: str | None, max_concur
         pass
 
 
+def _get_mp_ctx() -> mp.context.SpawnContext | mp.context.ForkServerContext:
+    return mp.get_context("spawn") if sys.platform == "darwin" else mp.get_context("forkserver")
+
+
 def launch_gateway() -> None:
     with GatewayConnectionManager.lock:
+        gateway = config.cascade.gateway
+        if isinstance(gateway, UnmanagedGateway):
+            logger.warning("gateway is unmanaged, launch_gateway is a no-op")
+            return
         if GatewayConnectionManager.gateway_connection is not None:
             raise GatewayAlreadyRunning("Process already running.")
-        gateway = config.cascade.gateway
         if isinstance(gateway, LocalGateway):
             startup_params = gateway.startup_params
             max_concurrent_jobs = startup_params.max_concurrent_jobs
-            cascade_logging_base = startup_params.cascade_logging_base
             shared_path = startup_params.shared_path
-            logs_directory = TemporaryDirectory(prefix="fiabLogs", dir=cascade_logging_base)
-            logger.debug(f"logging base is at {logs_directory.name}")
+            # NOTE we dont use gateway.startup_params logging base, because backend already derived
+            # the directory. And we must not modify config with it live as we dont want to persist
+            # that value in case the config gets modified by the user using the admin api
+            logs_directory = LogDirectory(os.environ[BACKEND_LOG_DIRECTORY_ENV])
             logs_base = None if os.getenv("FIAB_LOGSTDOUT", "nay") == "yea" else logs_directory.name + os.sep
             gateway_url = f"tcp://localhost:{tunnel.claim_free_port()}"
-            process = platform.get_mp_ctx("gateway").Process(
+            # NOTE similarly to cascade, we always spawn on MacOS because xpc_connection_invalid tends
+            # to pop up otherwise. On Linux, we cannot fork because we may already have bunch of threads,
+            # http clients, subprocess, etc running
+            process = _get_mp_ctx().Process(
                 target=_local_process_entrypoint,
                 args=(gateway_url, logs_base, max_concurrent_jobs, shared_path),
             )  # type: ignore[unresolved-attribute] # context
@@ -146,8 +177,6 @@ def launch_gateway() -> None:
             tunnel.execute(handle, ["mkdir", "-p", log_base])
             tunnel.execute(handle, cmd, output_path=log_base + "gwstdouterr")
             GatewayConnectionManager.gateway_connection = RemoteTunnel(handle=handle)
-        elif isinstance(gateway, UnmanagedGateway):
-            raise NotImplementedError("RemoteUrl gateway cannot be launched by backend")
         else:
             assert_never(gateway)
 
@@ -169,7 +198,7 @@ def get_gateway_url() -> str:
         assert_never(gateway_connection)
 
 
-def get_logs_directory() -> Either[TemporaryDirectory, str]:  # ty: ignore[invalid-type-arguments]
+def get_logs_directory() -> Either[LogDirectory, str]:  # ty: ignore[invalid-type-arguments]
     gateway_connection = GatewayConnectionManager.gateway_connection
     if gateway_connection is None:
         return Either.error("gateway connection not initialized")
@@ -190,17 +219,51 @@ def status_gateway() -> str:
     if isinstance(gateway_connection, LocalProcess):
         if gateway_connection.process.exitcode is not None:
             raise GatewayExited(gateway_connection.process.exitcode)
-        return StatusMessage.gateway_running
     elif isinstance(gateway_connection, RemoteTunnel):
-        # TODO -- call gw status api once available, on fallback run command to check the proc status?
-        if tunnel.status(gateway_connection.handle):
-            return StatusMessage.gateway_running
-        raise GatewayExited(255)
+        if not tunnel.status(gateway_connection.handle):
+            raise GatewayExited(255)
     elif isinstance(gateway_connection, RemoteUrl):
-        # TODO -- actually attempt resolving the url, then call gw status api once its available.
-        return StatusMessage.gateway_running
+        pass
     else:
         assert_never(gateway_connection)
+
+    try:
+        response = client.request_response(
+            api.JobProgressRequest(job_ids=[], detailed_report=False),
+            get_gateway_url(),
+            timeout_ms=1000,
+        )
+        response = cast(api.JobProgressResponse, response)
+    except Exception as error:
+        return f"error: {repr(error)}"
+
+    if response.error:
+        return f"error: {response.error}"
+    return GATEWAY_RUNNING
+
+
+def ensure_gateway(attempts: int = 30, interval_seconds: float = 0.5) -> None:
+    """Poll status_gateway until it reports gateway_running status.
+
+    Intended to be called right after launch_gateway, to bound how long we wait for
+    the newly launched gateway to confirm it is up. Raises GatewayExited immediately
+    if the process is observed to have already exited, without retrying further.
+    Raises GatewayNotRunning if the gateway does not report running status within
+    the attempt budget.
+    """
+    last_error: BaseException | None = None
+    for _ in range(attempts):
+        try:
+            status = status_gateway()
+        except GatewayExited:
+            raise
+        except GatewayNotStarted as error:
+            last_error = error
+        else:
+            if _gateway_running(status):
+                return
+        time.sleep(interval_seconds)
+    raise GatewayNotRunning(f"gateway did not report running status within {attempts * interval_seconds:.1f}s") from last_error
 
 
 def get_current_cascade_proc() -> int | str:
@@ -235,7 +298,8 @@ def stop_gateway() -> None:
                 raise GatewayNotRunning("Gateway is not running")
             logger.debug("gateway shutdown message")
             m = api.ShutdownRequest()
-            client.request_response(m, gateway_connection.gateway_url, 4_000)
+            # TODO current gateway's shutdown is heavy and blocking, thus a long timeout. Remove once improved
+            client.request_response(m, gateway_connection.gateway_url, 15_000)
             logger.debug("gateway terminate and join")
 
             process = gateway_connection.process
@@ -256,6 +320,47 @@ def stop_gateway() -> None:
             raise NotImplementedError("RemoteUrl gateway cannot be stopped by backend")
         else:
             assert_never(gateway_connection)
+
+
+def _submit_stop_notification(event: GatewayStoppedEvent | GatewayStopFailedEvent, event_name: str) -> None:
+    try:
+        submit_event(Event(name=EventName(event_name), payload=event))
+    except Exception as error:
+        logger.exception(f"failed to submit gateway stop notification {event_name!r}: {repr(error)}")
+
+
+def submit_stop_gateway() -> None:
+    """Enqueue `stop_gateway` on the general pool, unmonitored, and return without waiting for it.
+
+    Raises ``GatewayNotRunning`` if there is no gateway to stop, ``GatewayStopInProgress`` if
+    a previously submitted stop has not finished yet, and ``SubmissionRejected`` if the pool does not
+    accept the task. Completion and failure are reported through gateway notification events.
+    """
+    connection = GatewayConnectionManager.gateway_connection
+    if connection is None or (isinstance(connection, LocalProcess) and connection.process.exitcode is not None):
+        raise GatewayNotRunning("Gateway is not running")
+    if not GatewayConnectionManager.stop_lock.acquire(blocking=False):
+        raise GatewayStopInProgress("Gateway stop is already in progress")
+
+    def task() -> None:
+        try:
+            stop_gateway()
+        except GatewayNotRunning as error:
+            logger.warning("background gateway stop found gateway not running")
+            _submit_stop_notification(GatewayStopFailedEvent(error=repr(error)), "gateway.stop_failed")
+        except Exception as error:
+            logger.exception("background gateway stop failed")
+            _submit_stop_notification(GatewayStopFailedEvent(error=repr(error)), "gateway.stop_failed")
+        else:
+            _submit_stop_notification(GatewayStoppedEvent(), "gateway.stopped")
+        finally:
+            GatewayConnectionManager.stop_lock.release()
+
+    try:
+        execution_manager.submit_unmonitored(ConcurrentPools.General, TaskName("gateway.stop"), task)
+    except BaseException:
+        GatewayConnectionManager.stop_lock.release()
+        raise
 
 
 async def shutdown_processes() -> None:

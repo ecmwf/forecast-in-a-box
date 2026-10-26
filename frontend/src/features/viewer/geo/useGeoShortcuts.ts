@@ -13,45 +13,50 @@
  * inside form fields):
  *   B          toggle both sidebars
  *   1–5        switch comparison mode
- *   F          fit to globe
+ *   F          fit view
  *   C          copy the view to the clipboard
  *   E          export dialog
  *   H          help dialog
+ *   ?          show the toolbar's keys until the next key or click
  *   N          toggle the annotate tool (Esc disarms)
  *   W/A/S/D    pan the map (arrow keys too)
+ *   + / -      zoom in / out one step
  * Space (flicker) and hold-Z (loupe) live with their features; the swipe
  * divider consumes its own arrow keys while focused (the pan guard
  * yields to it).
  */
 
-import { useEffect } from 'react'
-import {
-  formatForDisplay,
-  getKeyStateTracker,
-  useHotkey,
-  useKeyHold,
-} from '@tanstack/react-hotkeys'
+import { useCallback, useEffect, useEffectEvent, useState } from 'react'
+import { formatForDisplay, useHotkey } from '@tanstack/react-hotkeys'
+import { NAV_ZOOM_STEP } from './map-nav'
 import { COMPARE_MODES } from './types'
 import type { CompareMode } from './types'
+import { useHoldPan } from '@/hooks/useHoldPan'
 
 /** The viewer's keymap — badges, tooltips, and help all render from it. */
 export const COMPARE_KEYS = {
   sidebars: 'B',
   fit: 'F',
+  projection: 'P',
   copy: 'C',
   export: 'E',
   help: 'H',
+  badges: '?',
   annotate: 'N',
   /** Hold-to-magnify (handled in LoupeOverlay, not via useHotkey). */
   loupe: 'Z',
   modes: ['1', '2', '3', '4', '5'],
   pan: ['W', 'A', 'S', 'D'],
+  /** Raw keydown, not useHotkey: '+' needs Shift on some layouts, which hotkey matching rejects. */
+  zoom: ['+', '-'],
 } as const
 
-/** Continuous pan speed (px/s) while a WASD/arrow key is held. */
-const PAN_SPEED_PX_PER_SEC = 900
-/** Cap per-frame dt so a backgrounded tab doesn't lurch on return. */
-const MAX_FRAME_S = 0.05
+const ZOOM_DIRECTION: Partial<Record<string, number>> = {
+  '+': 1,
+  '=': 1,
+  '-': -1,
+  _: -1,
+}
 
 /**
  * Arrows/WASD must yield to widgets that consume them: the swipe
@@ -84,26 +89,34 @@ export function useGeoShortcuts(handlers: {
   onToggleSidebars: () => void
   onMode: (mode: CompareMode) => void
   onFit: (() => void) | null
+  /** Next available map projection. */
+  onProjectionCycle: () => void
   onCopy: () => void
   onExport: () => void
   onHelp: () => void
+  onToggleBadges: () => void
   onAnnotate: () => void
   /** Disarm the annotate tool; active only while it's armed (and the
    *  editor dialog is closed — the dialog owns Escape when open). */
   onAnnotateDisarm: { enabled: boolean; disarm: () => void }
   /** Pan the shared camera by (dx, dy) screen pixels. */
   onPan: (dx: number, dy: number) => void
+  /** Zoom the shared camera by `delta` levels. */
+  onZoom: (delta: number) => void
 }): void {
   const {
     onToggleSidebars,
     onMode,
     onFit,
+    onProjectionCycle,
     onCopy,
     onExport,
     onHelp,
+    onToggleBadges,
     onAnnotate,
     onAnnotateDisarm,
     onPan,
+    onZoom,
   } = handlers
   const opts = { ignoreInputs: true }
   const gated = (fn: () => void) => () => {
@@ -141,80 +154,63 @@ export function useGeoShortcuts(handlers: {
     gated(() => onFit?.()),
     opts,
   )
+  useHotkey(COMPARE_KEYS.projection, gated(onProjectionCycle), opts)
   useHotkey(COMPARE_KEYS.copy, gated(onCopy), opts)
   useHotkey(COMPARE_KEYS.export, gated(onExport), opts)
   useHotkey(COMPARE_KEYS.help, gated(onHelp), opts)
+  useHotkey(COMPARE_KEYS.badges, gated(onToggleBadges), opts)
   useHotkey(COMPARE_KEYS.annotate, gated(onAnnotate), opts)
   useHotkey('Escape', () => onAnnotateDisarm.disarm(), {
     ...opts,
     enabled: onAnnotateDisarm.enabled,
   })
-  // Continuous panning: hold WASD/arrows and a rAF loop moves the shared
-  // camera at a constant velocity — OS key-repeat is laggy and choppy.
-  // Held-state truth is TanStack's tracker: it clears keyups the OS
-  // swallows during ⌘-chords (macOS) and clears on blur.
+  useHoldPan(onPan, { arrows: true, isBlocked: panBlocked })
+
+  // One step per press, flat or globe: key repeat is ignored.
+  const zoomKey = useEffectEvent((e: KeyboardEvent) => {
+    const direction = ZOOM_DIRECTION[e.key]
+    if (!direction || e.repeat || e.metaKey || e.ctrlKey || e.altKey) return
+    const el = e.target as HTMLElement | null
+    if (el?.closest('input, textarea, select, [contenteditable="true"]')) return
+    if (panBlocked() || dialogOpen()) return
+    e.preventDefault()
+    onZoom(direction * NAV_ZOOM_STEP)
+  })
   useEffect(() => {
-    const VEC: Record<string, [number, number]> = {
-      w: [0, -1],
-      s: [0, 1],
-      a: [-1, 0],
-      d: [1, 0],
-      arrowup: [0, -1],
-      arrowdown: [0, 1],
-      arrowleft: [-1, 0],
-      arrowright: [1, 0],
-    }
-    const tracker = getKeyStateTracker()
-    // Armed = passed the gates on keydown; panning needs armed AND held.
-    const armed = new Set<string>()
-    let raf = 0
-    let last = 0
-    const tick = (t: number) => {
-      for (const k of armed) if (!tracker.isKeyHeld(k)) armed.delete(k)
-      const dt = last ? Math.min(MAX_FRAME_S, (t - last) / 1000) : 0
-      last = t
-      let dx = 0
-      let dy = 0
-      for (const k of armed) {
-        dx += VEC[k][0]
-        dy += VEC[k][1]
-      }
-      if (dx || dy) {
-        onPan(dx * PAN_SPEED_PX_PER_SEC * dt, dy * PAN_SPEED_PX_PER_SEC * dt)
-      }
-      if (armed.size) {
-        raf = requestAnimationFrame(tick)
-      } else {
-        raf = 0
-        last = 0
-      }
-    }
-    const down = (e: KeyboardEvent) => {
-      // Modifier chords (⌘A, ⌥←, …) belong to the browser, never the pan.
-      if (e.metaKey || e.ctrlKey || e.altKey) return
-      const k = e.key.toLowerCase()
-      if (!(k in VEC) || panBlocked()) return
-      const el = e.target as HTMLElement | null
-      if (el?.closest('input, textarea, select, [contenteditable="true"]'))
-        return
-      e.preventDefault()
-      armed.add(k)
-      if (!raf) raf = requestAnimationFrame(tick)
-    }
+    const down = (e: KeyboardEvent) => zoomKey(e)
     window.addEventListener('keydown', down)
-    return () => {
-      window.removeEventListener('keydown', down)
-      cancelAnimationFrame(raf)
-    }
-  }, [onPan])
+    return () => window.removeEventListener('keydown', down)
+  }, [])
 }
 
-/**
- * True while ⌘ (macOS) / Ctrl is held — the toolbar uses it to reveal
- * shortcut badges on its buttons (TanStack's global key-state tracker).
- */
-export function useShortcutReveal(): boolean {
-  const meta = useKeyHold('Meta')
-  const control = useKeyHold('Control')
-  return meta || control
+/** The toggle itself and bare modifiers (Shift types `?`) keep the badges up. */
+const KEEPS_BADGES = new Set([
+  '?',
+  'Shift',
+  'Meta',
+  'Control',
+  'Alt',
+  'AltGraph',
+])
+
+/** `?` toggles the toolbar's key badges; the next key, click or blur hides them and still acts. */
+export function useKeyBadges(): { shown: boolean; toggle: () => void } {
+  const [shown, setShown] = useState(false)
+  useEffect(() => {
+    if (!shown) return
+    const hide = () => setShown(false)
+    const key = (e: KeyboardEvent) => {
+      if (!KEEPS_BADGES.has(e.key)) hide()
+    }
+    window.addEventListener('keydown', key, true)
+    window.addEventListener('pointerdown', hide, true)
+    window.addEventListener('blur', hide)
+    return () => {
+      window.removeEventListener('keydown', key, true)
+      window.removeEventListener('pointerdown', hide, true)
+      window.removeEventListener('blur', hide)
+    }
+  }, [shown])
+  const toggle = useCallback(() => setShown((v) => !v), [])
+  return { shown, toggle }
 }

@@ -11,10 +11,10 @@
 /**
  * Global Command Shortcuts
  *
- * Registers app-wide keyboard sequences (e.g. `g` then `d`) for the navigation
+ * Registers app-wide keyboard sequences (e.g. `g` then `o`) for the navigation
  * commands that declare a `hotkey`. Each command is bound by its own child
- * component so `useHotkeySequence` is always called unconditionally (Rules of
- * Hooks). Renders no DOM.
+ * component so `useHotkey` is always called unconditionally (Rules of Hooks).
+ * Renders no DOM.
  *
  * `@tanstack/react-hotkeys` ignores single-key sequences while a text input is
  * focused, so these never fire mid-typing — including inside the command
@@ -22,7 +22,7 @@
  */
 
 import { useMemo } from 'react'
-import { useHotkeySequence } from '@tanstack/react-hotkeys'
+import { useHotkey } from '@tanstack/react-hotkeys'
 import { useNavigate } from '@tanstack/react-router'
 import type { Command } from '@/commands/registry'
 import { navigationCommands } from '@/commands/navigationCommands'
@@ -31,7 +31,7 @@ type CommandWithHotkey = Command & { hotkey: NonNullable<Command['hotkey']> }
 
 /** Binds a single command's key sequence. Renders nothing. */
 function CommandHotkey({ command }: { command: CommandWithHotkey }) {
-  useHotkeySequence(command.hotkey, command.action)
+  useHotkey(command.hotkey, command.action)
   return null
 }
 

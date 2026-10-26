@@ -100,10 +100,13 @@ function showMeSlotA(): ShowMeAction {
     }
   }
   const row = { within: TOUR.visualise.knownWms, selector: addSelector(name) }
-  // Mid-session the list sits in the Manage-sources dialog: open it first.
+  // Mid-session the list sits on the dialog's WMS tab: open both first.
   return findTourElement(TOUR.visualise.knownWms) !== null
     ? row
-    : { within: TOUR.visualise.addSource, then: row }
+    : {
+        within: TOUR.visualise.addSource,
+        then: { within: TOUR.visualise.sourceTabWms, then: row },
+      }
 }
 
 /** Preferred server now, first reachable as probes land; frozen once added. */
@@ -159,7 +162,7 @@ const compareServerName = (launch: FirstMapLaunch) =>
   launch.server.name === 'DWD' ? 'ECMWF' : 'DWD'
 
 /** Slot colours as the viewer paints them. */
-const SLOT_MARKUP = {
+export const SLOT_MARKUP = {
   slotA: <span className="font-medium text-blue-700 dark:text-blue-300" />,
   slotB: <span className="font-medium text-orange-700 dark:text-orange-300" />,
 }
@@ -200,6 +203,8 @@ export const firstMapDefinition: TutorialDefinition<FirstMapLaunch> = {
       advance: {
         kind: 'search',
         check: (search, atEntry) => search.cam !== atEntry.cam,
+        // The map's initial fit writes `cam` too; only a later pan counts.
+        settleMs: 1500,
       },
       allowNext: true,
       // The source may have been added from inside the Add-source dialog.
@@ -225,6 +230,12 @@ export const firstMapDefinition: TutorialDefinition<FirstMapLaunch> = {
       side: 'right',
       advance: { kind: 'next-click' },
       expandVia: TOUR.visualise.expandLeft,
+    },
+    {
+      id: 'projection',
+      anchor: TOUR.visualise.projection,
+      side: 'bottom',
+      advance: { kind: 'next-click' },
     },
     {
       id: 'time',
@@ -263,10 +274,13 @@ export const firstMapDefinition: TutorialDefinition<FirstMapLaunch> = {
           within: TOUR.visualise.knownWms,
           selector: addSelector(name),
         }
-        // Dialog already open → press the row; else open it, then press.
+        // List visible → press the row; else open the dialog's WMS tab first.
         return findTourElement(TOUR.visualise.knownWms) !== null
           ? row
-          : { within: TOUR.visualise.addSource, then: row }
+          : {
+              within: TOUR.visualise.addSource,
+              then: { within: TOUR.visualise.sourceTabWms, then: row },
+            }
       },
     },
     {

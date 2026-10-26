@@ -64,8 +64,9 @@ function pushError(
   message: string,
 ): void {
   const existing = (out as Record<string, Array<string> | undefined>)[configKey]
+  // Frontend and backend may both report an empty required value.
   if (existing) {
-    existing.push(message)
+    if (!existing.includes(message)) existing.push(message)
   } else {
     out[configKey] = [message]
   }
@@ -78,8 +79,8 @@ function pushError(
  * Recognised `errors` shapes:
  * - "Block contains extra config: {...}" → messages.unknownConfigKey
  * - "Block contains missing config: {...}" → messages.missingRequiredValue
- * - "Configuration option 'x' is missing for block factory ..." →
- *   messages.missingRequiredValue
+ * - "Configuration option 'x' is missing for block factory ..." or
+ *   "... 'x' cannot be empty" → messages.missingRequiredValue
  * - "Invalid value for configuration option 'x': ..." → verbatim, on `x`
  * - "Invalid glyph name: g (due to r); appears in [a, b]" → verbatim, on the
  *   keys it names
@@ -137,7 +138,7 @@ export function mapBlockErrorsToFields(
     }
 
     const missingOption = error.match(
-      /^Configuration option '([^']+)' is missing for block factory\b/,
+      /^Configuration option '([^']+)' (?:is missing for block factory\b|cannot be empty)/,
     )
     if (missingOption) {
       if (!keysWithUnknownGlyphs.has(missingOption[1])) {

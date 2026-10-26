@@ -1,44 +1,20 @@
 import * as React from 'react'
 
-import type { DashboardVariant, PanelShadow } from '@/stores/uiStore'
 import { cn } from '@/lib/utils'
 
-const variantStyles: Record<DashboardVariant, string> = {
-  default: 'bg-card border shadow-sm',
-  flat: 'bg-muted/50 border-0 shadow-none',
-  modern: 'bg-card/80 backdrop-blur-sm border border-border/50 shadow-md',
-  gradient:
-    'bg-gradient-to-br from-primary/5 via-card to-card border border-primary/10 shadow-sm',
-}
-
-const shadowStyles: Record<PanelShadow, string> = {
-  none: 'shadow-none',
-  sm: 'shadow-sm',
-  md: 'shadow-md',
-  lg: 'shadow-lg',
-}
-
 interface CardProps extends React.ComponentProps<'div'> {
-  variant?: DashboardVariant
-  shadow?: PanelShadow
   size?: 'default' | 'sm'
 }
 
-function Card({
-  className,
-  variant = 'default',
-  shadow = 'sm',
-  size = 'default',
-  ...props
-}: CardProps) {
+function Card({ className, size = 'default', ...props }: CardProps) {
   return (
     <div
       data-slot="card"
       data-size={size}
       className={cn(
         'group/card flex flex-col gap-6 overflow-hidden rounded-xl py-6 text-sm text-card-foreground has-[>img:first-child]:pt-0 data-[size=sm]:gap-4 data-[size=sm]:py-4 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl',
-        variantStyles[variant],
-        shadowStyles[shadow],
+        // The one card finish: faint brand wash, tinted hairline, no shadow.
+        'border border-primary/10 bg-gradient-to-br from-primary/5 via-card to-card',
         className,
       )}
       {...props}

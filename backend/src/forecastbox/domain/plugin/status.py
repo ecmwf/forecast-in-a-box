@@ -12,11 +12,17 @@
 from fiab_core.fable import BlockFactoryCatalogue, PluginCompositeId
 
 from forecastbox.domain.plugin.state import PluginManager
+from forecastbox.domain.plugin.store import stores_ready
 from forecastbox.utility.concurrency.synchronization import timed_acquire
 
 
 def status_brief() -> str:
-    if PluginManager.updater_error is not None:
+    if not stores_ready():
+        # NOTE the plugin stores are populated asynchronously in a background task submitted
+        # at startup -- until that completes, plugin operations relying on them (eg install) are
+        # not usable yet, so report the same status as an in-progress plugin operation would.
+        return "initializing"
+    elif PluginManager.updater_error is not None:
         return f"failure: {PluginManager.updater_error}"
     elif PluginManager.operation_in_progress:
         return "running"

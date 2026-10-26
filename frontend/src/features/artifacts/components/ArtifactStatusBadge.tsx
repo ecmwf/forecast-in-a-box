@@ -16,6 +16,12 @@
 import { useTranslation } from 'react-i18next'
 import type { StatusBadgeVariant } from '@/components/common/StatusBadge'
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import { cn } from '@/lib/utils'
+import {
   STATUS_BADGE_VARIANTS,
   StatusBadge,
 } from '@/components/common/StatusBadge'
@@ -24,35 +30,57 @@ interface ArtifactStatusBadgeProps {
   isAvailable: boolean
   /** If set, shows a "Downloading X%" badge instead of the static status */
   downloadProgress?: number
+  /** In-flight work, e.g. "Deleting"; progress shows elsewhere. */
+  busyLabel?: string
+  /** Failure reason, shown on hover. */
+  downloadError?: string
   className?: string
 }
 
 export function ArtifactStatusBadge({
   isAvailable,
   downloadProgress,
+  busyLabel,
+  downloadError,
   className,
 }: ArtifactStatusBadgeProps) {
   const { t } = useTranslation('artifacts')
 
-  // Downloading state takes priority.
-  if (downloadProgress !== undefined) {
+  const activeLabel =
+    downloadProgress !== undefined
+      ? t('status.downloading', { progress: Math.round(downloadProgress) })
+      : busyLabel
+  if (activeLabel !== undefined) {
     return (
       <StatusBadge
-        variant={{
-          label: t('status.downloading', {
-            progress: Math.round(downloadProgress),
-          }),
-          ...STATUS_BADGE_VARIANTS.available,
-        }}
+        variant={{ label: activeLabel, ...STATUS_BADGE_VARIANTS.busy }}
         pulse
         className={className}
       />
     )
   }
 
+  if (downloadError !== undefined) {
+    return (
+      <Tooltip>
+        <TooltipTrigger
+          render={<span className={cn('inline-flex', className)} />}
+        >
+          <StatusBadge
+            variant={{
+              label: t('status.downloadFailed'),
+              ...STATUS_BADGE_VARIANTS.error,
+            }}
+          />
+        </TooltipTrigger>
+        <TooltipContent>{downloadError}</TooltipContent>
+      </Tooltip>
+    )
+  }
+
   const variant: StatusBadgeVariant = isAvailable
     ? { label: t('status.downloaded'), ...STATUS_BADGE_VARIANTS.active }
-    : { label: t('status.notDownloaded'), ...STATUS_BADGE_VARIANTS.warning }
+    : { label: t('status.available'), ...STATUS_BADGE_VARIANTS.available }
 
   return <StatusBadge variant={variant} className={className} />
 }

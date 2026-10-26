@@ -16,9 +16,13 @@ on:
         default: true
 
 jobs:
-  build:
+  buildPublish:
     name: "Build and publish docker image"
-    runs-on: ["Linux", "platform-builder-docker-xl"]
+    strategy:
+      matrix:
+        registry: ["ghcr", "eccr"]
+        platform: ["x86", "aarch64"]
+    runs-on: "${{ fromJSON('{\"x86\": [\"Linux\", \"platform-builder-docker-xl\"], \"aarch64\": \"platform-builder-ubuntu-2404-arm64-000\"}')[matrix.platform] }}"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -29,21 +33,65 @@ jobs:
         if: ${{ github.event_name == 'release' || inputs.push }}
         uses: docker/login-action@v3
         with:
-          registry: 'eccr.ecmwf.int'
-          username: ${{ secrets.ECMWF_DOCKER_REGISTRY_USERNAME }}
-          password: ${{ secrets.ECMWF_DOCKER_REGISTRY_ACCESS_TOKEN }}
+          registry: ${{ matrix.registry == 'ghcr' && 'ghcr.io' || 'eccr.ecmwf.int' }}
+          username: ${{ matrix.registry == 'ghcr' && github.actor || secrets.ECMWF_DOCKER_REGISTRY_USERNAME }}
+          password: ${{ matrix.registry == 'ghcr' && secrets.GITHUB_TOKEN || secrets.ECMWF_DOCKER_REGISTRY_ACCESS_TOKEN }}
 
-      - name: Build image
+      - name: Build single image
         working-directory: deployment/v2
         env:
           RELEASE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.release_tag }}
         run: |
+          set -euo pipefail
           just buildRelease "$RELEASE_TAG"
 
-      - name: Publish image
+      - name: Publish single image
         if: ${{ github.event_name == 'release' || inputs.push }}
         working-directory: deployment/v2
         env:
           RELEASE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.release_tag }}
         run: |
-          just publish "$RELEASE_TAG"
+          set -euo pipefail
+          # NOTE unhealthily coupled with the justfile -- perhaps expose an action to obtain the built image tags?
+          if [[ "${{ matrix.registry }}" == "eccr" ]] ; then
+            registry="eccr.ecmwf.int/forecast-in-a-box/fiab-slim"
+          else
+            registry="ghcr.io/${{ github.repository }}/fiab-slim"
+          fi
+          target="${registry}:${RELEASE_TAG}-${{ matrix.platform }}"
+          docker tag "fiab-slim:release" "${target}"
+          docker push "${target}"
+
+  manifest:
+    needs: buildPublish
+    name: "Create manifests to unify architectures"
+    strategy:
+      matrix:
+        registry: ["ghcr", "eccr"]
+    runs-on: [self-hosted, macOS]
+    steps:
+      - name: Log in to a Container Registry
+        if: ${{ github.event_name == 'release' || inputs.push }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ matrix.registry == 'ghcr' && 'ghcr.io' || 'eccr.ecmwf.int' }}
+          username: ${{ matrix.registry == 'ghcr' && github.actor || secrets.ECMWF_DOCKER_REGISTRY_USERNAME }}
+          password: ${{ matrix.registry == 'ghcr' && secrets.GITHUB_TOKEN || secrets.ECMWF_DOCKER_REGISTRY_ACCESS_TOKEN }}
+      - name: Push the manifest
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          set -x
+          if [[ "${{ matrix.registry }}" == "eccr" ]] ; then
+            registry="eccr.ecmwf.int/forecast-in-a-box/fiab-slim"
+          else
+            registry="ghcr.io/${{ github.repository }}/fiab-slim"
+          fi
+          target="${registry}:${RELEASE_TAG}"
+          # NOTE manifest may not be necessary, esp given that the --amend was necessary
+          # But we are not in control of the docker buildx version, so we rather do it manually
+          docker manifest create --amend "${target}" \
+            "${target}-x86" \
+            "${target}-aarch64"
+          docker manifest push "${target}"

@@ -8,7 +8,7 @@ import httpx
 from cascade.low.func import assert_never
 
 from forecastbox.entrypoint.bootstrap.procs import ChildProcessGroup
-from forecastbox.utility.config import ROUTE_PREFIX, FIABConfig, StatusMessage, _default_plugins
+from forecastbox.utility.config import ROUTE_PREFIX, FIABConfig, _default_plugins
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +23,33 @@ def _call_succ(response: CallResult, url: str) -> bool:
             raise ValueError(f"failure on {url}: {response}")
     elif isinstance(response, httpx.ConnectError):
         return False
+    elif isinstance(response, httpx.ReadTimeout):
+        return False
+    elif isinstance(response, httpx.HTTPError):
+        raise ValueError(f"failure on {url}: {repr(response)}")
+    else:
+        assert_never(response)
+
+
+def _plugins_ready(response: CallResult, url: str) -> bool:
+    """Condition for `_wait_for` -- succeeds once the `/status` endpoint reports the plugin
+    subsystem as `ok`. Retries on `initializing`/`running` (plugin stores are populated
+    asynchronously in a background task submitted at startup, and a plugin operation may also
+    be legitimately in progress). Unlike `_call_succ`, a `ConnectError` is treated as a hard
+    failure rather than something to retry on: this condition is only ever used after
+    `check_backend_ready` has already confirmed the backend accepts connections, so losing the
+    connection at this point means the backend went down, not that it hasn't started yet. A
+    `ReadTimeout` is still tolerated, as the backend may simply be busy while starting up."""
+    if isinstance(response, httpx.Response):
+        if response.status_code != 200:
+            raise ValueError(f"failure on {url}: {response}")
+        plugins_status = response.json().get("plugins")
+        if plugins_status == "ok":
+            return True
+        elif plugins_status in ("initializing", "running"):
+            return False
+        else:
+            raise ValueError(f"plugins failure on {url}: {plugins_status}")
     elif isinstance(response, httpx.ReadTimeout):
         return False
     elif isinstance(response, httpx.HTTPError):
@@ -52,16 +79,10 @@ def _wait_for(client: httpx.Client, url: str, attempts: int, condition: Callable
     raise StartupError(f"failure on {url}: no more retries")
 
 
-def check_backend_ready(
-    config: FIABConfig, handles: ChildProcessGroup | None = None, attempts: int = 20, spawn_gateway: bool = True
-) -> None:
+def check_backend_ready(config: FIABConfig, handles: ChildProcessGroup | None = None, attempts: int = 20) -> None:
     try:
-        with httpx.Client() as client:
+        with httpx.Client(follow_redirects=True) as client:
             _wait_for(client, config.backend.local_url() + f"{ROUTE_PREFIX}/status", attempts, _call_succ)
-            if spawn_gateway:
-                client.post(config.backend.local_url() + f"{ROUTE_PREFIX}/gateway/start").raise_for_status()
-            gw_check = lambda resp, _: resp.raise_for_status().text == f'"{StatusMessage.gateway_running}"'
-            _wait_for(client, config.backend.local_url() + f"{ROUTE_PREFIX}/gateway/status", attempts, gw_check)
     except StartupError as e:
         logger.error(f"failed to start the backend: {e}")
         if handles is not None:
@@ -69,16 +90,74 @@ def check_backend_ready(
         raise
 
 
-def install_default_plugins(config: FIABConfig) -> None:
-    """Installs default plugins as specified by configs. Log-swallows all exceptions"""
+def install_default_plugins(config: FIABConfig, attempts: int = 20) -> None:
+    """Installs default plugins as specified by configs. Log-swallows all exceptions.
+
+    Plugin installation relies on the plugin stores, which are populated asynchronously in a
+    background task submitted at backend startup and may not be ready yet by the time this is
+    called -- wait for the `/status` endpoint to report the plugin subsystem as ready first."""
     try:
         with httpx.Client(follow_redirects=True) as client:
-            for pluginId in _default_plugins().keys():
+            _wait_for(client, config.backend.local_url() + f"{ROUTE_PREFIX}/status", attempts, _plugins_ready)
+            for pluginId in config.external.default_plugins:
                 url = config.backend.local_url() + f"{ROUTE_PREFIX}/plugin/install"
-                try:
-                    client.post(url, json=pluginId.model_dump()).raise_for_status()
-                except Exception:
-                    logger.exception(f"failed to install default plugin {pluginId}")
+                # TODO after the plugin queuing system work, remove the inner loop; this is a hotfix only
+                i = 4
+                while i > 0:
+                    try:
+                        response = client.post(url, json=pluginId.model_dump())
+                        if response.status_code == 500 and response.text == '{"detail":"plugin operation is not idle"}':
+                            if i > 1:
+                                logger.warning("plugin operation in progress -- sleep for 5 secs, then retry")
+                                time.sleep(5.0)
+                            i -= 1
+                            continue
+                        else:
+                            response.raise_for_status()
+                        i = 3
+                        break
+                    except httpx.HTTPStatusError:
+                        # NOTE sadly the status error does *not* preserve the text, hence the branched except
+                        logger.error(f"failed to install default plugin {pluginId}: {response!r} => {response.text}")
+                        break
+                    except Exception as e:
+                        logger.error(f"failed to install default plugin {pluginId}: {e!r}")
+                        break
+                if i == 0:
+                    logger.error(f"failed to install default plugin {pluginId} in time, system too busy")
+            # TODO -- extend the install endpoint to support this
+            for pluginId, overrideSettings in config.external.default_plugins_settings.items():
+                url = config.backend.local_url() + f"{ROUTE_PREFIX}/plugin/settings"
+                body = {
+                    "pluginCompositeId": pluginId.model_dump(),
+                    "isEnabled": overrideSettings.is_enabled,
+                    "excluded_templates": overrideSettings.excluded_templates,
+                    "glyph_remapping": overrideSettings.glyph_remapping,
+                    "update_strategy": overrideSettings.update_strategy,
+                }
+                i = 4
+                while i > 0:
+                    try:
+                        response = client.post(url, json=body)
+                        if response.status_code == 500 and response.text == '{"detail":"plugin operation is not idle"}':
+                            if i > 1:
+                                logger.warning("plugin operation in progress -- sleep for 5 secs, then retry")
+                                time.sleep(5.0)
+                            i -= 1
+                            continue
+                        else:
+                            response.raise_for_status()
+                        i = 3
+                        break
+                    except httpx.HTTPStatusError:
+                        # NOTE sadly the status error does *not* preserve the text, hence the branched except
+                        logger.error(f"failed to apply default plugin settings for {pluginId}: {response!r} => {response.text}")
+                        break
+                    except Exception as e:
+                        logger.error(f"failed to apply default plugin settings for {pluginId}: {e!r}")
+                        break
+                if i == 0:
+                    logger.error(f"failed to apply default plugin settings for {pluginId} in time, system too busy")
     except Exception:
         logger.exception(f"failed to install default plugins")
     # TODO here we should, in a finally, touch the first run marker, instead of fiab launcher doing it. And rename the top entry function 'first_run_setup' instead of 'default_plugin_install'

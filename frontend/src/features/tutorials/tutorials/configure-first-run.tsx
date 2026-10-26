@@ -58,9 +58,9 @@ const FALLBACK_TITLE: Record<BlockKind, string> = {
 const CANON_VALUES: Record<BlockKind, Record<string, string>> = {
   source: { source: 'ecmwf-open-data', forecast: 'ifs-ens' },
   transform: { dimension: 'step', values: '72' },
-  product: { param: '2t', statistic: 'mean' },
+  product: { statistic: 'mean' },
   sink: {
-    param: '2t',
+    param: '167',
     domain: 'global',
     format: 'png',
     groupby: 'none',

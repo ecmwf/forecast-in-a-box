@@ -1,0 +1,158 @@
+# (C) Copyright 2026- ECMWF.
+#
+# This software is licensed under the terms of the Apache Licence Version 2.0
+# which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# In applying this licence, ECMWF does not waive the privileges and immunities
+# granted to it by virtue of its status as an intergovernmental organisation
+# nor does it submit to any jurisdiction.
+
+import pytest
+from pydantic import ValidationError
+
+from fiab_core.fable import (
+    BlockConfigurationOption,
+    BlockFactoryId,
+    BlockInstance,
+    BlockInstanceId,
+    BlueprintTemplate,
+    BlueprintTemplateBlock,
+    BlueprintTemplateEnvironment,
+    BlueprintTemplateExampleInput,
+    ConfigurationOptionId,
+    PluginCompositeId,
+    PluginId,
+    PluginStoreId,
+)
+from fiab_core.types import StringType
+
+
+def test_block_configuration_option_parses_value_type() -> None:
+    option = BlockConfigurationOption.model_validate({"title": "Title", "description": "Description", "value_type": "str"})
+
+    assert isinstance(option.value_type, StringType)
+
+
+def test_block_configuration_option_serializes_value_type() -> None:
+    option = BlockConfigurationOption.model_validate({"title": "Title", "description": "Description", "value_type": "str"})
+
+    dumped = option.model_dump()
+    dumped_json = option.model_dump_json()
+
+    assert "_value_type" not in dumped
+    assert "_value_type" not in dumped_json
+    assert dumped["value_type"] == "str"
+
+
+def test_block_configuration_option_rejects_invalid_value_type() -> None:
+    with pytest.raises(ValidationError, match="Invalid type expression"):
+        BlockConfigurationOption.model_validate({"title": "Title", "description": "Description", "value_type": "not-a-fable-type"})
+
+
+# ---------------------------------------------------------------------------
+# BlueprintTemplate
+# ---------------------------------------------------------------------------
+
+_BLOCK_ID = BlockInstanceId("b1")
+_TEXT = ConfigurationOptionId("text")
+
+
+def _make_block() -> BlueprintTemplateBlock:
+    return BlueprintTemplateBlock(
+        factory_id=BlockFactoryId("source_text"),
+        instance=BlockInstance(configuration_values={_TEXT: "hello"}, input_ids={}),
+    )
+
+
+def _make_template(**overrides: object) -> BlueprintTemplate:
+    defaults: dict = dict(
+        display_name="myTemplate",
+        display_description="A template",
+        blocks={_BLOCK_ID: _make_block()},
+    )
+    defaults.update(overrides)
+    return BlueprintTemplate(**defaults)  # type: ignore[arg-type]
+
+
+def test_blueprint_template_constructs() -> None:
+    tmpl = _make_template()
+
+    assert tmpl.display_name == "myTemplate"
+    assert tmpl.display_description == "A template"
+    assert _BLOCK_ID in tmpl.blocks
+    assert tmpl.environment is None
+    assert tmpl.tags == []
+    assert tmpl.local_glyphs == {}
+    assert tmpl.example_values == {}
+    assert tmpl.example_glyphs == {}
+
+
+def test_blueprint_template_rejects_unknown_field() -> None:
+    with pytest.raises(ValidationError):
+        _make_template(unknown_field="oops")
+
+
+def test_blueprint_template_round_trips_model_dump() -> None:
+    tmpl = _make_template(
+        environment=BlueprintTemplateEnvironment(environment_variables={"K": "V"}),
+        tags=["Open Data", "GRIB"],
+        local_glyphs={"g": "v"},
+        example_values={_BLOCK_ID: {_TEXT: BlueprintTemplateExampleInput(example_value="world", display_name="World")}},
+        example_glyphs={"g": BlueprintTemplateExampleInput(example_value="world")},
+    )
+
+    dumped = tmpl.model_dump()
+    restored = BlueprintTemplate.model_validate(dumped)
+
+    assert restored.display_name == tmpl.display_name
+    assert restored.tags == ["Open Data", "GRIB"]
+    assert restored.environment is not None
+    assert restored.environment.environment_variables == {"K": "V"}
+    assert restored.local_glyphs == {"g": "v"}
+    assert restored.example_values == {_BLOCK_ID: {_TEXT: BlueprintTemplateExampleInput(example_value="world", display_name="World")}}
+    assert restored.example_glyphs == {"g": BlueprintTemplateExampleInput(example_value="world")}
+
+
+def test_blueprint_template_environment_rejects_unknown_field() -> None:
+    with pytest.raises(ValidationError):
+        BlueprintTemplateEnvironment(environment_variables={}, unexpected="x")  # type: ignore[call-arg]
+
+
+# ---------------------------------------------------------------------------
+# BlueprintTemplateExampleInput
+# ---------------------------------------------------------------------------
+
+
+def test_blueprint_template_example_input_accepts_valid_type_hint() -> None:
+    inp = BlueprintTemplateExampleInput.model_validate({"example_value": "hello", "type_hint": "str"})
+    assert isinstance(inp.type_hint, StringType)
+    assert inp.type_hint.serialize() == "str"
+    assert inp.model_dump()["type_hint"] == "str"
+
+
+def test_blueprint_template_example_input_accepts_none_type_hint() -> None:
+    inp = BlueprintTemplateExampleInput(example_value="hello")
+    assert inp.type_hint is None
+
+
+def test_blueprint_template_example_input_rejects_invalid_type_hint() -> None:
+    with pytest.raises(ValidationError):
+        BlueprintTemplateExampleInput.model_validate({"example_value": "hello", "type_hint": "not-a-fable-type"})
+
+
+def test_fetchable_mime_roundtrip() -> None:
+    from fiab_core.fable import get_fetchable_mime, is_fetchable_mime
+
+    mime = get_fetchable_mime("gribdir")
+    assert mime == "text/plain; fiab-format=gribdir; fiab-fetchable=1"
+    assert is_fetchable_mime(mime)
+    assert is_fetchable_mime("text/plain; fiab-fetchable=1")
+
+
+def test_is_fetchable_mime_negative() -> None:
+    from fiab_core.fable import is_fetchable_mime
+
+    assert not is_fetchable_mime("text/plain")
+    assert not is_fetchable_mime("text/plain; fiab-format=gribdir")
+    assert not is_fetchable_mime("text/plain; fiab-fetchable=0")
+    assert not is_fetchable_mime("application/octet-stream; fiab-fetchable=1")

@@ -20,9 +20,7 @@
  */
 
 import { formatStep } from './format'
-import { rebaseLensUrl } from './wms-capabilities'
 import type OlMap from 'ol/Map'
-import type { ParsedLayer } from './wms-capabilities'
 
 const CANVAS_MATRIX_RE = /^matrix\(([^)]*)\)$/
 
@@ -90,14 +88,12 @@ export function drawCompositedViewport(
   ctx.globalAlpha = 1
 }
 
-/**
- * Full-viewport composite of a rendered OL map onto a fresh canvas at
- * device-pixel resolution, on a white ground. Null when the container has
- * no size yet.
- */
+/** The rendered OL map at device pixels on `ground` (null: transparent); null before layout. */
 export function compositeMapToCanvas(
-  container: HTMLElement,
+  container: HTMLElement | null | undefined,
+  ground: string | null = '#ffffff',
 ): HTMLCanvasElement | null {
+  if (!container) return null
   const width = container.clientWidth
   const height = container.clientHeight
   if (width === 0 || height === 0) return null
@@ -107,8 +103,10 @@ export function compositeMapToCanvas(
   out.height = Math.round(height * dpr)
   const ctx = out.getContext('2d')
   if (!ctx) return null
-  ctx.fillStyle = '#ffffff'
-  ctx.fillRect(0, 0, out.width, out.height)
+  if (ground) {
+    ctx.fillStyle = ground
+    ctx.fillRect(0, 0, out.width, out.height)
+  }
   drawCompositedViewport(container, ctx, { originX: 0, originY: 0, scale: dpr })
   return out
 }
@@ -336,38 +334,6 @@ export async function exportMapPng(
     })
     map.renderSync()
   })
-}
-
-/**
- * Pre-load pinned legend images (cross-origin, anonymous) so they're ready
- * to draw onto the export canvas — if the map render raced ahead we'd draw
- * an empty box. Failed loads are dropped silently.
- */
-export async function loadLegendImages(
-  layers: ReadonlyArray<ParsedLayer>,
-  pinned: ReadonlySet<string>,
-  baseUrl: string,
-): Promise<ReadonlyArray<LegendExportItem>> {
-  const items: Array<{ title: string; url: string }> = []
-  for (const name of pinned) {
-    const layer = layers.find((l) => l.name === name)
-    const url = layer?.styles[0]?.legendUrl
-    if (!layer || !url) continue
-    items.push({ title: layer.title, url: rebaseLensUrl(url, baseUrl) })
-  }
-  const loaded = await Promise.all(
-    items.map(
-      (it) =>
-        new Promise<LegendExportItem | null>((resolve) => {
-          const img = new Image()
-          img.crossOrigin = 'anonymous'
-          img.onload = () => resolve({ title: it.title, image: img })
-          img.onerror = () => resolve(null)
-          img.src = it.url
-        }),
-    ),
-  )
-  return loaded.filter((x): x is LegendExportItem => x !== null)
 }
 
 /**

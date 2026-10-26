@@ -35,6 +35,8 @@ import {
   injectMockExecution,
   resetJobsState,
   secondGribRunExecution,
+  setMockGribDir,
+  setMockOutputAvailable,
 } from '@tests/../mocks/data/job.data'
 import {
   failMockLens,
@@ -52,6 +54,7 @@ import {
   wmsCapabilitiesRequestCount,
 } from '@tests/../mocks/data/wms.data'
 import type * as GeoViewerModule from '@/features/viewer/geo/GeoViewer'
+import type { JobExecutionDetail } from '@/api/types/job.types'
 import { Route as VisualiseRoute } from '@/routes/_authenticated/visualise'
 import { setPollIntervalsForTests } from '@/api/pollIntervals'
 import { VisualisePage } from '@/features/visualise/components/VisualisePage'
@@ -131,6 +134,60 @@ const RUN_B = {
   taskId: 'task-out-grib-b',
   blockId: 'block_sink_1',
   runName: 'Run B',
+  blockTitle: 'GRIB Sink',
+  runCreatedAt: null,
+} as const
+
+const GRIB_DIR_MIME = 'text/plain; fiab-format=gribdir'
+
+/** Still writing its GRIB sink: one of two marker tasks finished. */
+const writingRun: JobExecutionDetail = {
+  ...secondGribRunExecution,
+  run_id: 'job-writing-010',
+  status: 'running',
+  outputs: {
+    'task-grib-2t': {
+      mime_type: GRIB_DIR_MIME,
+      original_block: 'block_sink_1',
+      is_available: true,
+    },
+    'task-grib-msl': {
+      mime_type: GRIB_DIR_MIME,
+      original_block: 'block_sink_1',
+      is_available: false,
+    },
+  },
+}
+
+const RUN_WRITING = {
+  kind: 'output',
+  jobId: 'job-writing-010',
+  taskId: 'task-grib-2t',
+  blockId: 'block_sink_1',
+  runName: 'Run W',
+  blockTitle: 'GRIB Sink',
+  runCreatedAt: null,
+} as const
+
+/** A later run whose GRIB path writes into Run A's folder. */
+const sharedFolderRun: JobExecutionDetail = {
+  ...secondGribRunExecution,
+  run_id: 'job-shared-011',
+  outputs: {
+    'task-out-grib-c': {
+      mime_type: GRIB_DIR_MIME,
+      original_block: 'block_sink_1',
+      is_available: true,
+    },
+  },
+}
+
+const RUN_C = {
+  kind: 'output',
+  jobId: 'job-shared-011',
+  taskId: 'task-out-grib-c',
+  blockId: 'block_sink_1',
+  runName: 'Run C',
   blockTitle: 'GRIB Sink',
   runCreatedAt: null,
 } as const
@@ -236,12 +293,12 @@ describe('VisualisePage', () => {
     // Normalization fills A/B from basket order.
     const pickerA = screen.getByLabelText('Source for slot A')
     const pickerB = screen.getByLabelText('Source for slot B')
-    await expect.element(pickerA).toHaveTextContent('Run A')
-    await expect.element(pickerB).toHaveTextContent('Run B')
+    await expect.element(pickerA).toMatchTextContent('Run A')
+    await expect.element(pickerB).toMatchTextContent('Run B')
 
     await screen.getByRole('button', { name: 'Swap A and B' }).click()
-    await expect.element(pickerA).toHaveTextContent('Run B')
-    await expect.element(pickerB).toHaveTextContent('Run A')
+    await expect.element(pickerA).toMatchTextContent('Run B')
+    await expect.element(pickerB).toMatchTextContent('Run A')
   })
 
   it('a bare visit restores the last-used pair over basket order', async () => {
@@ -255,10 +312,10 @@ describe('VisualisePage', () => {
 
     await expect
       .element(screen.getByLabelText('Source for slot A'))
-      .toHaveTextContent('Run B')
+      .toMatchTextContent('Run B')
     await expect
       .element(screen.getByLabelText('Source for slot B'))
-      .toHaveTextContent('Run A')
+      .toMatchTextContent('Run A')
   })
 
   it('falls back to basket order when the stored pair left the basket', async () => {
@@ -272,10 +329,10 @@ describe('VisualisePage', () => {
 
     await expect
       .element(screen.getByLabelText('Source for slot A'))
-      .toHaveTextContent('Run A')
+      .toMatchTextContent('Run A')
     await expect
       .element(screen.getByLabelText('Source for slot B'))
-      .toHaveTextContent('Run B')
+      .toMatchTextContent('Run B')
   })
 
   it('swapping hands a healthy source to a slot whose start had failed', async () => {
@@ -324,8 +381,81 @@ describe('VisualisePage', () => {
     ).toHaveLength(0)
     await expect
       .element(screen.getByLabelText('Source for slot B'))
-      .toHaveTextContent('Pick a source…')
+      .toMatchTextContent('Pick a source…')
   })
+
+  it('holds the viewer layout while the lens starts', async () => {
+    useComparisonStore.getState().addEntry(RUN_A)
+    const screen = await renderVisualisePage()
+
+    // Before the lens runs, the viewer-shaped skeleton stands in — not a
+    // lifecycle card that would reflow the page once the map mounts.
+    await expect
+      .element(
+        screen.getByRole('status', {
+          name: /Starting lens server|Locating output directory/,
+        }),
+      )
+      .toBeVisible()
+    await expect
+      .element(screen.getByText(/display is static/), { timeout: 8000 })
+      .toBeVisible()
+  })
+
+  it(
+    'waits for the run to write every file before starting a lens',
+    { timeout: 30000 },
+    async () => {
+      injectMockExecution(writingRun)
+      useComparisonStore.getState().addEntry(RUN_WRITING)
+      const screen = await renderVisualisePage()
+
+      await expect
+        .element(
+          screen.getByRole('status', {
+            name: /Waiting for the run to write its files \(1 of 2\)/,
+          }),
+        )
+        .toBeVisible()
+      // Give a premature start a beat to (wrongly) materialize.
+      await new Promise((r) => setTimeout(r, 1000))
+      expect(listMockLenses()).toHaveLength(0)
+
+      // The run status poll picks up the last file, then the lens starts.
+      setMockOutputAvailable('job-writing-010', 'task-grib-msl', true)
+      await expect
+        .poll(() => listMockLenses(), { timeout: 15000 })
+        .toHaveLength(1)
+    },
+  )
+
+  it(
+    "starts a fresh lens for a run writing into another run's folder",
+    { timeout: 30000 },
+    async () => {
+      injectMockExecution(sharedFolderRun)
+      setMockGribDir('job-shared-011', '/data/output/job-completed-001_1')
+      useComparisonStore.getState().addEntry(RUN_A)
+      const screen = await renderVisualisePage()
+      await expect
+        .element(screen.getByText(/display is static/), { timeout: 8000 })
+        .toBeVisible()
+      expect(listMockLenses()).toHaveLength(1)
+
+      // Run A's lens scanned the folder before Run C wrote to it.
+      useComparisonStore.getState().addEntry(RUN_C)
+      await expect
+        .element(screen.getByLabelText('Source for slot B'))
+        .toMatchTextContent('Run C')
+      await expect
+        .poll(() => listMockLenses(), { timeout: 15000 })
+        .toHaveLength(2)
+      expect(listMockLenses().map((l) => l.lens_params.local_path)).toEqual([
+        '/data/output/job-completed-001_1',
+        '/data/output/job-completed-001_1',
+      ])
+    },
+  )
 
   it('gates local sources when SkinnyWMS is missing; external WMS stays', async () => {
     resetLensState({ skinnyWmsInstalled: false })
@@ -368,6 +498,8 @@ describe('VisualisePage', () => {
   })
 
   it('surfaces a lens-registry outage with Retry instead of spinning', async () => {
+    // Park the list poll so only the Retry click can recover the page.
+    setPollIntervalsForTests({ lensList: 60_000 })
     setLensListOutage(true)
     useComparisonStore.getState().addEntry(RUN_A)
     const screen = await renderVisualisePage()
@@ -501,10 +633,10 @@ describe('VisualisePage', () => {
     const screen = await renderVisualisePage()
     await expect
       .element(screen.getByLabelText('Source for slot A'))
-      .toHaveTextContent('Run A')
+      .toMatchTextContent('Run A')
     await expect
       .element(screen.getByLabelText('Source for slot B'))
-      .toHaveTextContent('Run B')
+      .toMatchTextContent('Run B')
 
     await screen
       .getByRole('button', { name: 'Remove A from view — continue with B' })
@@ -514,7 +646,7 @@ describe('VisualisePage', () => {
     // in the basket for later).
     await expect
       .element(screen.getByLabelText('Source for slot A'))
-      .toHaveTextContent('Run B')
+      .toMatchTextContent('Run B')
     await expect
       .poll(
         () =>
@@ -530,7 +662,7 @@ describe('VisualisePage', () => {
     const screen = await renderVisualisePage()
     await expect
       .element(screen.getByLabelText('Source for slot A'))
-      .toHaveTextContent('Run A')
+      .toMatchTextContent('Run A')
 
     await screen.getByRole('button', { name: 'Manage sources' }).click()
     const removeA = screen.getByRole('button', { name: /Remove Run A/ })
@@ -545,7 +677,7 @@ describe('VisualisePage', () => {
       .toHaveLength(1)
     await expect
       .element(screen.getByLabelText('Source for slot A'))
-      .toHaveTextContent('Run B')
+      .toMatchTextContent('Run B')
     // The removed ref left the URL — hydration must not resurrect it.
     await new Promise((r) => setTimeout(r, 1200))
     expect(useComparisonStore.getState().entries).toHaveLength(1)
@@ -557,7 +689,7 @@ describe('VisualisePage', () => {
     const screen = await renderVisualisePage()
     await expect
       .element(screen.getByLabelText('Source for slot B'))
-      .toHaveTextContent('Run B')
+      .toMatchTextContent('Run B')
 
     await screen.getByRole('button', { name: 'Manage sources' }).click()
     const removeB = screen.getByRole('button', { name: /Remove Run B/ })
@@ -572,7 +704,7 @@ describe('VisualisePage', () => {
       .toHaveLength(1)
     await expect
       .element(screen.getByLabelText('Source for slot A'))
-      .toHaveTextContent('Run A')
+      .toMatchTextContent('Run A')
     await new Promise((r) => setTimeout(r, 1200))
     expect(useComparisonStore.getState().entries).toHaveLength(1)
 
@@ -580,7 +712,7 @@ describe('VisualisePage', () => {
     useComparisonStore.getState().addEntry(RUN_B)
     await expect
       .element(screen.getByLabelText('Source for slot B'))
-      .toHaveTextContent('Run B')
+      .toMatchTextContent('Run B')
   })
 
   it(
@@ -653,7 +785,7 @@ describe('VisualisePage', () => {
 
     await expect
       .element(screen.getByLabelText('Source for slot B'))
-      .toHaveTextContent('Run B')
+      .toMatchTextContent('Run B')
 
     // Cancel keeps everything.
     await screen.getByRole('button', { name: 'Clear all' }).click()
@@ -694,7 +826,7 @@ describe('VisualisePage', () => {
     await screen.getByRole('option', { name: /Run A/ }).click()
     await expect
       .element(screen.getByLabelText('Source for slot B'))
-      .toHaveTextContent('Run A')
+      .toMatchTextContent('Run A')
   })
 
   it('the X clears B and materialization does not re-fill it', async () => {
@@ -703,16 +835,16 @@ describe('VisualisePage', () => {
     const screen = await renderVisualisePage()
 
     const pickerB = screen.getByLabelText('Source for slot B')
-    await expect.element(pickerB).toHaveTextContent('Run B')
+    await expect.element(pickerB).toMatchTextContent('Run B')
 
     await screen
       .getByRole('button', { name: 'Remove B from view — continue with A' })
       .click()
-    await expect.element(pickerB).toHaveTextContent('Pick a source…')
+    await expect.element(pickerB).toMatchTextContent('Pick a source…')
     // The `b=off` sentinel holds against the auto-fill effect, and the X
     // is gone while B is empty.
     await new Promise((r) => setTimeout(r, 1200))
-    await expect.element(pickerB).toHaveTextContent('Pick a source…')
+    await expect.element(pickerB).toMatchTextContent('Pick a source…')
     expect(
       screen
         .getByRole('button', { name: 'Remove B from view — continue with A' })
@@ -729,11 +861,11 @@ describe('VisualisePage', () => {
     const screen = await renderVisualisePage()
 
     const pickerB = screen.getByLabelText('Source for slot B')
-    await expect.element(pickerB).toHaveTextContent('Run B')
+    await expect.element(pickerB).toMatchTextContent('Run B')
     await screen
       .getByRole('button', { name: 'Remove B from view — continue with A' })
       .click()
-    await expect.element(pickerB).toHaveTextContent('Pick a source…')
+    await expect.element(pickerB).toMatchTextContent('Pick a source…')
 
     // Adding a NEW source is the intent to compare — B fills with it,
     // even though the URL carried the deliberate `b=off`.
@@ -742,7 +874,7 @@ describe('VisualisePage', () => {
       url: 'http://localhost:54391/wms?',
       label: 'maps.dwd.de',
     })
-    await expect.element(pickerB).toHaveTextContent('maps.dwd.de')
+    await expect.element(pickerB).toMatchTextContent('maps.dwd.de')
   })
 
   it('the X ejects an external-WMS B (regression: fake Select items)', async () => {
@@ -758,13 +890,13 @@ describe('VisualisePage', () => {
     const screen = await renderVisualisePage()
 
     const pickerB = screen.getByLabelText('Source for slot B')
-    await expect.element(pickerB).toHaveTextContent('maps.dwd.de')
+    await expect.element(pickerB).toMatchTextContent('maps.dwd.de')
     await screen
       .getByRole('button', { name: 'Remove B from view — continue with A' })
       .click()
-    await expect.element(pickerB).toHaveTextContent('Pick a source…')
+    await expect.element(pickerB).toMatchTextContent('Pick a source…')
     await new Promise((r) => setTimeout(r, 1200))
-    await expect.element(pickerB).toHaveTextContent('Pick a source…')
+    await expect.element(pickerB).toMatchTextContent('Pick a source…')
   })
 
   it('identifies sources in the slot dropdown with kind and id', async () => {
@@ -789,14 +921,14 @@ describe('VisualisePage', () => {
 
     const pickerA = screen.getByLabelText('Source for slot A')
     const pickerB = screen.getByLabelText('Source for slot B')
-    await expect.element(pickerB).toHaveTextContent('Run B')
+    await expect.element(pickerB).toMatchTextContent('Run B')
 
     // Picking A's source for slot B must NOT swap — same-source compare
     // (different layers of one run) is a real workflow.
     await pickerB.click()
-    await screen.getByRole('option', { name: 'Run A' }).click()
-    await expect.element(pickerA).toHaveTextContent('Run A')
-    await expect.element(pickerB).toHaveTextContent('Run A')
+    await screen.getByRole('option', { name: /^Run A/ }).click()
+    await expect.element(pickerA).toMatchTextContent('Run A')
+    await expect.element(pickerB).toMatchTextContent('Run A')
   })
 
   it('hydrates basket entries from a shared URL', async () => {

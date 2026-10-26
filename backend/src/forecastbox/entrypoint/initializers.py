@@ -20,21 +20,24 @@ import importlib
 import inspect
 import logging
 import pkgutil
+from collections.abc import Callable
+from concurrent.futures import Future
+from typing import TypeVar
 
 from fiab_core.artifacts import ArtifactsProvider
+from fiab_core.metkit import MetkitParamResolver
 
 import forecastbox.domain
 import forecastbox.schemata
 from forecastbox.domain.artifact.base import get_artifact_local_path
-from forecastbox.domain.artifact.manager import ArtifactManager, join_artifact_manager, submit_refresh_catalog
+from forecastbox.domain.artifact.manager import ArtifactManager, submit_refresh_catalog
 from forecastbox.domain.experiment.scheduling.background import start_scheduler, stop_scheduler
-from forecastbox.domain.gateway.service import shutdown_processes
+from forecastbox.domain.gateway.service import ensure_gateway, launch_gateway, shutdown_processes
 from forecastbox.domain.lens.manager import shutdown_all_lens_instances
-from forecastbox.domain.lens.proxy import aclose_client as aclose_lens_proxy_client
 from forecastbox.domain.notification.service import init_broadcaster
 from forecastbox.domain.plugin.store import submit_initialize_stores
 from forecastbox.domain.plugin.submit import submit_load_all as submit_load_plugins
-from forecastbox.utility.concurrency.manager import execution_manager
+from forecastbox.utility.concurrency.manager import ConcurrentPools, TaskName, execution_manager
 from forecastbox.utility.config import ConcurrentThreads, config
 from forecastbox.utility.dispatcher import (
     DispatcherRegistration,
@@ -48,7 +51,9 @@ from forecastbox.utility.dispatcher import (
 from forecastbox.utility.dispatcher import (
     stop_request as dispatcher_stop_request,
 )
+from forecastbox.utility.http_pools import start_http_pools, stop_http_pools
 from forecastbox.utility.initializer import Initializer, Initializers
+from forecastbox.utility.metkit import param_id_to_shortname, shortname_to_param_id
 from forecastbox.utility.tunnel import shutdown as shutdown_tunnels
 
 logger = logging.getLogger(__name__)
@@ -137,24 +142,92 @@ def _start_artifact_stores() -> None:
     submit_initialize_stores()
 
 
-def start_artifact_provider() -> None:
+def register_fiabcore_providers() -> None:
     ArtifactsProvider.register_get_artifacts_lookup(lambda: ArtifactManager.catalog)
     ArtifactsProvider.register_get_artifact_local_path(lambda composite_id: get_artifact_local_path(composite_id, config.backend.data_path))
+    MetkitParamResolver.register_param_id_to_shortname(param_id_to_shortname)
+    MetkitParamResolver.register_shortname_to_param_id(shortname_to_param_id)
 
 
-def _start_artifact_manager_plugin_catalog() -> None:
-    # TODO -- split in two, but there is a dependency between them!
+# The two barriers below let independent `Initializer` steps be gated on one another
+# without coupling their domain functions together (see `submit_load_all`, which is
+# unaware that its `start_after` future ultimately traces back to the artifact catalog
+# refresh, and `start_scheduler`, which is unaware of the plugin catalog at all).
+#
+# Each barrier is acked with the *same outcome* as the upstream step it is attached to,
+# via `_forward_to_barrier`: a successful upstream resolves the barrier with `None`, a
+# failed (or cancelled) upstream resolves the barrier with that same failure. This way,
+# a step gated on a barrier observes a failure early (and can choose to log-and-skip, as
+# `start_scheduler` does) rather than blocking forever or failing later on some
+# unrelated `None` value.
+#
+# TODO rework into better alignment with execution manager / initializers after concurrency migration concluded
+# In particular, we dont want to consume a thread by awaiting on a future, we want sequential task graphs
+# TODO the scheduler prerequisite waiter still blocks a General worker, as it waits on two futures and
+# the manager has no `submit_after_all`
+ArtifactsCatalogInitialized: Future[None] = Future()
+PluginsCatalogInitialized: Future[None] = Future()
+_T = TypeVar("_T")
+
+
+def _forward_to_barrier(barrier: Future[None]) -> Callable[[Future[_T]], None]:
+    """Build a done-callback that forwards the outcome of the future it is attached to
+    onto ``barrier`` (success, failure, or cancellation alike). Intended to be cheap and
+    non-blocking, so it can run on whichever thread completes the upstream future.
+    """
+
+    def _forward(done: Future[_T]) -> None:
+        if barrier.done():
+            return
+        if done.cancelled():
+            barrier.cancel()
+            return
+        error = done.exception()
+        if error is not None:
+            barrier.set_exception(error)
+        else:
+            barrier.set_result(None)
+
+    return _forward
+
+
+def _start_artifact_manager() -> None:
     catalog_ready = submit_refresh_catalog()
-    submit_load_plugins(start_after=catalog_ready)
+    catalog_ready.add_done_callback(_forward_to_barrier(ArtifactsCatalogInitialized))
 
 
-def _stop_artifact_manager_plugin_catalog() -> None:
-    join_artifact_manager(timeout_sec=10)
+def _start_plugin_catalog() -> None:
+    plugins_ready = submit_load_plugins(start_after=ArtifactsCatalogInitialized)
+    plugins_ready.add_done_callback(_forward_to_barrier(PluginsCatalogInitialized))
+
+
+GatewayInitialized: Future[None] = Future()
+
+
+def _run_gateway_startup() -> None:
+    launch_gateway()
+    ensure_gateway()
+
+
+def _start_gateway() -> None:
+    startup = execution_manager.submit_unmonitored(ConcurrentPools.General, TaskName("gateway.start"), _run_gateway_startup)
+    startup.add_done_callback(_forward_to_barrier(GatewayInitialized))
+
+
+def _await_scheduler_prereqs() -> None:
+    # NOTE if both futures failed, only the plugins failure is surfaced here -- the gateway
+    # failure was already logged via its own barrier's done-callback, so nothing is lost.
+    PluginsCatalogInitialized.result()
+    GatewayInitialized.result()
 
 
 def _start_scheduler() -> None:
-    # TODO delay the start until plugins are ready
-    start_scheduler()
+    prereqs_ready = execution_manager.submit_unmonitored(
+        ConcurrentPools.General,
+        TaskName("scheduler.await-prereqs"),
+        _await_scheduler_prereqs,
+    )
+    prereqs_ready.add_done_callback(start_scheduler)
 
 
 def _stop_scheduler() -> None:
@@ -173,10 +246,6 @@ def _stop_lens() -> None:
     shutdown_all_lens_instances()
 
 
-async def _stop_lens_proxy_client() -> None:
-    await aclose_lens_proxy_client()
-
-
 def build_initializers() -> Initializers:
     """Assemble the ordered list of startup/teardown steps for the application lifespan.
 
@@ -186,14 +255,13 @@ def build_initializers() -> Initializers:
     initializers = [
         Initializer("db_schema", start=start_db_schema),
         Initializer("execution_runtime", start=_start_execution_runtime, stop=_stop_execution_runtime),
+        Initializer("http_pools", start=start_http_pools, stop=stop_http_pools),
         Initializer("broadcaster", start=_start_broadcaster),
         Initializer("artifact_stores", start=_start_artifact_stores),
-        Initializer("artifact_provider", start=start_artifact_provider),
-        Initializer(
-            "artifact_manager_plugin_catalog",
-            start=_start_artifact_manager_plugin_catalog,
-            stop=_stop_artifact_manager_plugin_catalog,
-        ),
+        Initializer("fiabcore_providers", start=register_fiabcore_providers),
+        Initializer("artifact_manager", start=_start_artifact_manager),
+        Initializer("plugin_catalog", start=_start_plugin_catalog),
+        Initializer("gateway", start=_start_gateway),
     ]
     if config.backend.allow_scheduler:
         initializers.append(Initializer("scheduler", start=_start_scheduler, stop=_stop_scheduler))
@@ -202,7 +270,6 @@ def build_initializers() -> Initializers:
             Initializer("tunnels", stop=_stop_tunnels),
             Initializer("processes", stop=_stop_processes),
             Initializer("lens", stop=_stop_lens),
-            Initializer("lens_proxy_client", stop=_stop_lens_proxy_client),
         ]
     )
     return Initializers(initializers)

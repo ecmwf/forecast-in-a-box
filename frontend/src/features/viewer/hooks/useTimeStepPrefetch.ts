@@ -17,11 +17,19 @@
 
 import { useEffect } from 'react'
 import ImageLayer from 'ol/layer/Image'
+import { intersects } from 'ol/extent'
 import { makeDataLayerSource } from '../ol-layers'
+import {
+  layerExtentFor,
+  requestProjection,
+  viewerProjectionOf,
+} from '../projections'
+import { layerRequestParams } from '../wms-capabilities'
 import type { RefObject } from 'react'
 import type OlMap from 'ol/Map'
 import type ImageWMS from 'ol/source/ImageWMS'
-import type { ParsedLayer } from '../wms-capabilities'
+import type { BboxAxisOrder } from '../projections'
+import type { LayerRequestSettings, ParsedLayer } from '../wms-capabilities'
 
 const PREFETCH_LOAD_TIMEOUT_MS = 30_000
 
@@ -32,6 +40,8 @@ export function useTimeStepPrefetch(
     baseUrl,
     layers,
     activeOrder,
+    layerSettings,
+    bboxAxisOrder = 'epsg',
     timeSteps,
     mapVersion,
   }: {
@@ -39,6 +49,10 @@ export function useTimeStepPrefetch(
     baseUrl: string
     layers: ReadonlyArray<ParsedLayer>
     activeOrder: ReadonlyArray<string>
+    /** Per-layer style + dimension choices; absent = server defaults. */
+    layerSettings?: ReadonlyMap<string, LayerRequestSettings>
+    /** BBOX axis order this server expects in projected CRSs. */
+    bboxAxisOrder?: BboxAxisOrder
     /** Raw TIME strings this server advertises. */
     timeSteps: ReadonlyArray<string>
     /** useOlMapBase recreation counter — restart after a map rebuild. */
@@ -54,6 +68,15 @@ export function useTimeStepPrefetch(
       .filter((l): l is ParsedLayer => !!l && !!l.time && l.styles.length > 0)
     if (timeAwareActive.length === 0) return
 
+    // Same clip as the visible stack (URLs match); off-screen never loads.
+    const projection = viewerProjectionOf(map.getView())
+    const viewExtent = map.getView().calculateExtent(map.getSize())
+    const clipOf = (layer: ParsedLayer) =>
+      layerExtentFor(projection, layer.bbox)
+    const onScreen = timeAwareActive.filter((l) =>
+      intersects(clipOf(l), viewExtent),
+    )
+    if (onScreen.length === 0) return
     // Object-wrapped so TS-ESLint sees mutability across the await below.
     const state = { cancelled: false }
     const hiddenLayers: Array<ImageLayer<ImageWMS>> = []
@@ -62,17 +85,16 @@ export function useTimeStepPrefetch(
     const prefetchOne = (layer: ParsedLayer, step: string) =>
       new Promise<void>((resolve) => {
         if (state.cancelled) return resolve()
-        const source = makeDataLayerSource(baseUrl, {
-          LAYERS: layer.name,
-          STYLES: layer.styles[0].name,
-          FORMAT: 'image/png',
-          TRANSPARENT: 'TRUE',
-          TIME: step,
-        })
+        const source = makeDataLayerSource(
+          baseUrl,
+          layerRequestParams(layer, layerSettings?.get(layer.name), step),
+          requestProjection(map.getView(), bboxAxisOrder),
+        )
         const hidden = new ImageLayer({
           source,
           opacity: 0,
           zIndex: -1,
+          extent: clipOf(layer),
         })
         let settled = false
         let safetyTimer = 0
@@ -94,7 +116,7 @@ export function useTimeStepPrefetch(
       })
 
     ;(async () => {
-      for (const layer of timeAwareActive) {
+      for (const layer of onScreen) {
         for (const step of timeSteps) {
           if (state.cancelled) return
           await prefetchOne(layer, step)
@@ -107,5 +129,15 @@ export function useTimeStepPrefetch(
       // Best-effort cleanup of any still-attached hidden layers.
       for (const h of hiddenLayers) map.removeLayer(h)
     }
-  }, [enabled, baseUrl, activeOrder, layers, timeSteps, mapRef, mapVersion])
+  }, [
+    enabled,
+    baseUrl,
+    activeOrder,
+    layerSettings,
+    bboxAxisOrder,
+    layers,
+    timeSteps,
+    mapRef,
+    mapVersion,
+  ])
 }

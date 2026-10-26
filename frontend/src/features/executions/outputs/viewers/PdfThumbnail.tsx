@@ -17,6 +17,7 @@ import { FileText } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useJobResultBlob } from '../useJobResult'
+import { useInViewOnce } from './useInViewOnce'
 import type { ThumbnailProps } from '../types'
 import { createLogger } from '@/lib/logger'
 
@@ -28,22 +29,7 @@ export function PdfThumbnail({ item }: ThumbnailProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [pageCount, setPageCount] = useState<number | null>(null)
   const [rendered, setRendered] = useState(false)
-  const [shouldRender, setShouldRender] = useState(false)
-
-  useEffect(() => {
-    if (!ref.current) return
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) {
-          setShouldRender(true)
-          observer.disconnect()
-        }
-      },
-      { rootMargin: '200px' },
-    )
-    observer.observe(ref.current)
-    return () => observer.disconnect()
-  }, [])
+  const shouldRender = useInViewOnce(ref)
 
   // Deferred until the card scrolls into view; shares the blob cache with the
   // full PDF viewer for this same output.
@@ -107,14 +93,14 @@ export function PdfThumbnail({ item }: ThumbnailProps) {
   return (
     <div
       ref={ref}
-      className="relative flex aspect-video items-center justify-center overflow-hidden rounded bg-muted"
+      className="relative flex aspect-video items-center justify-center overflow-hidden rounded-md bg-muted"
     >
       <canvas ref={canvasRef} className="max-h-full max-w-full" />
       {!rendered && (
         <FileText className="absolute h-8 w-8 text-muted-foreground" />
       )}
       {pageCount !== null && (
-        <span className="absolute right-1 bottom-1 rounded bg-black/50 px-1.5 py-0.5 font-mono text-xs text-white">
+        <span className="absolute right-1 bottom-1 rounded-md bg-black/50 px-1.5 py-0.5 font-mono text-sm text-white">
           {t('outputs.viewer.pdfPageCount', { count: pageCount })}
         </span>
       )}

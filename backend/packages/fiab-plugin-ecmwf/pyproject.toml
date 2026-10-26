@@ -17,13 +17,14 @@ requires-python = ">=3.11"
 dynamic = [ "version" ]
 
 dependencies = [
-    "fiab-core>=3,<4", # auto-updateable -- do not remove this comment
-    "earthkit-workflows>=0.9.0",
-    "earthkit-workflows-anemoi>=0.7.2",
+    "fiab-core>=6,<7", # auto-updateable -- do not remove this comment
+    "earthkit-workflows>=0.18.0",
+    "earthkit-workflows-anemoi>=0.9.0",
+    "pproc-core>=0.4.0",
 ]
 
 optional-dependencies.runtime = [
-    "earthkit-data>=0.18.2",
+    "earthkit-data>=0.18.2,<1",
     "earthkit>=0.13.2",
     "earthkit-plots>=0.3.5,<1.0",
     "earthkit-workflows-anemoi[runtime-inference]",
@@ -32,6 +33,8 @@ optional-dependencies.runtime = [
 [dependency-groups]
 dev = [
   "ty==0.0.2",
+  "pytest_lazy_fixtures",
+  "pymetkit", # due to test-time injection
 ]
 
 [tool.setuptools_scm]
@@ -41,7 +44,7 @@ __version__ = "{version}"
 '''
 local_scheme = "no-local-version"
 root = ".."
-fallback_version = "3.0.0" # auto-updateable -- do not remove this comment
+fallback_version = "6.0.0" # auto-updateable -- do not remove this comment
 tag_regex = '^[vd](?P<version>\d+(?:\.\d+){0,2}[^\+]*)(?:\+.*)?$'
 
 [tool.ruff]
@@ -49,3 +52,6 @@ line-length = 140
 
 lint.ignore = [ "E731", "ANN401" ]
 lint.select = ["I", "ANN"]
+
+[tool.pytest.ini_options]
+log_cli = true

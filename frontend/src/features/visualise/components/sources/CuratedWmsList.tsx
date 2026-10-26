@@ -16,20 +16,29 @@ import { useTranslation } from 'react-i18next'
 import type { CuratedWmsServer } from '@/features/visualise/curated-wms'
 import { useCuratedWmsServers } from '@/features/visualise/curated-wms'
 import { probeWmsEndpoint } from '@/features/visualise/wms-probe'
+import { useComparisonStore } from '@/features/visualise/stores/comparisonStore'
 import {
-  MAX_COMPARISON_ENTRIES,
-  useComparisonStore,
-} from '@/features/visualise/stores/comparisonStore'
+  useAddedToast,
+  useSlotRefs,
+} from '@/features/visualise/hooks/useBasketAdd'
+import { useEcmwfKeyStore } from '@/stores/ecmwfKeyStore'
 import { Button } from '@/components/ui/button'
 import { P } from '@/components/base/typography'
 import { TOUR, tourActionAttr, tourAttr } from '@/features/tutorials/anchors'
 import { showToast } from '@/lib/toast'
+
+/** The curated entry a user's ECMWF key upgrades. */
+const ECMWF_SERVER_NAME = 'ECMWF'
 
 export function CuratedWmsList() {
   const { t } = useTranslation('visualise')
   const servers = useCuratedWmsServers()
   const entries = useComparisonStore((s) => s.entries)
   const addEntry = useComparisonStore((s) => s.addEntry)
+  const slotRefs = useSlotRefs()
+  const addedToast = useAddedToast()
+  const hasKey = useEcmwfKeyStore((s) => s.key !== null)
+  const openKeyDialog = useEcmwfKeyStore((s) => s.openDialog)
   const [busy, setBusy] = useState<ReadonlySet<string>>(new Set())
 
   // Probe stores URLs via `new URL(...).toString()` — match that form.
@@ -60,16 +69,13 @@ export function CuratedWmsList() {
       )
       return
     }
-    const added = addEntry({
-      kind: 'wms',
-      url: result.baseUrl,
-      label: server.name,
-    })
-    if (added === 'added') {
-      showToast.success(t('toast.added', { name: server.name }))
-    } else if (added === 'full') {
-      showToast.error(t('toast.full', { max: MAX_COMPARISON_ENTRIES }))
-    }
+    addedToast(
+      server.name,
+      addEntry(
+        { kind: 'wms', url: result.baseUrl, label: server.name },
+        slotRefs,
+      ),
+    )
   }
 
   return (
@@ -96,6 +102,17 @@ export function CuratedWmsList() {
                   >
                     {new URL(server.url).host}
                   </P>
+                )}
+                {server.name === ECMWF_SERVER_NAME && (
+                  <button
+                    type="button"
+                    className="text-[11px] text-primary hover:underline"
+                    onClick={openKeyDialog}
+                  >
+                    {hasKey
+                      ? t('picker.curated.ecmwfKeyActive')
+                      : t('picker.curated.ecmwfKeyHint')}
+                  </button>
                 )}
               </div>
               <Button

@@ -16,7 +16,15 @@ import { RunListPage } from '@/features/executions/components/RunListPage'
 const searchSchema = z.object({
   q: z.string().optional(),
   status: z
-    .enum(['all', 'submitted', 'running', 'completed', 'failed', 'bookmarked'])
+    .enum([
+      'all',
+      'submitted',
+      'running',
+      'completed',
+      'failed',
+      'stopped',
+      'bookmarked',
+    ])
     .optional(),
   group: z.enum(['none', 'date', 'schedule', 'tag']).optional(),
 })

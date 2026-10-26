@@ -39,7 +39,7 @@ describe('selectStarterTemplates', () => {
   it('orders by the plugin declaration order, not the list order', () => {
     const result = selectStarterTemplates(
       [template('C'), template('A'), template('B')],
-      ['A', 'B', 'C'],
+      { [ECMWF]: ['A', 'B', 'C'] },
     )
 
     expect(names(result)).toEqual(['A', 'B', 'C'])
@@ -48,7 +48,7 @@ describe('selectStarterTemplates', () => {
   it('caps at the limit', () => {
     const result = selectStarterTemplates(
       [template('A'), template('B'), template('C'), template('D')],
-      ['A', 'B', 'C', 'D'],
+      { [ECMWF]: ['A', 'B', 'C', 'D'] },
     )
 
     expect(names(result)).toEqual(['A', 'B', 'C'])
@@ -58,30 +58,29 @@ describe('selectStarterTemplates', () => {
     // 'A' is declared but has no row, so 'D' moves up rather than a card vanishing.
     const result = selectStarterTemplates(
       [template('B'), template('C'), template('D')],
-      ['A', 'B', 'C', 'D'],
+      { [ECMWF]: ['A', 'B', 'C', 'D'] },
     )
 
     expect(names(result)).toEqual(['B', 'C', 'D'])
   })
 
-  it('ignores templates from other plugins', () => {
+  it('prefers the ECMWF templates when that plugin is installed', () => {
     const result = selectStarterTemplates(
       [
         template('A'),
         template('Other', { pluginId: 'local:plugin-test' }),
         template('B'),
       ],
-      ['A', 'Other', 'B'],
+      { [ECMWF]: ['A', 'Other', 'B'] },
     )
 
     expect(names(result)).toEqual(['A', 'B'])
   })
 
   it('ignores rows with no display name, since that is the join key', () => {
-    const result = selectStarterTemplates(
-      [template(null), template('A')],
-      ['A'],
-    )
+    const result = selectStarterTemplates([template(null), template('A')], {
+      [ECMWF]: ['A'],
+    })
 
     expect(names(result)).toEqual(['A'])
   })
@@ -90,7 +89,7 @@ describe('selectStarterTemplates', () => {
     const first = template('A', { blueprintId: 'first' })
     const second = template('A', { blueprintId: 'second' })
 
-    const result = selectStarterTemplates([first, second], ['A'])
+    const result = selectStarterTemplates([first, second], { [ECMWF]: ['A'] })
 
     expect(result).toHaveLength(1)
     expect(result[0].blueprintId).toBe('first')
@@ -100,25 +99,33 @@ describe('selectStarterTemplates', () => {
     // /plugin/list unavailable or an older backend: keep the cards, lose the order.
     const result = selectStarterTemplates(
       [template('C'), template('A'), template('B'), template('D')],
-      [],
+      { [ECMWF]: [] },
     )
 
     expect(names(result)).toEqual(['C', 'A', 'B'])
   })
 
-  it('returns nothing when no ECMWF template exists', () => {
+  it('falls back to other plugins, each in its declared order', () => {
     const result = selectStarterTemplates(
-      [template('A', { pluginId: 'local:plugin-test' })],
-      ['A'],
+      [
+        template('Z', { pluginId: 'local:single' }),
+        template('Y', { pluginId: 'local:single' }),
+        template('Q', { pluginId: 'local:other' }),
+      ],
+      { 'local:other': ['Q'], 'local:single': ['Y', 'Z'] },
     )
+    expect(names(result)).toEqual(['Q', 'Y', 'Z'])
+  })
 
-    expect(result).toEqual([])
+  it('returns nothing when no plugin ships a template', () => {
+    expect(selectStarterTemplates([], {})).toEqual([])
+    expect(selectStarterTemplates([template(null)], {})).toEqual([])
   })
 
   it('honours an explicit limit', () => {
     const result = selectStarterTemplates(
       [template('A'), template('B')],
-      ['A', 'B'],
+      { [ECMWF]: ['A', 'B'] },
       1,
     )
 
@@ -143,5 +150,45 @@ describe('templateConfigureSearch', () => {
         template: true,
       },
     )
+  })
+})
+
+describe('selectStarterTemplates with bookmarks', () => {
+  const official = [template('A'), template('B'), template('C'), template('D')]
+  const order = { [ECMWF]: ['A', 'B', 'C', 'D'] }
+  const key = (name: string, pluginId = ECMWF) => `${pluginId}::${name}`
+
+  it('puts bookmarks first, in bookmark order, then fills with defaults', () => {
+    const result = selectStarterTemplates(official, order, 3, [
+      key('D'),
+      key('C'),
+    ])
+    expect(names(result)).toEqual(['D', 'C', 'A'])
+  })
+
+  it('shows bookmarks from any plugin, not only the official one', () => {
+    const other = template('X', { pluginId: 'local:other' })
+    const result = selectStarterTemplates([...official, other], order, 3, [
+      key('X', 'local:other'),
+    ])
+    expect(names(result)).toEqual(['X', 'A', 'B'])
+  })
+
+  it('skips bookmarks whose template no longer exists', () => {
+    const result = selectStarterTemplates(official, order, 3, [
+      key('Gone'),
+      key('B'),
+    ])
+    expect(names(result)).toEqual(['B', 'A', 'C'])
+  })
+
+  it('shows only the first bookmarks when more than the limit exist', () => {
+    const result = selectStarterTemplates(official, order, 3, [
+      key('D'),
+      key('C'),
+      key('B'),
+      key('A'),
+    ])
+    expect(names(result)).toEqual(['D', 'C', 'B'])
   })
 })

@@ -14,6 +14,7 @@ import {
   computeTrafficLightStatus,
   getComponentStatusDetails,
   normalizeConcurrencyStatus,
+  normalizePluginStatus,
   statusResponseSchema,
 } from '@/types/status.types'
 
@@ -97,5 +98,13 @@ describe('concurrency in the overall status', () => {
       status: 'down',
       isActive: true,
     })
+  })
+})
+
+describe('normalizePluginStatus', () => {
+  it('treats the post-start initializing phase as operational', () => {
+    expect(normalizePluginStatus('initializing')).toBe('up')
+    expect(normalizePluginStatus('ok')).toBe('up')
+    expect(normalizePluginStatus('failure: boom')).toBe('down')
   })
 })

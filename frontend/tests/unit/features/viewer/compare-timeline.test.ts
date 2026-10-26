@@ -118,4 +118,23 @@ describe('availabilityRange / overlapRange', () => {
     expect(availabilityRange([false, false])).toBeNull()
     expect(overlapRange([true, false, false], [false, false, true])).toBeNull()
   })
+
+  it('trims not-served marks off the edges only', () => {
+    const a = [true, true, true, true, true]
+    const none: Array<string> = []
+    const failed = [['msl'], ['msl'], none, ['msl'], none]
+    expect(availabilityRange(a, failed)).toEqual([2, 4])
+    expect(availabilityRange(a, [none, none, none, none, ['msl']])).toEqual([
+      0, 3,
+    ])
+    expect(
+      availabilityRange(
+        a,
+        a.map(() => ['msl']),
+      ),
+    ).toBeNull()
+    expect(overlapRange(a, a, failed, [none, none, none, none, ['x']])).toEqual(
+      [2, 3],
+    )
+  })
 })

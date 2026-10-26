@@ -13,9 +13,10 @@
  * that decides icon, label, thumbnail, viewer, and per-output actions.
  */
 
-import type { ComponentType, LazyExoticComponent } from 'react'
+import type { ComponentType, LazyExoticComponent, ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import type { TFunction } from 'i18next'
+import type { OutputDim } from './dims'
 
 /** A typed `t` function bound to the `executions` namespace. */
 export type ExecutionsT = TFunction<'executions'>
@@ -28,8 +29,16 @@ export interface OutputItem {
   taskId: string
   /** Authoritative MIME from RunOutputMetadata. */
   mimeType: string
-  /** Source block identifier — used as the human-readable card label and group key. */
+  /** Source block id — the group key and viewer link. */
   originalBlock: string
+  /** Display name of that block, e.g. "Map Plot". */
+  blockName: string
+  /** Split coordinates, e.g. [["param", "167"], ["step", "6"]]. */
+  dims?: ReadonlyArray<OutputDim>
+  /** Short coordinate label, e.g. 2t and step 6. */
+  subtitle?: string
+  /** Long form of `subtitle` with full parameter names. */
+  subtitleFull?: string
   isAvailable: boolean
   /** Reason a produced output is no longer retrievable; absent = pending. */
   lostReason?: string
@@ -74,6 +83,8 @@ export interface ViewerProps {
   onNext?: () => void
   /** 1-based position for the header indicator. */
   navIndex?: { current: number; total: number }
+  /** Rendered below the stage, e.g. the output filmstrip. */
+  footer?: ReactNode
 }
 
 export interface OutputAdapter {

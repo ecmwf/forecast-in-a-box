@@ -15,10 +15,18 @@
  * StringField, NumberField, DateTimeField, EnumField, ListField
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { userEvent } from 'vitest/browser'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import { HttpResponse, http } from 'msw'
 import { renderWithProviders } from '@tests/utils/render'
+import { worker } from '@tests/../mocks/browser'
+import { failNextDownloadPoll } from '../../../../mocks/handlers/artifacts.handlers'
+import { API_ENDPOINTS } from '@/api/endpoints'
+import {
+  resetDownloadState,
+  useDownloadActions,
+} from '@/api/hooks/useArtifacts'
 import { FieldRenderer } from '@/components/base/fields/FieldRenderer'
 
 /**
@@ -345,6 +353,239 @@ describe('FieldRenderer Integration', () => {
         <ControlledFieldRenderer valueType="geodomain" />,
       )
       await expect.element(screen.getByText('Select an area…')).toBeVisible()
+    })
+  })
+
+  // Labels come from the MSW resolveDisplay handler (mockParamDisplays).
+  describe('Parameter fields', () => {
+    const PARAM_LIST = "list[enumClosed[param]('151','165','167','999')]"
+
+    it('labels chips with shortnames and stores ids', async () => {
+      const screen = await renderWithProviders(
+        <ControlledFieldRenderer
+          valueType={PARAM_LIST}
+          initialValue="167,151"
+        />,
+      )
+      const chip = screen.getByText('2t', { exact: true })
+      await expect.element(chip).toBeVisible()
+      await expect
+        .element(screen.getByText('msl', { exact: true }))
+        .toBeVisible()
+      await expect
+        .element(screen.getByTestId('current-value'))
+        .toHaveTextContent('167,151')
+
+      await chip.hover()
+      await expect
+        .element(
+          screen.getByText('2 metre temperature [K] (2t)', { exact: true }),
+        )
+        .toBeVisible()
+    })
+
+    it('finds a parameter by name or id and stores its id', async () => {
+      const screen = await renderWithProviders(
+        <ControlledFieldRenderer valueType={PARAM_LIST} />,
+      )
+      const input = screen.getByPlaceholder('Add item...')
+      await input.fill('temperature')
+      await expect
+        .element(screen.getByRole('option', { name: /2 metre temperature/ }))
+        .toBeVisible()
+      expect(screen.getByRole('option').elements()).toHaveLength(1)
+
+      await input.fill('165')
+      const wind = screen.getByRole('option', { name: /10 metre U wind/ })
+      await expect.element(wind).toBeVisible()
+      await wind.click()
+      await expect
+        .element(screen.getByTestId('current-value'))
+        .toHaveTextContent('165')
+    })
+
+    it('lists ids the backend cannot resolve as they are', async () => {
+      const screen = await renderWithProviders(
+        <ControlledFieldRenderer valueType={PARAM_LIST} />,
+      )
+      await screen.getByPlaceholder('Add item...').fill('999')
+      await expect
+        .element(screen.getByRole('option', { name: '999' }))
+        .toBeVisible()
+    })
+
+    it('keeps a value the options no longer offer visible', async () => {
+      const screen = await renderWithProviders(
+        <ControlledFieldRenderer
+          valueType={PARAM_LIST}
+          initialValue="2t-167,151"
+        />,
+      )
+      const stale = screen.getByText('2t-167', { exact: true })
+      await expect.element(stale).toBeVisible()
+      await expect
+        .element(screen.getByText('msl', { exact: true }))
+        .toBeVisible()
+
+      await stale.hover()
+      await expect
+        .element(
+          screen.getByText(
+            '2t-167 is no longer offered by the input. Remove it.',
+          ),
+        )
+        .toBeVisible()
+    })
+
+    it('labels list[param] tags', async () => {
+      const screen = await renderWithProviders(
+        <ControlledFieldRenderer valueType="list[param]" initialValue="167" />,
+      )
+      const tag = screen.getByText('2t', { exact: true })
+      await expect.element(tag).toBeVisible()
+      await tag.hover()
+      await expect
+        .element(
+          screen.getByText('2 metre temperature [K] (2t)', { exact: true }),
+        )
+        .toBeVisible()
+    })
+
+    it('shows the full label in a single-parameter select', async () => {
+      const screen = await renderWithProviders(
+        <ControlledFieldRenderer
+          valueType="enumClosed[param]('167','151')"
+          initialValue="167"
+        />,
+      )
+      await expect
+        .element(
+          screen
+            .getByRole('combobox')
+            .getByText('2 metre temperature [K] (2t)'),
+        )
+        .toBeVisible()
+    })
+  })
+
+  // Names come from the MSW artifact catalogue (list_models).
+  describe('Artifact field', () => {
+    const CHECKPOINTS =
+      "enumClosed[artifact]('ecmwf:aifs-ens-crps-1.0_w_sdpa','ecmwf:not-in-catalogue')"
+
+    it('shows the catalogue name instead of the wire id', async () => {
+      const screen = await renderWithProviders(
+        <ControlledFieldRenderer
+          valueType={CHECKPOINTS}
+          initialValue="ecmwf:aifs-ens-crps-1.0_w_sdpa"
+        />,
+      )
+      const trigger = screen.getByRole('combobox')
+      await expect.element(trigger.getByText('AIFS ENS CRPS 1.0')).toBeVisible()
+
+      await trigger.click()
+      const option = screen.getByRole('option', { name: /AIFS ENS CRPS 1\.0/ })
+      await expect.element(option).toBeVisible()
+      // Download status replaces the size.
+      await expect.element(option.getByText('Downloaded')).toBeVisible()
+      expect(option.element().textContent).not.toMatch(/\d\s?[KMG]B/)
+      // Unknown ids stay selectable under their wire id.
+      await expect
+        .element(screen.getByRole('option', { name: 'ecmwf:not-in-catalogue' }))
+        .toBeVisible()
+    })
+
+    describe('after a failed download', () => {
+      afterEach(() => resetDownloadState())
+
+      it('marks the checkpoint, with the reason on hover', async () => {
+        const id = {
+          artifact_store_id: 'ecmwf',
+          artifact_local_id: 'aifs-single-mse-1.1_w_sdpa',
+        }
+        failNextDownloadPoll(id, 'HTTPError(503)')
+        function StartDownload() {
+          const { mutate } = useDownloadActions()
+          useEffect(() => mutate(id), [mutate])
+          return null
+        }
+        const screen = await renderWithProviders(
+          <>
+            <ControlledFieldRenderer
+              valueType="enumClosed[artifact]('ecmwf:aifs-single-mse-1.1_w_sdpa')"
+              initialValue=""
+            />
+            <StartDownload />
+          </>,
+        )
+
+        await screen.getByRole('combobox').click()
+        const badge = screen.getByRole('option').getByText('Download failed')
+        await expect.element(badge).toBeVisible()
+        await badge.hover()
+        await expect.element(screen.getByText('HTTPError(503)')).toBeVisible()
+      })
+    })
+
+    describe('with two models sharing a display name', () => {
+      const model = (localId: string) => ({
+        composite_id: {
+          artifact_store_id: 'ecmwf',
+          artifact_local_id: localId,
+        },
+        display_name: 'AIFS ENS CRPS 1.0',
+        display_author: 'ECMWF',
+        disk_size_bytes: 1,
+        supported_platforms: [],
+        tags: {},
+        is_available: false,
+        is_locally_compatible: true,
+        local_compatibility_detail: null,
+      })
+      const useTwins = () =>
+        worker.use(
+          http.get(`*${API_ENDPOINTS.artifacts.listModels}`, () =>
+            HttpResponse.json([model('crps_sdpa'), model('crps_flash')]),
+          ),
+        )
+
+      it('keeps the bare name when only one of them is offered', async () => {
+        useTwins()
+        const screen = await renderWithProviders(
+          <ControlledFieldRenderer
+            valueType="enumClosed[artifact]('ecmwf:crps_sdpa')"
+            initialValue="ecmwf:crps_sdpa"
+          />,
+        )
+        await expect
+          .element(
+            screen
+              .getByRole('combobox')
+              .getByText('AIFS ENS CRPS 1.0', { exact: true }),
+          )
+          .toBeVisible()
+      })
+
+      it('tells them apart by id when both are offered', async () => {
+        useTwins()
+        const screen = await renderWithProviders(
+          <ControlledFieldRenderer valueType="artifact" initialValue="" />,
+        )
+        await screen.getByRole('combobox').click()
+        const flash = screen.getByRole('option', { name: /crps_flash/ })
+        await expect
+          .element(flash.getByText('crps_flash', { exact: true }))
+          .toBeVisible()
+        // The one-line trigger carries the id in its label instead.
+        await flash.click()
+        await expect
+          .element(
+            screen
+              .getByRole('combobox')
+              .getByText('AIFS ENS CRPS 1.0 · crps_flash'),
+          )
+          .toBeVisible()
+      })
     })
   })
 })

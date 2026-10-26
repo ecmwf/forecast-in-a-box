@@ -73,7 +73,7 @@ export function MimeFilterChips({
         value={ALL_VALUE}
         variant="outline"
         aria-label={t('outputs.filter.allMimes')}
-        className="gap-1.5 font-mono text-xs"
+        className="gap-1.5 font-mono text-sm"
       >
         <span>{t('outputs.filter.allMimes')}</span>
         <span className="text-muted-foreground tabular-nums">{total}</span>
@@ -87,7 +87,7 @@ export function MimeFilterChips({
             value={mime}
             variant="outline"
             aria-label={labelFn(t)}
-            className="gap-1.5 font-mono text-xs"
+            className="gap-1.5 font-mono text-sm"
           >
             <span>{labelFn(t)}</span>
             <span className="text-muted-foreground tabular-nums">

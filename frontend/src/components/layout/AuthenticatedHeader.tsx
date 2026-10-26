@@ -15,16 +15,16 @@ import { Link, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import {
   Blocks,
+  CalendarClock,
   Cloud,
   FileText,
   Globe,
   HelpCircle,
-  Layout,
+  KeyRound,
   LogOut,
-  Maximize2,
-  Minimize2,
   Monitor,
   Moon,
+  Search,
   Settings,
   Sparkles,
   Sun,
@@ -58,14 +58,18 @@ import {
 import { Logo } from '@/components/common/Logo'
 import { ActivityMonitor } from '@/components/common/ActivityMonitor'
 import { TimeZoneSelect } from '@/components/common/TimeZoneSelect'
+import { EcmwfKeyDialog } from '@/features/visualise/components/sources/EcmwfKeyDialog'
+import { useEcmwfKeyStore } from '@/stores/ecmwfKeyStore'
 import { NavToggle } from '@/components/layout/NavToggle'
 import { StatusDetailsPopover } from '@/components/common/StatusDetailsPopover'
 import { StatusIndicator } from '@/components/common/StatusIndicator'
 import { useAuth } from '@/features/auth/AuthContext'
 import { cn } from '@/lib/utils'
+import { PAGE_WIDTH_CLASS } from '@/lib/page-width'
 import { useUser } from '@/hooks/useUser'
 import { useStatus } from '@/api/hooks/useStatus'
 import { useUiStore } from '@/stores/uiStore'
+import { useCommandStore } from '@/stores/commandStore'
 import { useOnboardingStore } from '@/stores/onboardingStore'
 import { timeZoneOffsetLabel, useAppTimeZone } from '@/lib/datetime'
 
@@ -75,14 +79,13 @@ export function AuthenticatedHeader() {
   const { authType, signOut } = useAuth()
   const theme = useUiStore((state) => state.theme)
   const setTheme = useUiStore((state) => state.setTheme)
-  const layoutMode = useUiStore((state) => state.layoutMode)
-  const setLayoutMode = useUiStore((state) => state.setLayoutMode)
-  const dashboardVariant = useUiStore((state) => state.dashboardVariant)
-  const setDashboardVariant = useUiStore((state) => state.setDashboardVariant)
   const setTimeZone = useUiStore((state) => state.setTimeZone)
   const timeZone = useAppTimeZone()
   const [tzDialogOpen, setTzDialogOpen] = useState(false)
+  const hasEcmwfKey = useEcmwfKeyStore((s) => s.key !== null)
+  const openEcmwfKeyDialog = useEcmwfKeyStore((s) => s.openDialog)
   const { t } = useTranslation('common')
+  const setCommandOpen = useCommandStore((state) => state.setOpen)
   const navigate = useNavigate()
 
   const isAuthenticated = authType === 'authenticated'
@@ -104,8 +107,8 @@ export function AuthenticatedHeader() {
     <header className="sticky top-0 z-30 border-b border-border bg-card">
       <div
         className={cn(
+          PAGE_WIDTH_CLASS,
           'flex h-16 items-center gap-2 px-4 sm:gap-4 sm:px-6 lg:px-8',
-          layoutMode === 'boxed' && 'mx-auto max-w-7xl',
         )}
       >
         {/* Logo — flex-1 balances the actions so the nav stays centred. */}
@@ -142,6 +145,18 @@ export function AuthenticatedHeader() {
 
           {/* Activity Monitor */}
           <ActivityMonitor />
+
+          {/* Command palette (also ⌘K / Ctrl+K) */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="hidden text-muted-foreground sm:inline-flex"
+            aria-label={t('commandPalette.open')}
+            title={t('commandPalette.open')}
+            onClick={() => setCommandOpen(true)}
+          >
+            <Search className="h-5 w-5" />
+          </Button>
 
           {/* Help Button */}
           <Button
@@ -192,23 +207,6 @@ export function AuthenticatedHeader() {
               {/* View Group */}
               <DropdownMenuGroup>
                 <DropdownMenuLabel>{t('userMenu.view')}</DropdownMenuLabel>
-                <DropdownMenuItem
-                  onClick={() =>
-                    setLayoutMode(layoutMode === 'boxed' ? 'fluid' : 'boxed')
-                  }
-                >
-                  {layoutMode === 'boxed' ? (
-                    <>
-                      <Maximize2 className="mr-2 h-4 w-4" />
-                      {t('userMenu.fluidLayout')}
-                    </>
-                  ) : (
-                    <>
-                      <Minimize2 className="mr-2 h-4 w-4" />
-                      {t('userMenu.boxedLayout')}
-                    </>
-                  )}
-                </DropdownMenuItem>
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger>
                     <Sun className="mr-2 h-4 w-4" />
@@ -238,43 +236,21 @@ export function AuthenticatedHeader() {
                     </DropdownMenuSubContent>
                   </DropdownMenuPortal>
                 </DropdownMenuSub>
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger>
-                    <Layout className="mr-2 h-4 w-4" />
-                    {t('userMenu.cardStyle')}
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuPortal>
-                    <DropdownMenuSubContent>
-                      <DropdownMenuRadioGroup
-                        value={dashboardVariant}
-                        onValueChange={(value) =>
-                          setDashboardVariant(
-                            value as 'default' | 'flat' | 'modern' | 'gradient',
-                          )
-                        }
-                      >
-                        <DropdownMenuRadioItem value="default">
-                          {t('userMenu.cardDefault')}
-                        </DropdownMenuRadioItem>
-                        <DropdownMenuRadioItem value="flat">
-                          {t('userMenu.cardFlat')}
-                        </DropdownMenuRadioItem>
-                        <DropdownMenuRadioItem value="modern">
-                          {t('userMenu.cardModern')}
-                        </DropdownMenuRadioItem>
-                        <DropdownMenuRadioItem value="gradient">
-                          {t('userMenu.cardGradient')}
-                        </DropdownMenuRadioItem>
-                      </DropdownMenuRadioGroup>
-                    </DropdownMenuSubContent>
-                  </DropdownMenuPortal>
-                </DropdownMenuSub>
                 <DropdownMenuItem onClick={() => setTzDialogOpen(true)}>
                   <Globe className="mr-2 h-4 w-4" />
                   {t('userMenu.timezone')}
                   <span className="ml-auto text-xs text-muted-foreground">
                     {timeZoneOffsetLabel(timeZone)}
                   </span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={openEcmwfKeyDialog}>
+                  <KeyRound className="mr-2 h-4 w-4" />
+                  {t('userMenu.ecmwfKey')}
+                  {hasEcmwfKey && (
+                    <span className="ml-auto text-xs text-muted-foreground">
+                      {t('userMenu.ecmwfKeySet')}
+                    </span>
+                  )}
                 </DropdownMenuItem>
               </DropdownMenuGroup>
 
@@ -324,6 +300,10 @@ export function AuthenticatedHeader() {
                     <DropdownMenuLabel>
                       {t('userMenu.administration')}
                     </DropdownMenuLabel>
+                    <DropdownMenuItem render={<Link to="/schedules" />}>
+                      <CalendarClock className="mr-2 h-4 w-4" />
+                      {t('userMenu.schedules')}
+                    </DropdownMenuItem>
                     <DropdownMenuItem render={<Link to="/admin/plugins" />}>
                       <Blocks className="mr-2 h-4 w-4" />
                       {t('userMenu.plugins')}
@@ -340,17 +320,21 @@ export function AuthenticatedHeader() {
                 </>
               )}
 
-              {/* Sign Out */}
-              <DropdownMenuSeparator />
-              <DropdownMenuGroup>
-                <DropdownMenuItem
-                  onClick={handleSignOut}
-                  className="text-danger focus:text-danger"
-                >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  {t('userMenu.signOut')}
-                </DropdownMenuItem>
-              </DropdownMenuGroup>
+              {/* Passthrough mode has no session to end. */}
+              {isAuthenticated && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem
+                      onClick={handleSignOut}
+                      className="text-danger focus:text-danger"
+                    >
+                      <LogOut className="mr-2 h-4 w-4" />
+                      {t('userMenu.signOut')}
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -371,6 +355,7 @@ export function AuthenticatedHeader() {
               />
             </DialogContent>
           </Dialog>
+          <EcmwfKeyDialog />
         </div>
       </div>
 

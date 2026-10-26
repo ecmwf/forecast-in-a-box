@@ -37,7 +37,7 @@ describe('ConfirmDeleteArtifactDialog', () => {
         onConfirm={() => {}}
       />,
     )
-    expect(screen.getByText('Delete Model').elements()).toHaveLength(0)
+    expect(screen.getByText('Delete model').elements()).toHaveLength(0)
   })
 
   it('shows title and the model name in the description', async () => {
@@ -48,7 +48,7 @@ describe('ConfirmDeleteArtifactDialog', () => {
         onConfirm={() => {}}
       />,
     )
-    await expect.element(screen.getByText('Delete Model')).toBeVisible()
+    await expect.element(screen.getByText('Delete model')).toBeVisible()
     await expect
       .element(screen.getByText(/Are you sure you want to delete AIFS X\?/))
       .toBeVisible()

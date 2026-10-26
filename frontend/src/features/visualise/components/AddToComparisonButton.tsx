@@ -18,10 +18,10 @@ import { Check, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { entryDisplayName, entryRef } from '../entry-ref'
 import {
-  MAX_COMPARISON_ENTRIES,
   useComparisonStore,
   useIsInComparison,
 } from '../stores/comparisonStore'
+import { useAddedToast, useSlotRefs } from '../hooks/useBasketAdd'
 import { useRemoveComparisonSource } from '../hooks/useRemoveComparisonSource'
 import type { NewComparisonEntry } from '../entry-ref'
 import { useSkinnyWmsAvailable } from '@/api/hooks/useLens'
@@ -45,6 +45,8 @@ export function AddToComparisonButton({
   const ref = entryRef(entry)
   const inBasket = useIsInComparison(ref)
   const addEntry = useComparisonStore((s) => s.addEntry)
+  const slotRefs = useSlotRefs()
+  const addedToast = useAddedToast()
   const removeSource = useRemoveComparisonSource()
   // Output/path sources need a lens — don't invite adds that can only fail.
   const skinnyAvailable = useSkinnyWmsAvailable()
@@ -63,12 +65,7 @@ export function AddToComparisonButton({
       showToast.info(t('toast.removed', { name }))
       return
     }
-    const result = addEntry(entry)
-    if (result === 'added') {
-      showToast.success(t('toast.added', { name }))
-    } else if (result === 'full') {
-      showToast.error(t('toast.full', { max: MAX_COMPARISON_ENTRIES }))
-    }
+    addedToast(name, addEntry(entry, slotRefs))
   }
 
   return (

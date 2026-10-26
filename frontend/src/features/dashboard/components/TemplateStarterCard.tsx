@@ -17,10 +17,16 @@
 import { LayoutTemplate } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
 import { templateConfigureSearch } from '../hooks/useTemplatePresets'
+import { BookmarkToggle } from './BookmarkToggle'
 import { GettingStartedCard } from './GettingStartedCard'
 import type { TemplateEntry } from '../hooks/useTemplatePresets'
 import { useFable } from '@/api/hooks/useFable'
 import { Skeleton } from '@/components/ui/skeleton'
+import { cn } from '@/lib/utils'
+import {
+  templateBookmarkKey,
+  useTemplateBookmarksStore,
+} from '@/stores/templateBookmarksStore'
 
 /** Chips the card has room for. */
 const MAX_TAGS = 3
@@ -65,24 +71,45 @@ export function TemplateStarterCard({
 
   const title = template.displayName ?? ''
 
+  const bookmarkKey = templateBookmarkKey(template)
+  const bookmarked = useTemplateBookmarksStore(
+    (state) => bookmarkKey !== null && state.keys.includes(bookmarkKey),
+  )
+  const toggle = useTemplateBookmarksStore((state) => state.toggle)
+
   return (
-    <GettingStartedCard
-      icon={<LayoutTemplate className="h-5 w-5" />}
-      title={title}
-      ariaLabel={title}
-      testId="starter-template-card"
-      description={template.displayDescription ?? ''}
-      tags={template.tags.slice(0, MAX_TAGS)}
-      iconColor={accent.iconColor}
-      borderColor={accent.borderColor}
-      previewFable={builder}
-      onClick={() =>
-        navigate({
-          to: '/configure',
-          search: templateConfigureSearch(template),
-        })
-      }
-    />
+    // The star sits beside the card, not in it: the card is itself a button.
+    <div className="group/starter relative h-full">
+      <GettingStartedCard
+        icon={<LayoutTemplate className="h-5 w-5" />}
+        title={title}
+        ariaLabel={title}
+        testId="starter-template-card"
+        description={template.displayDescription ?? ''}
+        tags={template.tags.slice(0, MAX_TAGS)}
+        iconColor={accent.iconColor}
+        borderColor={accent.borderColor}
+        previewFable={builder}
+        onClick={() =>
+          navigate({
+            to: '/configure',
+            search: templateConfigureSearch(template),
+          })
+        }
+      />
+      {bookmarkKey && (
+        <BookmarkToggle
+          bookmarked={bookmarked}
+          onToggle={() => toggle(bookmarkKey)}
+          subtle
+          className={cn(
+            'absolute top-4 right-4',
+            !bookmarked &&
+              'opacity-0 group-hover/starter:opacity-100 focus-visible:opacity-100',
+          )}
+        />
+      )}
+    </div>
   )
 }
 

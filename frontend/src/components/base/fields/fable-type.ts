@@ -21,6 +21,13 @@
  * `date-iso8601`) normalize to canonical kinds. Serialization is always
  * canonical. `optional[T]` is NOT part of this grammar anymore — the
  * legacy widget projection in value-type-parser.ts still peels it.
+ *
+ * Traits (fiab-core's `{trait1, trait2(arg), ...}` suffix, eg
+ * `int{positive}` or `float{nonNegative,divisibleBy(3)}`) are recognized
+ * and discarded during parsing so typed values carrying them still parse;
+ * they are not represented in `FableType` nor re-emitted by
+ * `serializeValueType`. *TODO* surface traits in the UI (e.g. richer
+ * field validation/hints) instead of ignoring them.
  */
 
 export type FableType =
@@ -29,6 +36,8 @@ export type FableType =
   | { kind: 'float' }
   | { kind: 'date' }
   | { kind: 'datetime' }
+  | { kind: 'timedelta' }
+  | { kind: 'none' }
   | { kind: 'geodomain' }
   | { kind: 'geodomainSingle' }
   | { kind: 'bboxWSEN' }
@@ -51,6 +60,9 @@ export const intType: FableType = { kind: 'int' }
 export const floatType: FableType = { kind: 'float' }
 export const dateType: FableType = { kind: 'date' }
 export const datetimeType: FableType = { kind: 'datetime' }
+export const timedeltaType: FableType = { kind: 'timedelta' }
+/** Only valid as a union member: `union[str,none]` admits an explicit null. */
+export const noneType: FableType = { kind: 'none' }
 export const geodomainType: FableType = { kind: 'geodomain' }
 export const artifactType: FableType = { kind: 'artifact' }
 export const paramType: FableType = { kind: 'param' }
@@ -96,9 +108,13 @@ export function unionOf(types: ReadonlyArray<FableType>): FableType {
 
 // -------- Serialization (mirrors FableType.serialize) --------
 
-/** Mirrors `_serialize_enum_item`: date/datetime items bare ISO, str-ish quoted. */
+/** Mirrors `_serialize_enum_item`: date/datetime/timedelta items bare ISO, str-ish quoted. */
 function serializeEnumItem(item: string | number, subtype: FableType): string {
-  if (subtype.kind === 'date' || subtype.kind === 'datetime') {
+  if (
+    subtype.kind === 'date' ||
+    subtype.kind === 'datetime' ||
+    subtype.kind === 'timedelta'
+  ) {
     return String(item)
   }
   return typeof item === 'string' ? `'${item}'` : String(item)
@@ -116,6 +132,10 @@ export function serializeValueType(t: FableType): string {
       return 'date'
     case 'datetime':
       return 'datetime'
+    case 'timedelta':
+      return 'timedelta'
+    case 'none':
+      return 'none'
     case 'geodomain':
       return 'geodomain'
     case 'geodomainSingle':
@@ -147,6 +167,7 @@ const ATOMS: ReadonlyArray<[keyword: string, kind: FableType]> = [
   ['geodomainsingle', { kind: 'geodomainSingle' }],
   ['date-iso8601', dateType],
   ['geodomain', geodomainType],
+  ['timedelta', timedeltaType],
   ['datetime', datetimeType],
   ['bboxwsen', { kind: 'bboxWSEN' }],
   ['artifact', artifactType],
@@ -155,6 +176,7 @@ const ATOMS: ReadonlyArray<[keyword: string, kind: FableType]> = [
   ['number', floatType],
   ['param', paramType],
   ['float', floatType],
+  ['none', noneType],
   ['date', dateType],
   ['int', intType],
   ['str', stringType],
@@ -212,8 +234,28 @@ function parseEnumItems(
     )
 }
 
-/** Parse a type from the start of `s`; returns the type and the unparsed tail. */
+/** Parse a type from the start of `s`; returns the type and the unparsed tail.
+ *
+ * Wraps `parsePrefixBare` to also consume (and discard) an optional trailing
+ * `{trait1, trait2(arg), ...}` suffix, mirroring the backend's `_parse`/`_parse_bare`
+ * split. Applied at every recursion level so nested occurrences (e.g.
+ * `list[int{positive}]`) parse too. */
 function parsePrefix(s: string): [FableType, string] | null {
+  const bare = parsePrefixBare(s)
+  if (!bare) return null
+  const [type, remainder] = bare
+  const afterBare = remainder.replace(/^\s+/, '')
+  if (afterBare.startsWith('{')) {
+    const split = splitDelimited(afterBare, '{', '}')
+    if (!split) return null
+    // *TODO* parse split[0] into trait descriptors and attach them to `type`
+    // instead of discarding them.
+    return [type, split[1]]
+  }
+  return [type, remainder]
+}
+
+function parsePrefixBare(s: string): [FableType, string] | null {
   const input = s.replace(/^\s+/, '')
   const lower = input.toLowerCase()
 

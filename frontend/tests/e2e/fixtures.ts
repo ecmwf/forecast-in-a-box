@@ -15,7 +15,8 @@
  * @playwright/test instead to exercise these surfaces themselves.
  */
 
-import { test as base } from '@playwright/test'
+import { test as base, expect } from '@playwright/test'
+import type { Page } from '@playwright/test'
 
 export const test = base.extend({
   page: async ({ page }, use) => {
@@ -45,3 +46,15 @@ export const test = base.extend({
 })
 
 export { expect } from '@playwright/test'
+
+/**
+ * Skip a running tour. The coachmark re-anchors as the page settles, so a
+ * single click can land where the button was; retry until the card is gone.
+ */
+export async function skipTour(page: Page, title: string): Promise<void> {
+  const card = page.getByRole('dialog', { name: title })
+  await expect(async () => {
+    await card.getByRole('button', { name: 'Skip tour', exact: true }).click()
+    await expect(card).toBeHidden({ timeout: 1000 })
+  }).toPass({ timeout: 10000 })
+}

@@ -3,6 +3,7 @@
   * when adding new functionality, try to add both unit tests and integration tests
   * there are additionally `tests/largeE2E` -- you are not expected to run or modify these during regular work, those are for releases
 * project is managed by `uv` -- utilize that for running any python-related subcommands like `uv run pytest` or `uv run ty`
+  * keep the pyproject.toml in sync with uv.lock -- when you add a new dependency or update a constraint in pyproject, run the corresponding `uv lock` command
 * utilize `just` for command running -- `just val` is the "all typechecking and testing". Always run this prior to a commit, as well as utilizing pre-commit with prek
   * during development, utilize granular validation -- first, run type checking, then unit tests for the code you have created or changed, then all integration tests
   * don't change formatting on a whim. When you notice a bug or breach of guidelines that is not related or affecting your current task, ignore it.
@@ -28,6 +29,7 @@
 * all imports belong to top level of the file, dont import inside function definitions unless necessiated by runtime (and in that case, always add explanatory comment at the site)
 * dont alias in imports unless there is a name collision, or unless its a standard shortcut: `datetime as dt`, `multiprocessing as mp`, `numpy as np`, `xarray as xr`, `earthkit.data as ekd`
 * never use python keywords and builtins as variable names -- for example, don't use `id` variable, prefer `id_<something>` or `id_`
+* prefer existing code in `utility` submodules over writing it from scratch -- for example, don't use directly `requests` or `httpx.Client`, instead use `utility.http_pools`; don't manually convert `datetime` objects to string with `strftime`, instead use `utility.time.value_dt2str`, etc.
 
 # High Level Code Organization and Placement
 When adding new code, make sure you place it in the right submodule:
@@ -69,3 +71,6 @@ There is currently async loop which serves all the requests to the FastAPI app, 
   * for one-to-many, loosely coupled reactions (crossing or reversing the usual dependency hierarchy), use the process-local event dispatcher (`utility/dispatcher.py`) instead of a direct call or a new thread -- producers publish an immutable `Event` and never import consumers; the entrypoint discovers and wires handlers via each domain's optional `dispatchers.py`.
   * for a linear workflow where the next step just needs a different pool/lock, prefer `execution_manager.submit_after` (a non-blocking continuation) over the event bus -- the event bus is not a substitute for an ordinary same-direction function call.
 * sometimes a request to the FastAPI app triggers a possibly long operation, which we offload to a named `ExecutionManager` pool -- for example, submitting a Run domain entity. It is imperative that all such operations are fully wrapped in a try-catch block, and any error manifests by updating the database state with the respective error message.
+* HTTP clients must not be created ad hoc. Use the central registry in `utility/http_pools.py`, which holds one long-lived sync and one async `httpx` client per `HttpProfile` (eg, `Default`, `Download`, `Proxy`). The registry is started in the `http_pools` initializer step and closed at shutdown, before the execution pools are joined, so in-flight sync requests fail and are thereby cancelled.
+  * `get_sync(profile)` returns an `httpx.Client` usable from any thread, including pool workers. `get_async(profile)` returns an `httpx.AsyncClient` usable only on the event loop thread. Never block the loop with a sync client.
+  * exceptions: the bootstrap checks (`entrypoint/bootstrap/checks.py`) run outside the backend lifecycle and use short lived local clients, and `httpx_oauth` in `domain/auth/oidc.py` creates and closes its own clients internally.

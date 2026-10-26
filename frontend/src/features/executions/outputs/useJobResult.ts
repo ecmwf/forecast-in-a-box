@@ -85,6 +85,21 @@ export function fetchJobResultBlob(
   })
 }
 
+/** Warm the shared cache for an output about to be shown; never throws. */
+export function prefetchJobResultBlob(
+  queryClient: QueryClient,
+  jobId: string,
+  taskId: string,
+): Promise<void> {
+  return queryClient.prefetchQuery<JobResult>({
+    queryKey: jobResultKeys.blob(jobId, taskId),
+    queryFn: () => getJobResult(jobId, taskId),
+    staleTime: BLOB_STALE_TIME,
+    gcTime: BLOB_GC_TIME,
+    retry: BLOB_RETRY,
+  })
+}
+
 /**
  * Imperatively resolve the leading `byteCount` bytes of an output for MIME
  * sniffing, deduplicated through the shared cache. Avoids downloading the

@@ -66,6 +66,8 @@ def test_initialize_stores_publishes_only_after_successful_fetch(monkeypatch: py
     from forecastbox.domain.plugin import store as store_module
 
     monkeypatch.setattr(store_module.StoresManager, "stores", store_module.pmap())
+    client = MagicMock(spec=httpx.Client)
+    monkeypatch.setattr(store_module, "get_sync", lambda profile: client)
 
     def _boom(client: httpx.Client, plugin_store_config: object) -> PluginStore:
         raise RuntimeError("network exploded")
@@ -75,7 +77,7 @@ def test_initialize_stores_publishes_only_after_successful_fetch(monkeypatch: py
     with pytest.raises(RuntimeError):
         store_module.initialize_stores({PluginStoreId("someStore"): MagicMock()})
 
-    assert dict(StoresManager.stores) == {}
+    assert StoresManager.stores is not None and dict(StoresManager.stores) == {}
 
 
 def test_get_plugins_detail_is_lock_free_over_published_map(monkeypatch: pytest.MonkeyPatch) -> None:

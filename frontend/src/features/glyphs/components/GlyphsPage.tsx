@@ -18,7 +18,8 @@ import { useState } from 'react'
 import { Braces, Plus, Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { GlobalGlyphItem } from '@/api/types/fable.types'
-import { useListGlobalGlyphs } from '@/api/hooks/useFable'
+import { useDeleteGlobalGlyph, useListGlobalGlyphs } from '@/api/hooks/useFable'
+import { ConfirmDeleteGlyphDialog } from '@/features/glyphs/components/ConfirmDeleteGlyphDialog'
 import { GlyphFormDialog } from '@/features/glyphs/components/GlyphFormDialog'
 import { GlyphListItem } from '@/features/glyphs/components/GlyphListItem'
 import { EmptyState } from '@/components/common/EmptyState'
@@ -28,21 +29,21 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { PageHeader } from '@/components/common/PageHeader'
 import { Pagination } from '@/components/common/Pagination'
 import { H2 } from '@/components/base/typography'
+import { showToast } from '@/lib/toast'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { useUiStore } from '@/stores/uiStore'
 
 const PAGE_SIZE = 10
 
 export function GlyphsPage() {
   const { t } = useTranslation('glyphs')
-  const dashboardVariant = useUiStore((state) => state.dashboardVariant)
-  const panelShadow = useUiStore((state) => state.panelShadow)
   const [page, setPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editGlyph, setEditGlyph] = useState<GlobalGlyphItem | undefined>()
+  const [deleteTarget, setDeleteTarget] = useState<GlobalGlyphItem | null>(null)
+  const deleteGlyph = useDeleteGlobalGlyph()
 
   const { data, isLoading, isError, error } = useListGlobalGlyphs(
     page,
@@ -57,6 +58,19 @@ export function GlyphsPage() {
   function handleEdit(glyph: GlobalGlyphItem) {
     setEditGlyph(glyph)
     setDialogOpen(true)
+  }
+
+  async function handleDelete(glyph: GlobalGlyphItem) {
+    try {
+      await deleteGlyph.mutateAsync(glyph.global_glyph_id)
+      showToast.success(t('actions.deleteSuccess'), glyph.key)
+    } catch (err) {
+      showToast.error(
+        t('actions.deleteFailed'),
+        err instanceof Error ? err.message : undefined,
+      )
+    }
+    setDeleteTarget(null)
   }
 
   if (isLoading) {
@@ -113,11 +127,7 @@ export function GlyphsPage() {
         }
       />
 
-      <Card
-        className="overflow-hidden"
-        variant={dashboardVariant}
-        shadow={panelShadow}
-      >
+      <Card className="overflow-hidden">
         <div className="flex flex-col items-start justify-between gap-4 border-b border-border p-6 sm:flex-row sm:items-center">
           <H2 className="text-xl font-semibold">{t('page.title')}</H2>
 
@@ -144,6 +154,7 @@ export function GlyphsPage() {
                 key={`${glyph.created_by}:${glyph.key}`}
                 glyph={glyph}
                 onEdit={handleEdit}
+                onDelete={setDeleteTarget}
               />
             ))
           ) : (
@@ -166,6 +177,12 @@ export function GlyphsPage() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         editGlyph={editGlyph}
+      />
+      <ConfirmDeleteGlyphDialog
+        target={deleteTarget}
+        busy={deleteGlyph.isPending}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={(glyph) => void handleDelete(glyph)}
       />
     </ListPageContainer>
   )

@@ -108,7 +108,7 @@ describe('Fable Builder workbench', () => {
     seedWorkbench()
 
     const screen = await renderWithRouter(<FableBuilderPage />)
-    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
 
     await expect
       .poll(() => Object.keys(useFableBuilderStore.getState().fable.blocks))
@@ -123,9 +123,9 @@ describe('Fable Builder workbench', () => {
     seedWorkbench()
 
     const screen = await renderWithRouter(<FableBuilderPage />)
-    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
 
-    await screen.getByRole('button', { name: 'New configuration' }).click()
+    await screen.getByRole('button', { name: 'New workflow' }).click()
 
     expect(mockNavigate).toHaveBeenCalledWith({
       to: '/configure',
@@ -137,7 +137,7 @@ describe('Fable Builder workbench', () => {
     seedLiveDirtyBench()
 
     const screen = await renderWithRouter(<FableBuilderPage />)
-    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
 
     expect(Object.keys(useFableBuilderStore.getState().fable.blocks)).toContain(
       'draft_block',
@@ -146,7 +146,7 @@ describe('Fable Builder workbench', () => {
 
   it('fresh with a clean bench blanks the canvas without a banner', async () => {
     const screen = await renderWithRouter(<FreshToggleHarness />)
-    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
 
     await screen.getByRole('button', { name: 'go fresh' }).click()
 
@@ -160,7 +160,7 @@ describe('Fable Builder workbench', () => {
     seedWorkbench()
 
     const screen = await renderWithRouter(<FableBuilderPage fresh />)
-    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
 
     await expect
       .poll(() => Object.keys(useFableBuilderStore.getState().fable.blocks))
@@ -175,7 +175,7 @@ describe('Fable Builder workbench', () => {
 
   it('mid-session fresh shelves live dirty work and blanks', async () => {
     const screen = await renderWithRouter(<FreshToggleHarness />)
-    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
 
     seedLiveDirtyBench()
     await screen.getByRole('button', { name: 'go fresh' }).click()
@@ -249,7 +249,7 @@ describe('Fable Builder workbench', () => {
     const screen = await renderWithRouter(
       <FableBuilderPage fableId="fable-001" templateMode />,
     )
-    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
 
     // The fork survives — no re-fork, nothing shelved.
     expect(Object.keys(useFableBuilderStore.getState().fable.blocks)).toContain(
@@ -262,7 +262,7 @@ describe('Fable Builder workbench', () => {
     const screen = await renderWithRouter(
       <FableBuilderPage fableId="fable-001" templateMode />,
     )
-    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
 
     await expect
       .poll(() => Object.keys(useFableBuilderStore.getState().fable.blocks))
@@ -330,7 +330,7 @@ describe('Fable Builder workbench', () => {
       .toBeVisible()
 
     await screen
-      .getByRole('button', { name: 'Discard set-aside configuration' })
+      .getByRole('button', { name: 'Discard set-aside workflow' })
       .click()
 
     expect(shelfName()).toBeUndefined()

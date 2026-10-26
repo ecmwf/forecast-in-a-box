@@ -14,6 +14,7 @@ Runs in its own thread.
 import datetime as dt
 import logging
 import threading
+from concurrent.futures import Future
 
 from forecastbox.domain.experiment.scheduling import db
 from forecastbox.domain.experiment.scheduling.job_utils import experiment2runnable
@@ -22,7 +23,7 @@ from forecastbox.domain.run.service import submit_run_sync
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.concurrency.synchronization import timed_acquire
 from forecastbox.utility.config import config
-from forecastbox.utility.time import current_time
+from forecastbox.utility.time import current_time, get_sleepable_difference
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +55,7 @@ class SchedulerThread(threading.Thread):
         self.liveness_signal.set()
         return self.liveness_timestamp
 
-    def _try_schedule(self) -> int:
+    def _try_schedule(self) -> float:
         """Check and submit due ExperimentDefinition scheduled runs."""
         now = self.mark_alive()
         logger.debug(f"Scheduler inquiry at {now}")
@@ -113,13 +114,13 @@ class SchedulerThread(threading.Thread):
 
         next_schedulable_at = db.next_schedulable_experiment()
 
-        sleep_duration = sleep_duration_min
         if next_schedulable_at:
-            time_to_next_schedulable_at = int((next_schedulable_at - current_time("scheduling")).total_seconds())
-            if time_to_next_schedulable_at > 0:
-                sleep_duration = min(time_to_next_schedulable_at, sleep_duration_min)
-            else:
-                sleep_duration = 0
+            sleep_duration = max(
+                min(sleep_duration_min, get_sleepable_difference(current_time("scheduling"), next_schedulable_at)),
+                0,
+            )
+        else:
+            sleep_duration = sleep_duration_min
 
         return sleep_duration
 
@@ -154,7 +155,25 @@ class Globals:
     scheduler: SchedulerThread | None = None
 
 
-def start_scheduler() -> None:
+def start_scheduler(start_after: Future[None] | None = None) -> None:
+    """Start the scheduler thread.
+
+    ``start_after``, if given, gates the actual start on some prerequisite (eg. plugins
+    having finished loading): if it is not yet resolved, this call blocks until it is;
+    if it resolved with a failure (or was cancelled), the start is aborted -- logged as
+    critical, but not raised -- since a failed prerequisite elsewhere should not itself
+    take down the scheduler startup path.
+
+    This is a stand-in until the scheduler is migrated onto `ExecutionManager` like the
+    plugin machinery already is; called with no argument (eg. from the scheduler restart
+    route), it starts immediately.
+    """
+    if start_after is not None:
+        try:
+            start_after.result()
+        except BaseException as error:
+            logger.critical(f"scheduler start aborted, prerequisite failed with {repr(error)}")
+            return
     with timed_acquire(scheduler_lock, timeout_acquire_lifecycle) as acquired:
         if not acquired:
             raise ValueError("Could not acquire scheduler_lock within timeout during start")

@@ -23,6 +23,7 @@ import {
 import { artifactKeys, wakeDownloadPolling } from '@/api/hooks/useArtifacts'
 import { fableKeys } from '@/api/hooks/useFable'
 import { pluginKeys } from '@/api/hooks/usePlugins'
+import { statusQueryKey } from '@/api/hooks/useStatus'
 import { queryClient } from '@/lib/queryClient'
 import { showToast } from '@/lib/toast'
 
@@ -141,6 +142,18 @@ describe('dispatchClientNotification', () => {
   ])('also invalidates %s on a plugin event', (_label, queryKey) => {
     dispatchClientNotification(pluginNotification('pluginInstalled'))
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKey() })
+  })
+
+  it('refreshes the system status when a gateway stop finishes', () => {
+    dispatchClientNotification(
+      notification({
+        sourceDomainName: 'gateway',
+        sourceDomainEvent: 'gatewayStopped',
+        context: {},
+        refreshRoutes: ['/api/v1/gateway/status'],
+      }),
+    )
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: statusQueryKey })
   })
 
   it('ignores unmapped refresh routes without invalidating', () => {

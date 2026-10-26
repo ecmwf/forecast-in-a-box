@@ -10,7 +10,7 @@
 
 /**
  * ForecastJournal Integration Tests — the dashboard journal widget against the
- * /run/list API: rendering, status filtering, bookmarking, "View all".
+ * /run/list API: rendering, bookmarking, the hand-off to the runs page.
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -47,38 +47,24 @@ describe('ForecastJournal Integration', () => {
   })
 
   describe('rendering', () => {
-    it('renders the journal title', async () => {
+    it('renders the recent-runs title', async () => {
       const screen = await renderJournal()
-      await expect.element(screen.getByText('Forecast Journal')).toBeVisible()
-    })
-
-    it('renders the search input', async () => {
-      const screen = await renderJournal()
-      await expect
-        .element(
-          screen.getByPlaceholder('Search or filter, e.g. tag:production'),
-        )
-        .toBeVisible()
-    })
-
-    it('renders the status filter buttons', async () => {
-      const screen = await renderJournal()
-      for (const name of ['All', 'Running', 'Completed', 'Failed']) {
-        await expect
-          .element(screen.getByRole('button', { name, exact: true }))
-          .toBeVisible()
-      }
+      await expect.element(screen.getByText('Recent runs')).toBeVisible()
     })
 
     it('renders runs from the API', async () => {
       const screen = await renderJournal()
-      await expect.element(screen.getByText('#job-running-...')).toBeVisible()
-      await expect.element(screen.getByText('#job-complete...')).toBeVisible()
+      await expect
+        .element(screen.getByTestId('run-row-job-running-002'))
+        .toBeVisible()
+      await expect
+        .element(screen.getByTestId('run-row-job-completed-001'))
+        .toBeVisible()
     })
 
-    it('shows a "View all" link to the executions page', async () => {
+    it('hands off to the runs page', async () => {
       const screen = await renderJournal()
-      await expect.element(screen.getByText('View all')).toBeVisible()
+      await expect.element(screen.getByText('View all runs')).toBeVisible()
     })
   })
 
@@ -90,59 +76,56 @@ describe('ForecastJournal Integration', () => {
 
     it('links completed runs to their results', async () => {
       const screen = await renderJournal()
-      await expect.element(screen.getByText('View Results')).toBeVisible()
+      await expect.element(screen.getByText('View results')).toBeVisible()
     })
 
     it('links failed runs to their error', async () => {
       const screen = await renderJournal()
-      await expect.element(screen.getByText('View Error')).toBeVisible()
+      await expect.element(screen.getByText('View error')).toBeVisible()
     })
   })
 
-  describe('filtering', () => {
-    it('filters to running runs only', async () => {
-      const screen = await renderJournal()
-      await screen.getByRole('button', { name: 'Running', exact: true }).click()
-
-      await expect.element(screen.getByText('#job-running-...')).toBeVisible()
-      expect(screen.getByText('#job-complete...').query()).toBeNull()
-    })
-
-    it('filters to completed runs only', async () => {
+  describe('row actions (ecmwf#770)', () => {
+    async function openRowMenu(runId: string) {
       const screen = await renderJournal()
       await screen
-        .getByRole('button', { name: 'Completed', exact: true })
+        .getByTestId(`run-row-${runId}`)
+        .getByRole('button', { name: 'More options' })
         .click()
+      return screen
+    }
 
-      await expect.element(screen.getByText('#job-complete...')).toBeVisible()
-      expect(screen.getByText('#job-running-...').query()).toBeNull()
-    })
-
-    it('shows the empty state when no runs are bookmarked', async () => {
-      const screen = await renderJournal()
-      await screen
-        .getByRole('button', { name: 'Bookmarked', exact: true })
-        .click()
-
+    it('offers Stop, not Delete, for an active run', async () => {
+      const screen = await openRowMenu('job-running-002')
       await expect
-        .element(screen.getByText('No forecasts found matching your criteria.'))
+        .element(screen.getByRole('menuitem', { name: 'Stop run' }))
         .toBeVisible()
+      expect(
+        screen.getByRole('menuitem', { name: 'Delete' }).elements(),
+      ).toHaveLength(0)
+    })
+
+    it('offers Delete, not Stop, for a finished run', async () => {
+      const screen = await openRowMenu('job-completed-001')
+      await expect
+        .element(screen.getByRole('menuitem', { name: 'Delete' }))
+        .toBeVisible()
+      expect(
+        screen.getByRole('menuitem', { name: 'Stop run' }).elements(),
+      ).toHaveLength(0)
     })
   })
 
   describe('bookmarking', () => {
-    it('bookmarks a run so it appears under the Bookmarked filter', async () => {
+    it('toggles a bookmark from the row', async () => {
       const screen = await renderJournal()
-      await expect.element(screen.getByText('#job-running-...')).toBeVisible()
-
+      await expect
+        .element(screen.getByTestId('run-row-job-running-002'))
+        .toBeVisible()
       await screen.getByLabelText('Bookmark').first().click()
-      await screen
-        .getByRole('button', { name: 'Bookmarked', exact: true })
-        .click()
-
-      expect(
-        screen.getByText('No forecasts found matching your criteria.').query(),
-      ).toBeNull()
+      await expect
+        .element(screen.getByLabelText('Remove bookmark').first())
+        .toBeVisible()
     })
   })
 })

@@ -12,6 +12,7 @@ import { HttpResponse, delay, http } from 'msw'
 import {
   calculateExpansion,
   mockCatalogue,
+  mockParamDisplays,
   mockSavedFables,
 } from '../data/fable.data'
 import { consumeCatalogueUnavailable } from './plugins.handlers'
@@ -19,6 +20,7 @@ import type {
   BlueprintUpdateRequest,
   FableBuilderV1,
   FableUpsertRequest,
+  ResolvableValue,
 } from '@/api/types/fable.types'
 import {
   FableBuilderV1Schema,
@@ -26,6 +28,7 @@ import {
   serializeFable,
 } from '@/api/types/fable.types'
 import { API_ENDPOINTS } from '@/api/endpoints'
+import { parseFableType } from '@/components/base/fields/fable-type'
 
 interface SavedFableEntry {
   fable: FableBuilderV1
@@ -557,6 +560,27 @@ export const fableHandlers = [
     }
     mockGlobalGlyphs.splice(index, 1)
     return new HttpResponse(null, { status: 204 })
+  }),
+
+  http.post(API_ENDPOINTS.fable.resolveDisplay, async ({ request }) => {
+    await delay(150)
+    const { elements } = (await request.json()) as {
+      elements: Array<ResolvableValue>
+    }
+    const invalid = elements.find((e) => parseFableType(e.typeName) === null)
+    if (invalid) {
+      return HttpResponse.json(
+        { detail: `Invalid type expression '${invalid.typeName}'` },
+        { status: 404 },
+      )
+    }
+    return HttpResponse.json({
+      elements: elements.map((e) => ({
+        ...e,
+        display:
+          e.typeName === 'param' ? (mockParamDisplays[e.value] ?? null) : null,
+      })),
+    })
   }),
 
   http.get(API_ENDPOINTS.fable.get, async ({ request }) => {

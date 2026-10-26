@@ -14,9 +14,12 @@
  * Per source kind:
  *  - `wms`    → immediately running (the capabilities fetch is the health
  *               check downstream)
- *  - `output` → resolve the GRIB dir from the marker payload, then ↓
+ *  - `output` → wait for the sink to finish, resolve the GRIB dir from
+ *               the marker payload, then ↓
  *  - `path`   → match an already-running lens by `local_path`, else
  *               auto-start one, then poll until running
+ *
+ * Output entries never reuse a lens started for another run attempt.
  *
  * Idempotency: two panels resolving to the same path must start exactly
  * ONE lens. A module-level in-flight map dedupes concurrent starts across
@@ -27,8 +30,15 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  lensFitsOwner,
+  lensOwner,
+  lensOwnerKey,
+  setLensOwner,
+} from '../lens-owners'
 import type { ComparisonEntry } from '../entry-ref'
 import type { LensInstanceDetailResponse } from '@/api/types/lens.types'
+import { useJobStatus } from '@/api/hooks/useJobs'
 import {
   useLensList,
   useLensStatus,
@@ -36,7 +46,13 @@ import {
 } from '@/api/hooks/useLens'
 import { buildLensBaseUrl, stopLens } from '@/api/endpoints/lens'
 import { ApiClientError } from '@/api/client'
-import { useStoredDirPath } from '@/features/executions/outputs/stored-dir'
+import {
+  gribSinkProgress,
+  isSinkComplete,
+  useStoredDirPath,
+} from '@/features/executions/outputs/stored-dir'
+import { withEcmwfKey } from '@/features/visualise/ecmwf-key'
+import { useEcmwfKey } from '@/stores/ecmwfKeyStore'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('useComparisonSource')
@@ -44,6 +60,8 @@ const log = createLogger('useComparisonSource')
 export type ComparisonSourceState =
   | { phase: 'idle' }
   | { phase: 'resolvingDir' }
+  /** The run is still writing this sink's files. */
+  | { phase: 'waitingForRun'; written: number; total: number }
   | { phase: 'dirError'; error: string; retry: () => void }
   | { phase: 'starting' }
   | {
@@ -57,52 +75,79 @@ export type ComparisonSourceState =
   /** No lens and auto-start suppressed (user stopped the servers). */
   | { phase: 'stopped'; start: () => void }
 
-/** In-flight lens starts keyed by path — shared across hook instances. */
-const pendingStartByPath = new Map<string, Promise<string>>()
-const startedIdByPath = new Map<string, string>()
+/** A lens start for one folder; `owner` is null for path entries. */
+interface LensStart {
+  path: string
+  owner: string | null
+  promise: Promise<string>
+  id?: string
+}
+
+/** Lens starts by folder and owner, shared across hook instances. */
+const lensStarts = new Map<string, LensStart>()
+/** Revivals per lens key for a lens that dies after serving; then ask the user. */
+const MAX_AUTO_RESTARTS = 2
+const autoRestartsByKey = new Map<string, number>()
+
+function lensStartKey(path: string, owner: string | null): string {
+  return `${owner ?? ''}\n${path}`
+}
 
 function ensureLensStarted(
   path: string,
+  owner: string | null,
   start: (p: string) => Promise<string>,
 ): Promise<string> {
-  const existing = pendingStartByPath.get(path)
-  if (existing) return existing
+  // A sibling's start for this folder fits unless it belongs to another run.
+  for (const existing of lensStarts.values()) {
+    if (
+      existing.path === path &&
+      (existing.owner === null || owner === null || existing.owner === owner)
+    ) {
+      return existing.promise
+    }
+  }
   // Resolved promises stay cached: a sibling panel resolving its dir just
   // after the start completes must adopt this lens, not start a second one
   // (the 5 s lens-list poll lags). Failures and vanished lenses evict.
-  const promise = start(path).then(
-    (id) => {
-      startedIdByPath.set(path, id)
-      return id
-    },
-    (err: unknown) => {
-      evictLensStart(path)
-      throw err
-    },
-  )
-  pendingStartByPath.set(path, promise)
-  return promise
+  const key = lensStartKey(path, owner)
+  const lensStart: LensStart = {
+    path,
+    owner,
+    promise: start(path).then(
+      (id) => {
+        lensStart.id = id
+        if (owner !== null) setLensOwner(id, owner)
+        return id
+      },
+      (err: unknown) => {
+        lensStarts.delete(key)
+        throw err
+      },
+    ),
+  }
+  lensStarts.set(key, lensStart)
+  return lensStart.promise
 }
 
-/** With `goneLensId`, evict only the start that actually died — a
- *  sibling's fresh start (pending or resolved to a new id) must survive. */
-function evictLensStart(path: string, goneLensId?: string): void {
-  if (goneLensId !== undefined && startedIdByPath.get(path) !== goneLensId) {
-    return
+/** Evict only the start that died; a sibling's fresh start survives. */
+function evictLensStart(goneLensId: string): void {
+  for (const [key, lensStart] of lensStarts) {
+    if (lensStart.id === goneLensId) lensStarts.delete(key)
   }
-  pendingStartByPath.delete(path)
-  startedIdByPath.delete(path)
 }
 
 function pickMatchedLens(
   lenses: ReadonlyArray<LensInstanceDetailResponse> | undefined,
   localPath: string | null,
+  owner: string | null,
 ): LensInstanceDetailResponse | undefined {
   if (!lenses || !localPath) return undefined
   const candidates = lenses.filter(
     (l) =>
       l.lens_params.local_path === localPath &&
-      (l.status === 'running' || l.status === 'starting'),
+      (l.status === 'running' || l.status === 'starting') &&
+      lensFitsOwner(l.lens_instance_id, owner),
   )
   return candidates.find((l) => l.status === 'running') ?? candidates[0]
 }
@@ -113,6 +158,20 @@ export function useComparisonSource(
 ): ComparisonSourceState {
   const { autoStart } = options
   const isOutput = entry?.kind === 'output'
+  const ecmwfKey = useEcmwfKey()
+
+  // 0) Output entries wait until their sink has written every file.
+  const runQuery = useJobStatus(isOutput ? entry.jobId : undefined)
+  const run = runQuery.data
+  const progress =
+    isOutput && run ? gribSinkProgress(run.outputs, entry.blockId) : null
+  // An unreadable run doesn't hold the entry back; the dir lookup reports it.
+  const sinkReady =
+    !isOutput ||
+    runQuery.isError ||
+    (!!run && !!progress && isSinkComplete(progress, run.status))
+  const owner =
+    isOutput && run ? lensOwnerKey(entry.jobId, run.attempt_count) : null
 
   // 1) Resolve the directory (output entries only; a path IS the dir).
   const dirQuery = useStoredDirPath(
@@ -126,37 +185,38 @@ export function useComparisonSource(
       : isOutput
         ? (dirQuery.data ?? null)
         : null
+  const lensKey = localPath ? lensStartKey(localPath, owner) : null
 
   // 2) Match a lens that already serves this path (page-wide 5 s poll).
   const lensListQuery = useLensList()
-  const matched = pickMatchedLens(lensListQuery.data, localPath)
+  const matched = pickMatchedLens(lensListQuery.data, localPath, owner)
 
-  // 3) Auto-start when nothing matches. Start state is path-scoped so a
+  // 3) Auto-start when nothing matches. Start state is key-scoped so a
   // slot swap's stale outcome can't fail or shadow the new entry's source.
   const startMutation = useStartSkinnyWms()
-  const [started, setStarted] = useState<{ path: string; id: string } | null>(
+  const [started, setStarted] = useState<{ key: string; id: string } | null>(
     null,
   )
   const [startFailure, setStartFailure] = useState<{
-    path: string
+    key: string
     error: string
   } | null>(null)
-  const startedLensId = started?.path === localPath ? started.id : null
-  const startError =
-    startFailure?.path === localPath ? startFailure.error : null
-  const attemptedPathsRef = useRef<Set<string>>(new Set())
+  const startedLensId = started?.key === lensKey ? started.id : null
+  const startError = startFailure?.key === lensKey ? startFailure.error : null
+  const attemptedKeysRef = useRef<Set<string>>(new Set())
 
   const startForPath = useCallback(
-    (path: string) => {
-      attemptedPathsRef.current.add(path)
+    (path: string, lensOwnerId: string | null) => {
+      const key = lensStartKey(path, lensOwnerId)
+      attemptedKeysRef.current.add(key)
       setStartFailure(null)
-      ensureLensStarted(path, (p) =>
+      ensureLensStarted(path, lensOwnerId, (p) =>
         startMutation.mutateAsync({ localPath: p }),
       ).then(
-        (id) => setStarted({ path, id }),
+        (id) => setStarted({ key, id }),
         (err: unknown) =>
           setStartFailure({
-            path,
+            key,
             error: err instanceof Error ? err.message : String(err),
           }),
       )
@@ -166,15 +226,18 @@ export function useComparisonSource(
 
   useEffect(() => {
     if (!entry || entry.kind === 'wms') return
-    if (!autoStart || !localPath) return
+    if (!autoStart || !localPath || !lensKey || !sinkReady) return
     if (matched || startedLensId || startError) return
     if (!lensListQuery.isSuccess) return
-    if (attemptedPathsRef.current.has(localPath)) return
-    startForPath(localPath)
+    if (attemptedKeysRef.current.has(lensKey)) return
+    startForPath(localPath, owner)
   }, [
     entry,
     autoStart,
     localPath,
+    lensKey,
+    owner,
+    sinkReady,
     matched,
     startedLensId,
     startError,
@@ -186,6 +249,13 @@ export function useComparisonSource(
   const lensId = matched?.lens_instance_id ?? startedLensId ?? undefined
   const statusQuery = useLensStatus(entry?.kind === 'wms' ? undefined : lensId)
   const detail = statusQuery.data ?? matched
+
+  // Claim an adopted lens of unknown origin for this run attempt.
+  useEffect(() => {
+    if (owner !== null && lensId && sinkReady && !lensOwner(lensId)) {
+      setLensOwner(lensId, owner)
+    }
+  }, [owner, lensId, sinkReady])
 
   // A 404 on the status poll means the instance vanished (stopped from
   // this page or elsewhere) — that's "gone", not "failed". The backend
@@ -209,14 +279,22 @@ export function useComparisonSource(
       statusQuery.error instanceof ApiClientError &&
       statusQuery.error.status === 404) ||
     diedAfterServing
+  const [restartsExhausted, setRestartsExhausted] = useState(false)
   useEffect(() => {
     if (!statusGone || !startedLensId) return
+    if (diedAfterServing && lensKey) {
+      const restarts = (autoRestartsByKey.get(lensKey) ?? 0) + 1
+      autoRestartsByKey.set(lensKey, restarts)
+      if (restarts > MAX_AUTO_RESTARTS) {
+        // Keeps crashing after serving: stop reviving it, show Failed.
+        setRestartsExhausted(true)
+        return
+      }
+    }
     servedIdsRef.current.delete(startedLensId)
     setStarted(null)
-    if (localPath) {
-      attemptedPathsRef.current.delete(localPath)
-      evictLensStart(localPath, startedLensId)
-    }
+    if (lensKey) attemptedKeysRef.current.delete(lensKey)
+    evictLensStart(startedLensId)
     if (diedAfterServing) {
       // Purge the failed record — the registry keeps it otherwise, and a
       // corpse sharing the revived lens's path reads as a duplicate.
@@ -224,19 +302,21 @@ export function useComparisonSource(
         log.debug('Failed to purge dead lens record', { error: err }),
       )
     }
-  }, [statusGone, diedAfterServing, startedLensId, localPath])
+  }, [statusGone, diedAfterServing, startedLensId, lensKey])
 
   const retry = useCallback(() => {
-    if (localPath) {
-      attemptedPathsRef.current.delete(localPath)
-      // Evict only the instance we know failed — rejected starts already
-      // self-evict, and a blanket evict could clobber a sibling's fresh
-      // in-flight start and spawn a duplicate server.
-      if (startedLensId) evictLensStart(localPath, startedLensId)
+    setRestartsExhausted(false)
+    if (lensKey) {
+      autoRestartsByKey.delete(lensKey)
+      attemptedKeysRef.current.delete(lensKey)
     }
+    // Evict only the instance we know failed — rejected starts already
+    // self-evict, and a blanket evict could clobber a sibling's fresh
+    // in-flight start and spawn a duplicate server.
+    if (startedLensId) evictLensStart(startedLensId)
     setStarted(null)
     setStartFailure(null)
-  }, [localPath, startedLensId])
+  }, [lensKey, startedLensId])
 
   // -------- Phase derivation --------
 
@@ -244,7 +324,7 @@ export function useComparisonSource(
   if (entry.kind === 'wms') {
     return {
       phase: 'running',
-      baseUrl: entry.url,
+      baseUrl: withEcmwfKey(entry.url, ecmwfKey),
       lensId: null,
       localPath: null,
     }
@@ -256,10 +336,20 @@ export function useComparisonSource(
       retry: () => void dirQuery.refetch(),
     }
   }
+  if (!sinkReady) {
+    return progress
+      ? {
+          phase: 'waitingForRun',
+          written: progress.written,
+          total: progress.total,
+        }
+      : { phase: 'resolvingDir' }
+  }
   if (!localPath) return { phase: 'resolvingDir' }
 
   // An error atop last-known-running keeps serving — death is 404/terminal.
   const terminal =
+    restartsExhausted ||
     startError !== null ||
     (!!lensId &&
       statusQuery.isError &&
@@ -295,7 +385,7 @@ export function useComparisonSource(
 
   // Nothing running/starting and auto-start is off → explicit start.
   if (!autoStart && !lensId && !startMutation.isPending) {
-    return { phase: 'stopped', start: () => startForPath(localPath) }
+    return { phase: 'stopped', start: () => startForPath(localPath, owner) }
   }
   return { phase: 'starting' }
 }

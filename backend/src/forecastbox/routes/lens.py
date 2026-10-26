@@ -35,7 +35,7 @@ from forecastbox.domain.auth.users import get_auth_context
 from forecastbox.domain.lens import metadata_db
 from forecastbox.domain.lens import proxy as lens_proxy
 from forecastbox.domain.lens.core import PREFIX
-from forecastbox.domain.lens.exceptions import NoLensFound, UnproxyableLens
+from forecastbox.domain.lens.exceptions import LensFailure, LensStarting, NoLensFound, UnproxyableLens
 from forecastbox.domain.lens.manager import (
     LensInstanceDetail,
     LensInstanceId,
@@ -171,7 +171,11 @@ async def proxy_lens(
     except NoLensFound:
         raise HTTPException(status_code=404, detail=f"Lens instance {lens_instance_id!r} not found")
     except UnproxyableLens as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
+    except LensStarting as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except LensFailure as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/supported")

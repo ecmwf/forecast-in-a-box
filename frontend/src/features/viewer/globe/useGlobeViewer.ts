@@ -1,0 +1,269 @@
+/*
+ * (C) Copyright 2026- ECMWF and individual contributors.
+ *
+ * This software is licensed under the terms of the Apache Licence Version 2.0
+ * which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
+ * In applying this licence, ECMWF does not waive the privileges and immunities
+ * granted to it by virtue of its status as an intergovernmental organisation nor
+ * does it submit to any jurisdiction.
+ */
+
+/** GeoViewer's side of the globe: support, mode, camera bridges and failure paths. */
+
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react'
+import { useTranslation } from 'react-i18next'
+import { compositeMapToCanvas } from '../map-export'
+import { whenViewRendered } from '../hooks/useOlMapBase'
+import { DEFAULT_PROJECTION_ID } from '../projection-ids'
+import { navEaseMs } from '../geo/map-nav'
+import { GLOBE_ENGINE } from './engine-entry'
+import {
+  GLOBE_HOME_CAMERA,
+  flatKindOf,
+  globeMinZoom,
+  groundMppFromZoom,
+  panGlobeCamera,
+  zoomFromGroundMpp,
+} from './globe-camera'
+import { useGlobeMode } from './useGlobeMode'
+import { disableGlobe, supportsGlobe } from './webgl-support'
+import type { RefObject } from 'react'
+import type View from 'ol/View'
+import type { CaptureResult, CompareMode } from '../geo/types'
+import type { SourceSlot } from '../geo/layer-pairing'
+import type { ViewerUrlState } from '../geo/view-url-state'
+import type { FlatProjectionId, ProjectionId } from '../projection-ids'
+import type { GlobeCamera } from './engine'
+import type { GlobeMode } from './useGlobeMode'
+import { useMedia } from '@/hooks/useMedia'
+import { createLogger } from '@/lib/logger'
+import { showToast } from '@/lib/toast'
+
+const log = createLogger('globe')
+
+/** Where a URL restore starts on the globe; null starts flat. */
+export function globeStartCamera(
+  initial: ViewerUrlState | null,
+): GlobeCamera | null {
+  if (initial?.projection !== 'globe' || !supportsGlobe()) return null
+  return initial.camera ?? GLOBE_HOME_CAMERA
+}
+
+/** The flat panels' pixels now (DOM order a, b): the bend starts from them. */
+function snapshotFlatMaps(area: HTMLElement | null): Array<CaptureResult> {
+  if (!area) return []
+  const viewports = [...area.querySelectorAll<HTMLElement>('.ol-viewport')]
+  return viewports.flatMap((viewport, i) => {
+    // Transparent: the globe's own ground shows where the flat map has none.
+    const canvas = compositeMapToCanvas(
+      viewport.parentElement ?? viewport,
+      null,
+    )
+    return canvas
+      ? [{ slot: i === 0 ? 'a' : 'b', label: '', timeLabel: null, canvas }]
+      : []
+  })
+}
+
+export interface GlobeViewer extends GlobeMode {
+  /** Hardware WebGL is there; a lost context withdraws it for the session. */
+  available: boolean
+  /** Globe panels the current layout mounts. */
+  panels: 1 | 2
+  /** Back from the globe: the flat map it bent from, else Mercator. */
+  exitTarget: FlatProjectionId
+  /** What the map shows: the globe from the moment it starts bending in. */
+  projectionId: ProjectionId
+  changeProjection: (id: ProjectionId) => void
+  /** The flat maps' area, snapshotted at the handoff. */
+  mapAreaRef: RefObject<HTMLDivElement | null>
+  /** The hidden globe is mounted ahead of a choice (menu open). */
+  warm: boolean
+  warmUp: () => void
+  onFailure: (err: unknown) => void
+  onContextLost: () => void
+  onBasemapFailed: () => void
+  /** Nudge the globe by screen px; false when the flat map should pan. */
+  pan: (dx: number, dy: number) => boolean
+  /** Step the globe's zoom (eased, within range); false when the flat map should. */
+  zoomBy: (delta: number) => boolean
+  /** Zoom the globe to a ground resolution; false when the flat map should. */
+  zoomToResolution: (mpp: number) => boolean
+  /** Ground m/px of the settled globe; null off it. */
+  resolution: number | null
+}
+
+export function useGlobeViewer({
+  viewRef,
+  adoptFlatView,
+  changeFlatProjection,
+  flatId,
+  initialProjection,
+  initialCamera,
+  hasB,
+  focusSlot,
+  mode,
+}: {
+  viewRef: RefObject<View>
+  adoptFlatView: (view: View, id: FlatProjectionId) => void
+  changeFlatProjection: (id: FlatProjectionId) => void
+  flatId: FlatProjectionId
+  /** The restored projection, to say why a globe restore starts flat. */
+  initialProjection: ProjectionId | undefined
+  /** From globeStartCamera: start on the globe, or null. */
+  initialCamera: GlobeCamera | null
+  hasB: boolean
+  focusSlot: SourceSlot | null
+  mode: CompareMode
+}): GlobeViewer {
+  const { t } = useTranslation('visualise')
+  const [available, setAvailable] = useState(supportsGlobe)
+  // The restore is judged once, on mount.
+  const [unsupported] = useState(
+    () => initialProjection === 'globe' && initialCamera === null,
+  )
+  const notifyUnsupported = useEffectEvent(() =>
+    showToast.info(t('globe.unsupported'), undefined, 'globe-unsupported'),
+  )
+  useEffect(() => {
+    if (unsupported) notifyUnsupported()
+  }, [unsupported])
+
+  const reducedMotion = useMedia('(prefers-reduced-motion: reduce)')
+  const panels = hasB && focusSlot === null && mode === 'side' ? 2 : 1
+  const exitTarget: FlatProjectionId =
+    flatKindOf(flatId) !== null ? flatId : DEFAULT_PROJECTION_ID
+  const mapAreaRef = useRef<HTMLDivElement>(null)
+  const globe = useGlobeMode({
+    viewRef,
+    onFlatView: adoptFlatView,
+    panelCount: panels,
+    reducedMotion,
+    exitTarget,
+    initialCamera,
+    onFailure: (err) => {
+      log.error('Globe failed to start', { error: err })
+      showToast.error(t('globe.failed'), undefined, 'globe-failed')
+    },
+    captureFlat: () => Promise.resolve(snapshotFlatMaps(mapAreaRef.current)),
+    whenFlatRendered: whenViewRendered,
+  })
+  const phaseRef = useRef(globe.phase)
+  useLayoutEffect(() => {
+    phaseRef.current = globe.phase
+  })
+
+  const [warm, setWarm] = useState(false)
+  const warmUp = useCallback(() => setWarm(true), [])
+  const { fail } = globe
+  // Unmounting the failed view lets the next menu open try afresh.
+  const onFailure = useCallback(
+    (err: unknown) => {
+      log.error('Globe engine failed', { error: err })
+      // Each panel's engine reports: one toast.
+      showToast.error(t('globe.failed'), undefined, 'globe-failed')
+      fail()
+      setWarm(false)
+    },
+    [fail, t],
+  )
+  const onContextLost = useCallback(() => {
+    log.warn('Globe WebGL context lost')
+    disableGlobe()
+    setAvailable(false)
+    showToast.error(t('globe.contextLost'), undefined, 'globe-context-lost')
+    fail()
+    setWarm(false)
+  }, [fail, t])
+  // Each panel's engine reports: one toast.
+  const onBasemapFailed = useCallback(
+    () =>
+      showToast.info(
+        t('globe.basemapFailed'),
+        undefined,
+        'globe-basemap-failed',
+      ),
+    [t],
+  )
+
+  const projectionId: ProjectionId =
+    globe.phase === 'entering' || globe.phase === 'globe' ? 'globe' : flatId
+  const { enter, leave } = globe
+  const changeProjection = useCallback(
+    (id: ProjectionId) => {
+      if (id === 'globe') return enter()
+      if (phaseRef.current !== 'flat') return leave(id)
+      changeFlatProjection(id)
+    },
+    [enter, leave, changeFlatProjection],
+  )
+
+  const { camera, panelSize } = globe
+  // Keys pan the view; the globe pans like the opposite drag.
+  const pan = useCallback(
+    (dx: number, dy: number) => {
+      if (phaseRef.current !== 'globe') return false
+      camera.set(panGlobeCamera(camera.get(), -dx, -dy), 'keys')
+      return true
+    },
+    [camera],
+  )
+  // Buttons and +/- ease (not under reduced motion); drags and the WASD loop cut.
+  const zoomBy = useCallback(
+    (delta: number) => {
+      const size = panelSize()
+      if (phaseRef.current !== 'globe' || !size) return false
+      const cam = camera.get()
+      const zoom = Math.min(
+        GLOBE_ENGINE.maxZoom,
+        Math.max(globeMinZoom(size[0], size[1]), cam.zoom + delta),
+      )
+      camera.set({ ...cam, zoom }, 'controls', {
+        easeMs: navEaseMs(),
+      })
+      return true
+    },
+    [camera, panelSize],
+  )
+  const zoomToResolution = useCallback(
+    (mpp: number) => {
+      if (phaseRef.current !== 'globe') return false
+      camera.set({ ...camera.get(), zoom: zoomFromGroundMpp(mpp) }, 'scale')
+      return true
+    },
+    [camera],
+  )
+  // Scale hints need no finer than 1/20 zoom; the measured zoom drifts on every drag frame.
+  const zoom = useSyncExternalStore(
+    camera.subscribe,
+    () => Math.round(camera.get().zoom * 20) / 20,
+  )
+  const resolution = globe.phase === 'globe' ? groundMppFromZoom(zoom) : null
+
+  return {
+    ...globe,
+    available,
+    panels,
+    exitTarget,
+    projectionId,
+    changeProjection,
+    mapAreaRef,
+    warm,
+    warmUp,
+    onFailure,
+    onContextLost,
+    onBasemapFailed,
+    pan,
+    zoomBy,
+    zoomToResolution,
+    resolution,
+  }
+}

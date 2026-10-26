@@ -8,6 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
+import { collidingTitles, qualifiedFactoryTitle } from './block-names'
 import type { Edge, Node } from '@xyflow/react'
 import type {
   BlockFactory,
@@ -16,7 +17,7 @@ import type {
   BlockInstanceId,
   FableBuilderV1,
 } from '@/api/types/fable.types'
-import { getFactory } from '@/api/types/fable.types'
+import { getFactory, pluginIdToDisplayKey } from '@/api/types/fable.types'
 
 export interface FableNodeData extends Record<string, unknown> {
   instanceId: BlockInstanceId
@@ -51,6 +52,7 @@ export function fableToNodes(
 ): Array<Node<FableNodeData>> {
   const nodes: Array<Node<FableNodeData>> = []
   const liveIds = new Set<BlockInstanceId>()
+  const colliding = collidingTitles(catalogue)
 
   for (const [instanceId, instance] of Object.entries(fable.blocks)) {
     const factory = getFactory(catalogue, instance.factory_id)
@@ -68,7 +70,11 @@ export function fableToNodes(
             instanceId,
             instance,
             factory,
-            label: factory.title,
+            label: qualifiedFactoryTitle(
+              factory.title,
+              pluginIdToDisplayKey(instance.factory_id.plugin),
+              colliding,
+            ),
             catalogue,
           }
     nodeDataCache.set(instanceId, data)

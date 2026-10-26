@@ -1,8 +1,8 @@
 {
   "card": {
-    "title": "System Status",
-    "titleError": "System Status - Error",
-    "description": "Forecast-In-A-Box Service Status",
+    "title": "System status",
+    "titleError": "System status - error",
+    "description": "Forecast-in-a-Box service status",
     "loading": "Loading status information...",
     "errorMessage": "Failed to fetch status information",
     "unknownError": "An unknown error occurred",
@@ -21,9 +21,9 @@
   },
   "trafficLight": {
     "unknown": "Checking...",
-    "green": "All Systems Normal",
-    "orange": "Partial Outage",
-    "red": "System Outage"
+    "green": "All systems normal",
+    "orange": "Partial outage",
+    "red": "System outage"
   },
   "version": "Version"
 }
