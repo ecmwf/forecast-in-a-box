@@ -269,6 +269,42 @@ class _StaleRecord(Exception):
 _POLL_ATTEMPTS = 3
 
 
+def _current_cascade_proc_or_none() -> int | str | None:
+    try:
+        return get_current_cascade_proc()
+    except (GatewayExited, GatewayNotStarted):
+        return None
+
+
+def _request_job_progress(job_id: JobId, detailed_report: bool) -> api.JobProgressResponse:
+    response = client.request_response(
+        api.JobProgressRequest(job_ids=[job_id], detailed_report=detailed_report),
+        get_gateway_url(),
+    )
+    return cast(api.JobProgressResponse, response)
+
+
+def _fetch_textual_values(job_id: JobId, candidates: dict[TaskId, str]) -> dict[TaskId, str]:
+    """Fetch and decode textual outputs from the gateway. Failures are logged per task and omitted from the result."""
+    values: dict[TaskId, str] = {}
+    for task_id, mime_type in candidates.items():
+        try:
+            fetch_resp = client.request_response(
+                api.ResultRetrievalRequest(job_id=job_id, dataset_id=DatasetId(task=task_id, output="0")),
+                get_gateway_url(),
+            )
+            fetch_resp = cast(api.ResultRetrievalResponse, fetch_resp)  # type: ignore[attr-defined]
+            if fetch_resp.error:
+                logger.warning("Failed to fetch value for task %r: %s", task_id, fetch_resp.error)
+                continue
+            decoded = api.decoded_result(fetch_resp, job=None)  # type: ignore[attr-defined]
+            if isinstance(decoded, bytes):
+                values[task_id] = _decode_textual_output(decoded, mime_type)
+        except Exception as e:
+            logger.warning("Failed to fetch value for task %r: %r", task_id, e)
+    return values
+
+
 async def poll_and_update(execution: RunRecord, detailed_report: bool = False) -> RunDetail:
     """Poll cascade for a Run's status, update db if changed, and return current detail.
 
@@ -312,10 +348,9 @@ async def _poll_and_update_once(execution: RunRecord, detailed_report: bool) -> 
     available_task_ids: list[TaskId] | None
     lost_task_ids: dict[TaskId, str] = {}
     if status == "completed":
-        try:
-            current_cascade_proc = get_current_cascade_proc()
-        except (GatewayExited, GatewayNotStarted):
-            current_cascade_proc = None
+        current_cascade_proc = await execution_manager.awaitable_submit(
+            ConcurrentPools.Io, TaskName("run.poll.cascade-proc"), _current_cascade_proc_or_none
+        )
         if current_cascade_proc is not None and stored_cascade_proc == current_cascade_proc:
             available_task_ids = [TaskId(k) for k in (raw_outputs or {}).get("outputs", {}).keys()]
         elif raw_outputs:
@@ -388,11 +423,9 @@ async def _poll_and_update_once(execution: RunRecord, detailed_report: bool) -> 
                 warning_error = f"unable to provide completed/planned tasks: {repr(e)}"
 
         try:
-            response = client.request_response(
-                api.JobProgressRequest(job_ids=[job_id], detailed_report=detailed_report),
-                get_gateway_url(),
+            response = await execution_manager.awaitable_submit(
+                ConcurrentPools.Io, TaskName("run.poll.progress"), partial(_request_job_progress, job_id, detailed_report)
             )
-            response = cast(api.JobProgressResponse, response)
         except TimeoutError:
             return _build(status_override="unknown", error_override="failed to communicate with gateway")
         except Exception as e:
@@ -413,25 +446,19 @@ async def _poll_and_update_once(execution: RunRecord, detailed_report: bool) -> 
                 outputs_model = RunOutputs.model_validate(raw_outputs)
                 already_fetched = {tid for tid, char in outputs_model.outputs.items() if char.value is not None}
                 cascade_available = {d.task for d in response.datasets[job_id]}
+                candidates: dict[TaskId, str] = {}
                 for task_id in cascade_available - already_fetched:
                     char = outputs_model.outputs.get(task_id)
                     if char is None or not is_textual(char.mime_type):
                         continue
-                    try:
-                        fetch_resp = client.request_response(
-                            api.ResultRetrievalRequest(job_id=job_id, dataset_id=DatasetId(task=task_id, output="0")),
-                            get_gateway_url(),
-                        )
-                        fetch_resp = cast(api.ResultRetrievalResponse, fetch_resp)  # type: ignore[attr-defined]
-                        if fetch_resp.error:
-                            logger.warning("Failed to fetch value for task %r: %s", task_id, fetch_resp.error)
-                            continue
-                        decoded = api.decoded_result(fetch_resp, job=None)  # type: ignore[attr-defined]
-                        if isinstance(decoded, bytes):
-                            char.value = _decode_textual_output(decoded, char.mime_type)
-                            updated_outputs = outputs_model
-                    except Exception as e:
-                        logger.warning("Failed to fetch value for task %r: %r", task_id, e)
+                    candidates[task_id] = char.mime_type
+                if candidates:
+                    fetched = await execution_manager.awaitable_submit(
+                        ConcurrentPools.Io, TaskName("run.poll.textual-outputs"), partial(_fetch_textual_values, job_id, candidates)
+                    )
+                    for task_id, value in fetched.items():
+                        outputs_model.outputs[task_id].value = value
+                        updated_outputs = outputs_model
             except Exception as e:
                 logger.warning("Failed to process textual outputs for run %r: %r", run_id, e)
         if updated_outputs is not None:

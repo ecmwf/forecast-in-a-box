@@ -17,6 +17,10 @@ class NoLensFound(Exception):
     """Raised when retrieving details of a LensId for which no Lens exists."""
 
 
+class LensPathNotFound(Exception):
+    """Raised when starting a Lens on a local path which does not exist."""
+
+
 class UnproxyableLens(Exception):
     """Raised when trying to proxy a Lens which is unproxyable, eg, has more than one port."""
 

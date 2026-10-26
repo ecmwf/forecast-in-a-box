@@ -34,8 +34,8 @@ from forecastbox.domain.plugin.state import PluginManager
 from forecastbox.domain.plugin.store import get_plugins_detail, submit_install_single
 from forecastbox.domain.plugin.submit import submit_uninstall_single, submit_unload_single, submit_update_single
 from forecastbox.routes.admin import get_admin_user
-from forecastbox.utility.concurrency.manager import execution_manager
-from forecastbox.utility.config import ROUTE_PREFIX
+from forecastbox.utility.concurrency.manager import TaskName, execution_manager
+from forecastbox.utility.config import ROUTE_PREFIX, ConcurrentPools
 from forecastbox.utility.http_pools import HttpProfile, get_sync
 from forecastbox.utility.packages import get_package_versions
 from forecastbox.utility.pydantic import FiabBaseModel
@@ -95,7 +95,9 @@ async def update_plugin(
         settings = await _pluginId2settings(pluginCompositeId)
         if settings is None:
             raise HTTPException(status_code=404, detail=f"Plugin {pluginCompositeId!r} not found")
-        versions = _source2Versions(settings.pip_source)
+        versions = await execution_manager.awaitable_submit(
+            ConcurrentPools.Io, TaskName("plugin.versions"), partial(_source2Versions, settings.pip_source)
+        )
         if not versions.versions:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -145,7 +147,9 @@ async def get_plugin_versions(pluginCompositeId: Annotated[PluginCompositeId, De
     settings = await _pluginId2settings(pluginCompositeId)
     if settings is None:
         raise HTTPException(status_code=404, detail=f"Plugin {pluginCompositeId!r} not found")
-    return _source2Versions(settings.pip_source)
+    return await execution_manager.awaitable_submit(
+        ConcurrentPools.Io, TaskName("plugin.versions"), partial(_source2Versions, settings.pip_source)
+    )
 
 
 @router.post("/install")

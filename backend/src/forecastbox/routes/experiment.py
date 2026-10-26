@@ -357,5 +357,6 @@ async def restart_scheduler(auth_context: AuthContext = Depends(get_auth_context
     """Restart the scheduler thread. Requires admin access."""
     if not auth_context.has_admin():
         raise HTTPException(status_code=403, detail="Only admins may restart the scheduler.")
+    # TODO(concurrency phase 4): joins the scheduler thread on the event loop; replaced by a managed thread
     stop_scheduler()
     start_scheduler()

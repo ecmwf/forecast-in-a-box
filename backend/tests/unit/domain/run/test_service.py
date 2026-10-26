@@ -416,3 +416,57 @@ def test_submit_run_sync_marks_failed_when_submission_rejected() -> None:
     assert result.e is not None
     assert update.call_args.kwargs["expected_status"] == "submitted"
     assert update.call_args.kwargs["status"] == "failed"
+
+
+def test_fetch_textual_values_returns_only_decoded(caplog: pytest.LogCaptureFixture) -> None:
+    def _fake(request: object, url: str) -> object:
+        if request.dataset_id.task == "bad":  # type: ignore[attr-defined]
+            raise TimeoutError("down")
+        return SimpleNamespace(error=None)
+
+    with (
+        patch("forecastbox.domain.run.service.client.request_response", side_effect=_fake),
+        patch("forecastbox.domain.run.service.get_gateway_url", return_value="tcp://gw"),
+        patch("forecastbox.domain.run.service.api.decoded_result", return_value=b"hello", create=True),
+        caplog.at_level("WARNING"),
+    ):
+        values = service._fetch_textual_values(JobId("job-1"), {TaskId("ok"): "text/plain", TaskId("bad"): "text/plain"})
+    assert values == {TaskId("ok"): "hello"}
+    assert "Failed to fetch value for task" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_poll_progress_routed_to_io_pool(monkeypatch: pytest.MonkeyPatch) -> None:
+    from forecastbox.utility.concurrency.manager import execution_manager
+    from forecastbox.utility.config import ConcurrentPools
+
+    calls: list[tuple[object, str]] = []
+
+    async def _recording(pool: object, name: object, task: object) -> object:
+        calls.append((pool, str(name)))
+        raise TimeoutError
+
+    monkeypatch.setattr(execution_manager, "awaitable_submit", _recording)
+    detail = await service.poll_and_update(cast(RunRecord, _make_running_execution(None)))
+    assert detail.status == "unknown"
+    assert calls == [(ConcurrentPools.Io, "run.poll.progress")]
+
+
+@pytest.mark.asyncio
+async def test_gateway_start_and_artifact_delete_routing(monkeypatch: pytest.MonkeyPatch) -> None:
+    from forecastbox.domain.artifact.base import CompositeArtifactId
+    from forecastbox.routes import artifacts as artifacts_route
+    from forecastbox.routes import gateway as gateway_route
+    from forecastbox.utility.concurrency.manager import execution_manager
+    from forecastbox.utility.config import ConcurrentPools
+
+    calls: list[tuple[object, str]] = []
+
+    async def _recording(pool: object, name: object, task: object) -> object:
+        calls.append((pool, str(name)))
+        return SimpleNamespace(t=1, e=None) if str(name) == "artifact.delete" else None
+
+    monkeypatch.setattr(execution_manager, "awaitable_submit", _recording)
+    await gateway_route.start_gateway()
+    await artifacts_route.delete_model_endpoint(cast(CompositeArtifactId, object()))
+    assert calls == [(ConcurrentPools.General, "gateway.start"), (ConcurrentPools.Io, "artifact.delete")]
