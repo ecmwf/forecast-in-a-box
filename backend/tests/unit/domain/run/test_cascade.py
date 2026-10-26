@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import pytest
+from cascade.low.exceptions import CascadeInternalError
 
 import forecastbox.domain.run.cascade as run_cascade
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
@@ -193,3 +194,18 @@ def test_execute_cascade_ssh_cluster_uses_gateway_spec(patch_submit_stack: dict[
     assert request.job.infra_spec.controller_url == "ssh://controller"
     assert request.job.infra_spec.worker_urls == ["ssh://worker-1", "ssh://worker-2"]
     assert request.job.infra_spec.workers_per_host == 3
+
+
+def test_execute_cascade_does_not_touch_artifact_manager(patch_submit_stack: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(config.cascade, "constraints", CascadeConstraints(default_cascade_infra="localProcess"))
+    monkeypatch.setattr(config.cascade, "gateway", UnmanagedGateway(gateway_type="unmanaged", cascade_url="tcp://gw"))
+    assert not hasattr(run_cascade, "ArtifactManager")
+    assert not hasattr(run_cascade, "submit_artifact_download")
+    environment = EnvironmentSpecification.model_construct(runtime_artifacts=["x"], cascade_infra="localProcess")
+    assert run_cascade.execute_cascade(_spec_with_environment(environment)) == "ok"
+
+
+def test_build_infra_spec_unknown_infra_raises_internal_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(run_cascade, "_select_cascade_infra", lambda env: "bogus")
+    with pytest.raises(CascadeInternalError):
+        run_cascade._build_infra_spec(EnvironmentSpecification(), workers_per_host=1, hosts=1)

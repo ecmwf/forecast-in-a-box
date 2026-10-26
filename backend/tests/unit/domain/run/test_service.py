@@ -1,6 +1,6 @@
 import datetime as dt
 from types import SimpleNamespace
-from typing import cast
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import pytest
@@ -400,3 +400,19 @@ async def test_poll_and_update_raises_not_found_when_run_vanishes_during_retry()
     ):
         with pytest.raises(RunNotFound):
             await service.poll_and_update(cast(RunRecord, _make_running_execution(None)))
+
+
+def test_submit_run_sync_marks_failed_when_submission_rejected() -> None:
+    from forecastbox.utility.concurrency.manager import SubmissionRejected
+
+    blueprint = SimpleNamespace(builder={"x": 1}, blueprint_id="bp", version=1)
+    auth = SimpleNamespace(user_id="u")
+    with (
+        patch.object(service.run_db, "upsert_run", return_value=("rid", 1, dt.datetime.now())),
+        patch.object(service.run_db, "update_run_runtime", return_value=True) as update,
+        patch.object(service.execution_manager, "submit_monitored", side_effect=SubmissionRejected("full")),
+    ):
+        result = service.submit_run_sync(cast(Any, blueprint), cast(Any, auth))
+    assert result.e is not None
+    assert update.call_args.kwargs["expected_status"] == "submitted"
+    assert update.call_args.kwargs["status"] == "failed"
