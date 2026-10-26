@@ -26,7 +26,7 @@ import { JournalChip } from '@/features/journal/components/JournalChip'
 import { RunMetadataDialog } from '@/features/journal/components/RunMetadataDialog'
 import { RunRowMenu } from '@/features/journal/components/RunRowMenu'
 import { Checkbox } from '@/components/ui/checkbox'
-import { formatInZone, timeZoneOffsetLabel } from '@/lib/datetime'
+import { formatInZone, formatInZoneWithOffset } from '@/lib/datetime'
 import { useUiStore } from '@/stores/uiStore'
 import { cn } from '@/lib/utils'
 
@@ -64,9 +64,11 @@ export const ForecastRunRow = memo(function ({
   const title = run.displayName || t('item.untitled')
   // created_at is UTC with explicit offset — convert via the measured server-clock offset.
   const startedInstant = serverTimeToLocal(run.createdAt)
-  const startedAt =
-    formatInZone(startedInstant, timeZone, 'yyyy-MM-dd HH:mm') +
-    ` ${timeZoneOffsetLabel(timeZone, startedInstant)}`
+  const startedAt = formatInZoneWithOffset(
+    startedInstant,
+    timeZone,
+    'yyyy-MM-dd HH:mm',
+  )
   const startedDate = formatInZone(startedInstant, timeZone, 'yyyy-MM-dd')
   const modelLabel = run.modelLabel
 

@@ -22,6 +22,7 @@ import {
   timeZoneOffsetLabel,
   todayInZone,
   useAppTimeZone,
+  zonedNaiveToInstant,
 } from '@/lib/datetime'
 
 export interface DateTimeFieldProps {
@@ -116,6 +117,14 @@ function DateAndTimeInputs({
     () => splitDatetime(convertNaive(value, 'UTC', timeZone)),
     [value, timeZone],
   )
+  // Offset at the value's instant; now while empty.
+  const offsetLabel = useMemo(() => {
+    const instant = zonedNaiveToInstant(value, 'UTC')
+    return timeZoneOffsetLabel(
+      timeZone,
+      Number.isNaN(instant.getTime()) ? new Date() : instant,
+    )
+  }, [value, timeZone])
   const displayedTime = time || DEFAULT_TIME
 
   // Recombine the zoned date + time, then store back as canonical UTC.
@@ -168,7 +177,7 @@ function DateAndTimeInputs({
               />
             }
           >
-            {timeZoneOffsetLabel(timeZone)}
+            {offsetLabel}
           </TooltipTrigger>
           <TooltipContent side="top">
             {t('dateTimeField.timezoneTooltip', { timeZone })}

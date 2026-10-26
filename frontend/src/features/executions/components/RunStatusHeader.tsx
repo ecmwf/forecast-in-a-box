@@ -25,11 +25,7 @@ import type { ReactNode } from 'react'
 import type { JobStatus } from '@/api/types/job.types'
 import { isStoppableStatus, isTerminalStatus } from '@/api/types/job.types'
 import { useServerTime } from '@/api/hooks/useSchedules'
-import {
-  formatInZone,
-  timeZoneOffsetLabel,
-  useAppTimeZone,
-} from '@/lib/datetime'
+import { formatInZoneWithOffset, useAppTimeZone } from '@/lib/datetime'
 import {
   getStatusBadgeClasses,
   getStatusBarColor,
@@ -231,12 +227,20 @@ export function RunStatusHeader({
   const { serverTimeToLocal } = useServerTime()
   const startedAt =
     terminal && createdAt
-      ? `${formatInZone(serverTimeToLocal(createdAt), timeZone, 'yyyy-MM-dd HH:mm')} ${timeZoneOffsetLabel(timeZone)}`
+      ? formatInZoneWithOffset(
+          serverTimeToLocal(createdAt),
+          timeZone,
+          'yyyy-MM-dd HH:mm',
+        )
       : null
 
   const stoppedAt =
     status === 'stopped' && updatedAt
-      ? `${formatInZone(serverTimeToLocal(updatedAt), timeZone, 'yyyy-MM-dd HH:mm')} ${timeZoneOffsetLabel(timeZone)}`
+      ? formatInZoneWithOffset(
+          serverTimeToLocal(updatedAt),
+          timeZone,
+          'yyyy-MM-dd HH:mm',
+        )
       : null
 
   const progressPercent = parseFloat(progress) || 0

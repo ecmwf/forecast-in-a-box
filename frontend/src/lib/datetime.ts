@@ -168,16 +168,24 @@ export function formatInZone(
   return format(new TZDate(instant.getTime(), timeZone), pattern)
 }
 
+/** `formatInZone` plus that instant's offset label. */
+export function formatInZoneWithOffset(
+  input: Date | number | string,
+  timeZone: string,
+  pattern: string,
+): string {
+  const instant = input instanceof Date ? input : new Date(input)
+  if (Number.isNaN(instant.getTime())) return ''
+  return `${formatInZone(instant, timeZone, pattern)} ${timeZoneOffsetLabel(timeZone, instant)}`
+}
+
 // ── Labels ───────────────────────────────────────────────────────────────
 
 /**
- * Compact UTC-offset label for `timeZone` at `instant`:
+ * Compact UTC-offset label for `timeZone` at `instant` (DST-aware):
  * 'UTC', 'UTC+2', 'UTC-4', 'UTC+5:30'.
  */
-export function timeZoneOffsetLabel(
-  timeZone: string,
-  instant: Date = new Date(),
-): string {
+export function timeZoneOffsetLabel(timeZone: string, instant: Date): string {
   const minutes = tzOffset(timeZone, instant)
   if (!minutes) return 'UTC'
   const sign = minutes > 0 ? '+' : '-'

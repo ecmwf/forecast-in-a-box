@@ -240,7 +240,7 @@ export function AuthenticatedHeader() {
                   <Globe className="mr-2 h-4 w-4" />
                   {t('userMenu.timezone')}
                   <span className="ml-auto text-xs text-muted-foreground">
-                    {timeZoneOffsetLabel(timeZone)}
+                    {timeZoneOffsetLabel(timeZone, new Date())}
                   </span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={openEcmwfKeyDialog}>
