@@ -96,7 +96,7 @@ async def update_plugin(
         if settings is None:
             raise HTTPException(status_code=404, detail=f"Plugin {pluginCompositeId!r} not found")
         versions = await execution_manager.awaitable_submit(
-            ConcurrentPools.Io, TaskName("plugin.versions"), partial(_source2Versions, settings.pip_source)
+            ConcurrentPools.General, TaskName("plugin.versions"), partial(_source2Versions, settings.pip_source)
         )
         if not versions.versions:
             raise HTTPException(
@@ -148,7 +148,7 @@ async def get_plugin_versions(pluginCompositeId: Annotated[PluginCompositeId, De
     if settings is None:
         raise HTTPException(status_code=404, detail=f"Plugin {pluginCompositeId!r} not found")
     return await execution_manager.awaitable_submit(
-        ConcurrentPools.Io, TaskName("plugin.versions"), partial(_source2Versions, settings.pip_source)
+        ConcurrentPools.General, TaskName("plugin.versions"), partial(_source2Versions, settings.pip_source)
     )
 
 

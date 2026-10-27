@@ -57,7 +57,9 @@ async def get_status(request: Request) -> StatusResponse:
     status: dict[str, str] = {"api": "up", "cascade": "up", "ecmwf": "up", "scheduler": "up", "version": request.app.version}
 
     try:
-        status["cascade"] = await execution_manager.awaitable_submit(ConcurrentPools.Io, TaskName("status.probe.cascade"), _probe_cascade)
+        status["cascade"] = await execution_manager.awaitable_submit(
+            ConcurrentPools.General, TaskName("status.probe.cascade"), _probe_cascade
+        )
     except SubmissionRejected as e:
         logger.warning(f"Cascade probe rejected: {repr(e)}")
         status["cascade"] = "down"

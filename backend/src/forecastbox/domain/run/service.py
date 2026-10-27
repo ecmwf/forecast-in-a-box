@@ -349,7 +349,7 @@ async def _poll_and_update_once(execution: RunRecord, detailed_report: bool) -> 
     lost_task_ids: dict[TaskId, str] = {}
     if status == "completed":
         current_cascade_proc = await execution_manager.awaitable_submit(
-            ConcurrentPools.Io, TaskName("run.poll.cascade-proc"), _current_cascade_proc_or_none
+            ConcurrentPools.General, TaskName("run.poll.cascade-proc"), _current_cascade_proc_or_none
         )
         if current_cascade_proc is not None and stored_cascade_proc == current_cascade_proc:
             available_task_ids = [TaskId(k) for k in (raw_outputs or {}).get("outputs", {}).keys()]
@@ -424,7 +424,7 @@ async def _poll_and_update_once(execution: RunRecord, detailed_report: bool) -> 
 
         try:
             response = await execution_manager.awaitable_submit(
-                ConcurrentPools.Io, TaskName("run.poll.progress"), partial(_request_job_progress, job_id, detailed_report)
+                ConcurrentPools.General, TaskName("run.poll.progress"), partial(_request_job_progress, job_id, detailed_report)
             )
         except TimeoutError:
             return _build(status_override="unknown", error_override="failed to communicate with gateway")
@@ -454,7 +454,7 @@ async def _poll_and_update_once(execution: RunRecord, detailed_report: bool) -> 
                     candidates[task_id] = char.mime_type
                 if candidates:
                     fetched = await execution_manager.awaitable_submit(
-                        ConcurrentPools.Io, TaskName("run.poll.textual-outputs"), partial(_fetch_textual_values, job_id, candidates)
+                        ConcurrentPools.General, TaskName("run.poll.textual-outputs"), partial(_fetch_textual_values, job_id, candidates)
                     )
                     for task_id, value in fetched.items():
                         outputs_model.outputs[task_id].value = value

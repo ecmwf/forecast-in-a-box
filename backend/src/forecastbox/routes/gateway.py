@@ -54,7 +54,7 @@ async def get_status() -> str:
     if isinstance(config.cascade.gateway, UnmanagedGateway):
         return "not managed"
     try:
-        return await execution_manager.awaitable_submit(ConcurrentPools.Io, TaskName("gateway.status"), status_gateway)
+        return await execution_manager.awaitable_submit(ConcurrentPools.General, TaskName("gateway.status"), status_gateway)
     except GatewayNotStarted:
         return "not started"
     except GatewayExited as e:

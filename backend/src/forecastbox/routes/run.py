@@ -259,7 +259,7 @@ async def _retrieve_output_bytes(execution: db.RunRecord, spec: RunLookup, datas
         raise HTTPException(500, f"Result mime lookup failed: {mime_result.e}")
     try:
         decoded = await execution_manager.awaitable_submit(
-            ConcurrentPools.Io, TaskName("run.output.retrieve"), partial(retrieve_output_bytes, execution.cascade_job_id, dataset)
+            ConcurrentPools.General, TaskName("run.output.retrieve"), partial(retrieve_output_bytes, execution.cascade_job_id, dataset)
         )
     except RunOutputRetrievalFailed as e:
         raise HTTPException(500, str(e))
@@ -399,7 +399,7 @@ async def delete_run(
             # NOTE errors reported by gateway are ignored, most likely the job has been evicted already.
             # A timeout, such as due to a busy gateway, is reported, and we dont delete the db entity to not increase inconsistency
             await execution_manager.awaitable_submit(
-                ConcurrentPools.Io, TaskName("run.delete.datasets"), partial(delete_cascade_datasets, run_record.cascade_job_id)
+                ConcurrentPools.General, TaskName("run.delete.datasets"), partial(delete_cascade_datasets, run_record.cascade_job_id)
             )
         except Exception as e:
             raise HTTPException(500, f"Job deletion failed: {e}")
