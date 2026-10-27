@@ -436,7 +436,7 @@ class WeeklyStatistics(Product):
         PARAM: BlockConfigurationOption(
             title="Parameter",
             description="Parameter to compute",
-            value_type=ParameterType(),
+            value_type=ListType(ParameterType()),
         ),
     }
     inputs: list[str] = ["dataset"]
@@ -456,10 +456,10 @@ class WeeklyStatistics(Product):
             output_template={**coords, TYPE: self.stat_type[block.config_as_str(STATISTIC)]},
         ):
             prob_qube = prob_qube | Qube.from_datacube(output)
-        restrictions[PARAM] = ClosedEnumType(list(axes(prob_qube)[PARAM]), subtype=ParameterType())
+        restrictions[PARAM] = ListType(ClosedEnumType(list(axes(prob_qube)[PARAM]), subtype=ParameterType()))
 
-        selected_param_id = block.config_as_str(PARAM)
-        return QubedOutput(dataqube=prob_qube.select({PARAM: selected_param_id}))
+        selected_param_ids = block.config_as_list(PARAM, str)
+        return QubedOutput(dataqube=prob_qube.select({PARAM: selected_param_ids}))
 
     def compile(
         self,
