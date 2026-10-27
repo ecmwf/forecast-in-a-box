@@ -99,5 +99,10 @@
     "workerDirectory": [
       "public"
     ]
+  },
+  "allowScripts": {
+    "@swc/core": false,
+    "fsevents": false,
+    "unrs-resolver": false
   }
 }
