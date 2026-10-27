@@ -142,7 +142,7 @@ aggregation:
    loop ends, drain with `get_nowait()` and for each `_QueuedEvent` call
    `receipt.set_exception(DispatcherClosed("event dispatcher stopped before dispatch"))`
    and append to `_queue_failures`. Without this, a producer waiting on a
-   receipt (step 4 below) could wait for an envelope that will never be
+   receipt (step 5 below) could wait for an envelope that will never be
    dispatched.
 4. Update the class docstring: dequeue order is FIFO; handlers of one event
    are submitted in registration order; handler execution and completion
@@ -163,8 +163,7 @@ Add two frozen dataclasses. They deliberately do **not** implement
 class PluginTemplatesChangedEvent:
     """Emitted by the plugin-management worker after a plugin has been published to
     PluginManager.plugins, asking consumers to (re)ingest its blueprint templates.
-    Consumers read the plugin from the catalogue and its template settings from the
-    plugin_state table."""
+    Consumers obtain the plugin's templates and settings via domain.plugin.service."""
 
     plugin_id: PluginCompositeId
 
@@ -186,27 +185,70 @@ to the classes.
 Update the module docstring: it now holds both client-notification events and
 the template events consumed by the blueprint domain.
 
-### 3. Move the reaction logic to the consumer
+### 3. Plugin-side template API for consumers (`domain/plugin/service.py`, new)
+
+The blueprint handler needs the plugin object, the plugin's template
+settings, and must persist per-template errors and the `asset_ingest_needed`
+flag. It must do so through a higher-level plugin module, not through
+`domain/plugin/db.py` or `PluginManager` directly. Create
+`domain/plugin/service.py` with exactly what the consumer needs:
+
+```python
+@dataclass(frozen=True, eq=True, slots=True)
+class TemplateIngestSpec:
+    """Everything a consumer needs to ingest one plugin's blueprint templates."""
+
+    plugin_id: PluginCompositeId
+    templates: tuple[BlueprintTemplate, ...]
+    excluded_templates: frozenset[str]
+    glyph_remapping: Mapping[str, str]
+
+
+def begin_template_ingest(plugin_id: PluginCompositeId) -> TemplateIngestSpec | None:
+    """Return the ingestion spec for a published plugin and clear its asset_ingest_needed
+    flag, or None when no ingestion is needed. Raises PluginTemplatesUnavailable when the
+    plugin is not published or has no plugin_state row."""
+
+
+def record_template_errors(plugin_id: PluginCompositeId, template_errors: dict[str, str]) -> None:
+    """Persist the per-template ingestion errors of the last ingestion."""
+```
+
+`begin_template_ingest` contains the first half of today's
+`ingest_plugin_templates`: look up `PluginManager.plugins.get(plugin_id)`,
+`get_plugin_state`, the `asset_ingest_needed` check, and
+`clear_asset_ingest_needed` (cleared before ingesting, as today, so a partial
+failure does not trigger a spurious re-ingest). `PluginTemplatesUnavailable`
+is a new exception in `domain/plugin/exceptions.py`; the producer always
+publishes before emitting, so it signals a programming error. Use the
+`BlueprintTemplate` type `plugin.blueprint_templates` already has (from
+`fiab_core`). `record_template_errors` wraps `update_template_errors`.
+
+Both functions are synchronous and call jobs-DB helpers directly; they are
+meant for pool workers. Module docstring: "Plugin-domain operations offered to
+other domains (currently: the blueprint template consumer). Synchronous; call
+from pool workers only."
+
+### 4. Move the reaction logic to the consumer
 
 1. Move `domain/plugin/template_ingest.py` to
    `domain/blueprint/template_ingest.py` (use `git mv` to keep history) and
    rewrite it:
    - all imports at module top level (no more in-function imports);
-   - `ingest_plugin_templates(plugin_id: PluginCompositeId) -> None`: look up
-     `plugin = PluginManager.plugins.get(plugin_id)`; if `None`, raise
-     `PluginTemplatesUnavailable` (new, `domain/blueprint/exceptions.py`) - the
-     producer always publishes before emitting, so this is a programming error;
-     then the current body unchanged (DB state read, `asset_ingest_needed`
-     check, clear, per-template loop, `update_template_errors`). Calls to
+   - `ingest_plugin_templates(plugin_id: PluginCompositeId) -> None`:
+     `spec = begin_template_ingest(plugin_id)`; return if `None`; then the
+     current per-template loop over `spec.templates` (exclusion soft-delete,
+     convert, remap, validate, upsert, per-template error collection), and
+     finally `record_template_errors(plugin_id, template_errors)`. Calls to
      blueprint DB/service functions become ordinary module-level references.
+     The module does not import `domain/plugin/db.py` or
+     `domain/plugin/state.py`.
    - `remove_plugin_templates(plugin_id: PluginCompositeId) -> None`: the
-     current `unload_plugin_templates` body.
+     current `unload_plugin_templates` body (blueprint-owned rows only).
    - Module docstring: "Blueprint-side reaction to plugin template events.
      Runs on a `ConcurrentPools.General` worker via `dispatchers.py`, calls
-     jobs-DB helpers directly. Reads the plugin catalogue and plugin_state
-     (blueprint depends on plugin) and persists per-template errors and the
-     `asset_ingest_needed` flag back into plugin_state through the plugin
-     domain's DB helpers."
+     jobs-DB helpers directly. Obtains plugin data and persists ingestion
+     results through `domain.plugin.service`."
 2. Create `domain/blueprint/dispatchers.py`, following
    `domain/notification/dispatchers.py`:
 
@@ -243,8 +285,15 @@ the template events consumed by the blueprint domain.
    **must not** be `JobsDb` (it is reserved for single async-bridged DB
    calls). Put a short comment with this reason next to the tuple.
 
-### 4. Producer side (`domain/plugin/loading.py`)
+### 5. Producer side (`domain/plugin/loading.py` and neighbours)
 
+0. Move `_notify_failure` and `_notify_success` from `domain/plugin/submit.py`
+   into a new `domain/plugin/notifications.py` as public `notify_failure` /
+   `notify_success` (unchanged bodies), so `loading.py` can use them without
+   importing `submit.py` (which imports `loading.py`). Update `submit.py` to
+   import them. Add `PluginTemplateIngestFailed` to
+   `domain/plugin/exceptions.py` (docstring: raised after the failure has
+   already been reported to clients).
 1. Add one private helper:
 
    ```python
@@ -258,35 +307,60 @@ the template events consumed by the blueprint domain.
    ```
 
    Exceptions (`DispatcherError` subclasses, `AggregateDispatchError`,
-   `TimeoutError`) propagate to `_run_managed`, which records `updater_error`
-   and emits `PluginGlobalErrorEvent` exactly as for any other failure today.
-   The timeout is only a safety net; with step 1 every receipt eventually
-   resolves.
-2. `load_plugins`: after `publish_bulk_snapshot`, emit
-   `PluginTemplatesChangedEvent` for each loaded plugin **one at a time**,
-   waiting for each receipt (keeps at most one `General` worker busy with
-   ingestion, as today's sequential loop). Unlike today, do not abort on the
-   first failure: collect failing plugin ids and, after the loop, raise one
-   `RuntimeError` listing them. The operation still fails (so
-   `plugins_ready()` stays false and `updater_error` is set), but the other
-   plugins' templates are still ingested.
-3. `update_single`: replace the `ingest_plugin_templates(...)` call with
-   `_emit_and_wait(..., PluginTemplatesChangedEvent(pluginId))`, same
-   position and condition.
-4. `unload_single`: reverse the order:
+   `TimeoutError`) propagate to the caller. The timeout is only a safety net
+   (ingestion normally takes a few seconds at most); with step 1 every receipt
+   eventually resolves.
+2. Add a second private helper for the "changed" direction, which reports
+   each failure to clients immediately:
+
+   ```python
+   def _request_template_ingest(plugin_id: PluginCompositeId) -> str | None:
+       """Emit PluginTemplatesChangedEvent and wait; on failure notify clients and
+       return the error text, otherwise return None."""
+   ```
+
+   On exception: `logger.exception(...)`, then
+   `notify_failure(f"Template ingestion of plugin {plugin_id_str}", repr(e))`,
+   and return `f"{plugin_id_str}: {e!r}"`.
+3. `load_plugins`: after `publish_bulk_snapshot`, call
+   `_request_template_ingest` for each loaded plugin **one at a time**
+   (keeps at most one `General` worker busy with ingestion, as today's
+   sequential loop). Do not abort on a failure; continue with the remaining
+   plugins. After the loop, if any failed, raise
+   `PluginTemplateIngestFailed("; ".join(errors))`. Consequences:
+   - every failing plugin produced exactly one client notification;
+   - `updater_error` becomes the concatenation of all template failures (set
+     by `_run_managed`, see 5 below), so `plugins_ready()` is false;
+   - the operation future fails, so the startup barrier
+     `PluginsCatalogInitialized` fails as today and the scheduler is not
+     started (unchanged behaviour).
+4. `update_single`: replace the `ingest_plugin_templates(...)` call with
+   `error = _request_template_ingest(pluginId)` (same position and
+   condition) and raise `PluginTemplateIngestFailed(error)` if it is not
+   `None`.
+5. `domain/plugin/submit.py::_run_managed`: add an `except PluginTemplateIngestFailed`
+   branch before the generic one that logs at error level (no traceback
+   needed), calls `finish_with_error(str(e))`, does **not** call
+   `notify_failure` (already notified per plugin), and re-raises. Any other
+   exception keeps today's handling, so an unrelated hard failure still
+   overwrites `updater_error` and sends its own notification.
+6. `unload_single`: reverse the order:
    1. `_emit_and_wait(..., PluginTemplatesRemovedEvent(plugin_id))`;
    2. only then `publish_unloaded(plugin_id)` (keep its failure handling).
 
    If dispatch fails, the plugin stays published and the operation fails; a
    retry re-emits safely because removal is idempotent. Unload/uninstall
    reservations already ignore `updater_error`, so retry is possible.
-5. `uninstall_plugin_sync`: reverse the order to `unload_single(plugin_id)`
+7. `uninstall_plugin_sync`: reverse the order to `unload_single(plugin_id)`
    first, then `delete_plugin_state(...)`. If template removal fails, the
    plugin keeps its DB state and stays installed and published (consistent,
    retryable); the route's "is installed" check keeps working for a retry.
-6. Delete `domain/plugin/template_ingest.py` (moved in step 3) and its import.
+8. Delete `domain/plugin/template_ingest.py` (moved in step 4) and its import.
 
-### 5. Readiness
+Template removal failures (unload/uninstall) take the generic `_run_managed`
+path: one `updater_error`, one notification.
+
+### 6. Readiness
 
 No code change is needed: `load_plugins` runs inside the managed
 `plugin.initial-load` operation and waits for every ingestion receipt before
@@ -297,7 +371,7 @@ means "plugin-management startup succeeded and all required template
 dispatches completed without failure". Add one sentence saying exactly this to
 the `plugins_ready` docstring (it has none today).
 
-### 6. Docstrings and docs
+### 7. Docstrings and docs
 
 - `domain/plugin/__init__.py`: delete the circularity note; replace "Depends
   on Glyph domain (for glyph remapping)" with the actual dependencies (the
@@ -306,11 +380,16 @@ the `plugins_ready` docstring (it has none today).
   `PluginTemplatesChangedEvent`/`PluginTemplatesRemovedEvent` (see
   `events.py`), handled by `domain/blueprint/dispatchers.py`; the plugin
   domain never imports blueprint."
+  Also mention `service.py` as the entry point other domains (blueprint) use
+  for template ingestion data, and `notifications.py`.
 - `domain/blueprint/__init__.py`: delete the circularity note; add "Consumes
   plugin template events via `dispatchers.py` (`template_ingest.py`)".
 - `domain/plugin/state.py` and `domain/plugin/submit.py` docstrings mention
   "template ingestion" as work done on the plugin-management worker; reword
   to "waiting for template event dispatch".
+- `domain/plugin/submit.py` docstring: mention that template ingestion
+  failures are notified per plugin and recorded as one concatenated
+  `updater_error`.
 - `domain/plugin/errors.py` describes the `template_ingest` error source;
   keep the source value, update wording if it says the plugin domain
   performs the ingestion.
@@ -321,10 +400,15 @@ Unit tests:
 
 1. Move `tests/unit/domain/plugins/test_plugin_template_ingest.py` to
    `tests/unit/domain/blueprint/test_template_ingest.py`; adapt to the new
-   signature (populate `PluginManager.plugins` with the fake plugin in the
-   fixture and reset it afterwards); add a test that a plugin missing from the
-   catalogue raises `PluginTemplatesUnavailable`.
-2. `tests/unit/utility/test_dispatcher.py`, using a fake manager that returns
+   signature (monkeypatch `begin_template_ingest` / `record_template_errors`
+   in the blueprint module, or populate `PluginManager.plugins` in the fixture
+   and reset it afterwards).
+2. `tests/unit/domain/plugins/test_plugin_service.py`: `begin_template_ingest`
+   raises `PluginTemplatesUnavailable` for an unpublished plugin and for a
+   missing plugin_state row, returns `None` (and leaves the flag) when
+   `asset_ingest_needed` is false, and otherwise returns the spec and clears
+   the flag; `record_template_errors` persists the mapping.
+3. `tests/unit/utility/test_dispatcher.py`, using a fake manager that returns
    *pending* futures it controls:
    - `_dispatch` returns while handler futures are still pending, and the
      receipt is not done;
@@ -337,20 +421,27 @@ Unit tests:
      `DispatcherClosed`.
    The existing inline-fake tests must keep passing (callbacks fire
    synchronously on already-done futures).
-3. `tests/unit/domain/plugins/`: tests for `loading.py` with `submit_event`
+4. `tests/unit/domain/plugins/`: tests for `loading.py` with `submit_event`
    patched to return controllable futures:
    - `unload_single` does not call `publish_unloaded` when the receipt fails,
      and calls it after a successful receipt;
    - `uninstall_plugin_sync` keeps the DB state when template removal fails;
    - `load_plugins` emits one changed event per loaded plugin, continues after
-     a failed receipt, and raises at the end listing the failed plugin.
-4. `tests/unit/domain/blueprint/test_dispatchers.py`: the tuple contains the
+     a failed receipt, calls `notify_failure` once per failed plugin, and
+     raises `PluginTemplateIngestFailed` whose message contains all failed
+     plugin ids;
+   - `_run_managed` with a worker raising `PluginTemplateIngestFailed` sets
+     `updater_error` to its message and does not call `notify_failure`; with
+     any other exception it still notifies.
+5. `tests/unit/domain/blueprint/test_dispatchers.py`: the tuple contains the
    two registrations on `ConcurrentPools.General` with the expected
    `handler_type`s, and the handlers call the ingestion/removal functions with
    the payload's id.
-5. Add a static guard test (or a check in an existing test module) that no
-   file under `domain/plugin/` contains `forecastbox.domain.blueprint` - cheap
-   and prevents regressions.
+6. Add a static guard test (or a check in an existing test module) that no
+   file under `domain/plugin/` contains `forecastbox.domain.blueprint`, and
+   that `domain/blueprint/template_ingest.py` does not import
+   `forecastbox.domain.plugin.db` or `forecastbox.domain.plugin.state` -
+   cheap and prevents regressions.
 
 Integration tests: the existing ones in `tests/integration/test_blueprint.py`
 cover the observable behaviour and must pass unchanged:
@@ -399,22 +490,25 @@ Then `just val` and `uv run prek`.
   only relevant here because the new events must not implement
   `as_client_notification`.
 
+## Notes
+
+- "Regular" per-plugin install/load problems in `load_plugins` are recorded
+  as `PluginErrors` (shown in plugin detail) and are not operation failures;
+  they neither set `updater_error` nor send a notification today, and this
+  phase does not change that. Only failures that abort an operation (which
+  overwrite `updater_error`) and template ingestion failures (step 5) are
+  notified.
+- `TEMPLATE_DISPATCH_TIMEOUT_SECONDS = 600` is deliberately far above the
+  observed ingestion time (a few seconds per plugin).
+
 ## Open questions
 
-1. **Per-plugin failure during initial load.** This plan continues ingesting
-   the remaining plugins and fails the operation at the end; today the first
-   failure aborts the loop. Both leave `updater_error` set. Confirm the
-   change is welcome.
-> answer: if there is issue in template in a single plan, we want to continue the others, and the updater_erorr would ideally be a concatenation of the errors (but this is not critical, say if template ingests fail in one plugin and a regular load fail for another plugin, then if only a single of these survives as the updater_error its ok -- but both would ideally send failure notification to the client)
-2. **Who should own `asset_ingest_needed` and `template_errors` writes.** The
-   plan keeps them in the blueprint handler (calls into
-   `domain/plugin/db.py`), as the migration prescribes and so that a rejected
-   dispatch leaves the flag set for the next load. The alternative is the
-   producer checking/clearing the flag before emitting, which keeps plugin
-   state writes inside the plugin domain but loses that "retry next time"
-   property. Confirm.
-> answer: blueprint calling into plugin domain is ok, but ideally not the db.py itself, but through a service.py or some other higher level module in domain/plugin
-3. **Timeout value.** `TEMPLATE_DISPATCH_TIMEOUT_SECONDS = 600` per plugin is
-   a guess at "never hit in practice" for large template sets. Is there a known
-   upper bound for ingestion time of the ECMWF plugin?
-> answer: it is usually a few seconds tops, so 600 is a good idea
+1. **Notifications for per-plugin load errors.** Your answer mentioned that a
+   "regular load fail" for a plugin should ideally notify clients too. As
+   noted above, such failures are per-plugin `PluginErrors` (e.g. import
+   failure, install failure during the initial load), not operation
+   failures, and currently send nothing. Should this phase also emit one
+   `PluginGlobalErrorEvent` per plugin whose initial load/install ended with
+   an `error`-severity `PluginErrors` entry (and likewise in `update_single`)?
+   It is a small addition in `load_plugins`, but it is a behaviour change
+   unrelated to the event decoupling, so the plan currently leaves it out.

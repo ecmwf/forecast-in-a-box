@@ -3,17 +3,20 @@
 ## Purpose and scope
 
 Add a periodic jobs-database maintenance thread as a lifecycle proof of
-concept: a second, independent long-lived thread owned by the
+concept: a further independent long-lived thread owned by the
 `ExecutionManager`, registered as
-`ConcurrentThreads.DatabaseGarbageCollector` at stage 2, that wakes every 10
-minutes, runs one simple read-only jobs-DB query directly on its own thread
-(under the shared jobs lock), records the result in its component status, and
-sleeps again.
+`ConcurrentThreads.DatabaseGarbageCollector` at stage 2, that wakes every 3
+hours (or when explicitly triggered by an admin), runs one simple read-only
+jobs-DB query directly on its own thread (under the shared jobs lock), records
+the result in its component status, and sleeps again. It does not run during
+startup.
 
 This is **not** garbage collection. Do not delete rows, design retention or
 eligibility rules, traverse cascades, batch, or discover per-domain cleanup
 callables. Those belong to a later specification. Do not add configuration
-fields, an admin "run now" route, or a restart route.
+fields, a restart route, or any client notification. The only new route is an
+admin trigger (`POST /admin/triggerCleanup`), which exists so integration
+tests (now, and for the future real cleanup) do not depend on timing.
 
 ### Original design references
 
@@ -63,10 +66,9 @@ All paths below are relative to `backend/src/forecastbox/`.
    code that will later grow into real garbage collection across several
    domains (so it sits above them in the domain hierarchy); it is not
    general-purpose utility code and is not entrypoint bootstrapping. The
-   entrypoint only registers it.
+   entrypoint only registers it; `routes/admin.py` only triggers it.
 2. **Query: one new read-only helper in `domain/blueprint/db.py`.** Blueprint
-   is the clearest example of versioned, tombstoned rows, so a summary of its
-   rows is the natural input for future GC. A single aggregate `SELECT`:
+   is the clearest example of versioned, tombstoned rows:
 
    ```python
    @dataclass(frozen=True, eq=True, slots=True)
@@ -84,21 +86,24 @@ All paths below are relative to `backend/src/forecastbox/`.
    `select(func.count(), func.sum(case((Blueprint.is_deleted.is_(True), 1), else_=0)), func.count(func.distinct(Blueprint.blueprint_id)))`
    inside `dbRetry`, coalescing `None` to `0` (empty table). No auth context:
    this is an internal, non-user-facing query; say so in the docstring.
-3. **No `stop_request`.** The thread only ever waits on the manager's stop
-   event (`stop_event.wait(interval)`), which the manager sets before calling
-   any stop request, so a separate wake mechanism would be redundant. Pass
-   `stop_request=None`.
-4. **First query immediately on start**, then every 10 minutes. This makes the
-   PoC observable in status (and in integration tests) without waiting 10
-   minutes; the query is trivial.
-5. **Query failures do not kill the thread.** Catch `Exception` around the
+3. **Interval: 3 hours, hardcoded** in one named module constant
+   `CLEANUP_INTERVAL_SECONDS = 3 * 60 * 60`. Not in `utility/config.py`.
+4. **No run at startup.** The first run happens one interval after the thread
+   starts, or earlier when triggered. Startup is a busy period and nothing
+   unnecessary should run then.
+5. **Wake event + stop request.** The thread sleeps on a domain-owned
+   `threading.Event` (`wake`), which is set by the admin trigger and by the
+   registered `stop_request`. Same pattern as the Phase 4 scheduler: clear the
+   event *before* each run, so a trigger arriving mid-run causes one more run
+   instead of being lost.
+6. **Query failures do not kill the thread.** Catch `Exception` around the
    query, log it, record it in the status, and continue on the normal
    interval. Only programming errors outside the guarded call end the thread
    (recorded by the manager).
-6. **Restart policy:** `RestartPolicy(max_restarts=3)`. Nothing calls
-   `restart_thread` for this thread in this phase; the policy only documents
-   that it is restartable by explicit request if a later admin operation is
-   added.
+7. **Restart policy: the default `NEVER_RESTART`.** No automated restarts and
+   no restart route in this phase.
+8. **Silent.** No events, no client notifications; results are only logged at
+   debug level and exposed in status.
 
 ## Implementation steps
 
@@ -114,18 +119,24 @@ Add `BlueprintStorageSummary` and `summarize_blueprint_storage()` to
 `domain/maintenance/__init__.py` - docstring only:
 
 > Periodic jobs-database maintenance. Currently a proof of concept: a managed
-> long-lived thread that periodically runs a read-only summary query and
-> exposes the result in its status. Real garbage collection (retention,
-> deletion, cascades) is not implemented yet.
+> long-lived thread that periodically (or on admin trigger) runs a read-only
+> summary query and exposes the result in its status. Real garbage collection
+> (retention, deletion, cascades) is not implemented yet.
 >
 > Depends on the Blueprint domain (storage summary query). Depended on by no
-> other domain; registered by the entrypoint.
+> other domain; registered by the entrypoint, triggered by `routes/admin.py`.
+
+`domain/maintenance/exceptions.py`:
+
+```python
+class CleanupNotRunning(Exception):
+    """Raised when a cleanup is triggered while the maintenance thread is not running."""
+```
 
 `domain/maintenance/garbage_collector.py`:
 
 ```python
-GC_INTERVAL_SECONDS = 10 * 60
-GC_RESTART_POLICY = RestartPolicy(max_restarts=3)
+CLEANUP_INTERVAL_SECONDS = 3 * 60 * 60
 
 
 class GarbageCollectorState(StrEnum):
@@ -147,16 +158,16 @@ class GarbageCollectorStatus(StatusModel):
 
 
 class GarbageCollectorRuntime:
+    wake: threading.Event = threading.Event()
     status: GarbageCollectorStatus = GarbageCollectorStatus(state=GarbageCollectorState.stopped)
 ```
 
 Functions:
 
 - `_publish(**changes)` - reference swap via `model_copy(update=changes)`;
-  only the collector thread writes.
+  only the collector thread writes the status.
 - `_run_once() -> None`:
-  1. `now = current_time("liveness")`; publish `querying`,
-     `last_attempt_at=now`;
+  1. publish `querying`, `last_attempt_at=current_time("liveness")`;
   2. `try: summary = summarize_blueprint_storage()`;
      on `Exception as e`: `logger.exception(...)`, publish
      `last_failure=repr(e)`; else publish `last_result=summary`,
@@ -167,26 +178,39 @@ Functions:
   ```python
   try:
       while not stop_event.is_set():
-          _run_once()
           _publish(state=GarbageCollectorState.idle,
-                   next_wake_at=current_time("liveness") + dt.timedelta(seconds=GC_INTERVAL_SECONDS))
-          stop_event.wait(GC_INTERVAL_SECONDS)
+                   next_wake_at=current_time("liveness") + dt.timedelta(seconds=CLEANUP_INTERVAL_SECONDS))
+          GarbageCollectorRuntime.wake.wait(CLEANUP_INTERVAL_SECONDS)
+          if stop_event.is_set():
+              break
+          GarbageCollectorRuntime.wake.clear()
+          _run_once()
   finally:
       _publish(state=GarbageCollectorState.stopped, next_wake_at=None)
   ```
 
-  The entrypoint is re-entrant: a restart starts a new loop from the current
-  status (history fields are kept).
+  Note the order: sleep first (no run at startup), clear the wake event
+  before the run (a trigger during the run causes one more run).
+  The entrypoint is re-entrant: a later restart would start a new loop from
+  the current status (history fields are kept).
+- `garbage_collector_stop_request(timeout: float) -> None` - sets
+  `GarbageCollectorRuntime.wake` (the manager has already set the stop
+  event).
 - `garbage_collector_status() -> GarbageCollectorStatus` - status provider,
   returns `GarbageCollectorRuntime.status`; no I/O, no lock.
+- `trigger_cleanup() -> None` - raises `CleanupNotRunning` unless the state is
+  `idle` or `querying`; otherwise sets `GarbageCollectorRuntime.wake`. In-memory
+  and non-blocking, so it may be called directly from async code.
 
-Readiness: the first `_publish(state=querying, ...)` makes the thread ready
-immediately, so `execution_manager.start()` does not wait for the query.
+Readiness: the first `_publish(state=idle, ...)` makes the thread ready
+immediately, so `execution_manager.start()` does not wait.
 
 Module docstring: "Proof-of-concept periodic maintenance thread owned by
 `ExecutionManager` (stage 2, so it starts after and stops before the
-scheduler). Calls a locked jobs-DB helper directly on its own thread; the
-session is created and closed inside the helper. No rows are modified."
+scheduler). Runs every `CLEANUP_INTERVAL_SECONDS` or when triggered, never at
+startup. Calls a locked jobs-DB helper directly on its own thread; the
+session is created and closed inside the helper. No rows are modified and
+nothing is emitted."
 
 The `StatusModel` field `last_result: BlueprintStorageSummary | None` holds a
 stdlib frozen dataclass; pydantic serializes it as an object. If `ty` or
@@ -204,8 +228,8 @@ execution_manager.register_thread(
     ConcurrentThreads.DatabaseGarbageCollector,
     garbage_collector_entrypoint,
     status_provider=garbage_collector_status,
+    stop_request=garbage_collector_stop_request,
     stage=2,
-    restart_policy=GC_RESTART_POLICY,
 )
 ```
 
@@ -215,18 +239,36 @@ first. If `_start_execution_runtime` is getting long, extract
 `_register_threads()` holding the dispatcher, scheduler and collector
 registrations; keep it a flat sequence of calls (Phase 8 will consolidate).
 
-### 4. Documentation
+### 4. Admin trigger route (`routes/admin.py`)
+
+```python
+@router.post("/triggerCleanup")
+async def trigger_cleanup_endpoint(admin: UserRead | None = Depends(get_admin_user)) -> None:
+    """Wake the periodic database maintenance thread to run now. Returns once the run is
+    requested, not when it completes; observe completion in GET /status under
+    concurrency.threads.database-garbage-collector. Requires admin access."""
+    try:
+        trigger_cleanup()
+    except CleanupNotRunning as e:
+        raise HTTPException(status_code=409, detail=str(e))
+```
+
+Direct call (no pool submission): `trigger_cleanup` only sets an event. Update
+the `routes/admin.py` module docstring to mention the maintenance trigger.
+
+### 5. Documentation
 
 - `backend/development.md`, "Concurrency Considerations": the opening
   paragraph already lists "database garbage collector" among the background
   threads; add "(currently a read-only proof of concept in
-  `domain/maintenance`)".
-- No route or frontend change.
+  `domain/maintenance`, runs every 3 hours or on `POST /admin/triggerCleanup`)".
+- No frontend or CLI change.
 
 ## Tests and validation
 
 Unit tests (`tests/unit/domain/maintenance/test_garbage_collector.py`; reset
-`GarbageCollectorRuntime.status` in a fixture):
+`GarbageCollectorRuntime.status` and clear `GarbageCollectorRuntime.wake` in a
+fixture):
 
 1. `summarize_blueprint_storage` on an in-memory DB (reuse the
    `sync_session_maker` monkeypatch pattern from
@@ -234,67 +276,63 @@ Unit tests (`tests/unit/domain/maintenance/test_garbage_collector.py`; reset
    zeros; two versions of one blueprint plus one deleted blueprint give the
    expected counts.
 2. Entrypoint with `summarize_blueprint_storage` monkeypatched to a counter,
-   run on a plain test thread: after the first call the status is `idle`
-   with `last_result`, `last_success_at`, and `next_wake_at` set; setting the
-   stop event makes the thread return promptly (join with a 1-2 s timeout)
-   and the status becomes `stopped`. Monkeypatch `GC_INTERVAL_SECONDS` to a
-   large value so only one iteration runs.
+   run on a plain test thread: shortly after start the state is `idle` and the
+   query was **not** called; `trigger_cleanup()` causes exactly one call and
+   `last_result`, `last_success_at`, `next_wake_at` are set; setting the stop
+   event plus calling `garbage_collector_stop_request` makes the thread return
+   promptly (join with a 1-2 s timeout) and the state becomes `stopped`.
 3. A failing query records `last_failure`, keeps `last_success_at` unchanged,
-   and the thread keeps running (still alive before the stop event is set).
+   and the thread keeps running.
+4. `trigger_cleanup()` raises `CleanupNotRunning` when the state is `stopped`.
+5. Route: `trigger_cleanup_endpoint` maps `CleanupNotRunning` to 409
+   (monkeypatch `trigger_cleanup`).
 
-Integration test (`tests/integration`, e.g. in `test_db_startup.py` or a new
-`test_maintenance.py`): poll `GET /status` until
-`concurrency.threads["database-garbage-collector"]` has `alive: true`,
-`stage: 2`, and `component_status.last_success_at` not null; assert
-`component_status.last_result.total_rows >= 0`. This proves the third managed
-thread starts, uses the jobs lock alongside the scheduler and pools, and
-reports unified status.
+Integration test (new `tests/integration/test_maintenance.py`):
+
+1. `GET /status`: `concurrency.threads["database-garbage-collector"]` has
+   `alive: true`, `stage: 2`, `component_status.state == "idle"`, and
+   `component_status.last_attempt_at is None` (nothing ran at startup; this
+   holds as long as no other test triggered a cleanup before, so either run
+   this assertion only if it is the first trigger in the session or drop it).
+2. `POST /admin/triggerCleanup` as admin returns 200; poll `GET /status` until
+   `component_status.last_success_at` is set (and later than before the
+   trigger, if it was set); assert `last_result.total_rows >= 0`.
+3. With the non-admin `backend_client_user` fixture it returns 403 (the
+   integration backend runs with `auth.passthrough = False`).
 
 Manual check: stop the backend and verify from the logs that shutdown stops
 the collector before the scheduler (stage 2 before stage 1) without waiting
-for the 10-minute interval.
+for the interval.
 
 Then `just val` and `uv run prek`.
 
 ## Completion criteria
 
-- `concurrency.threads` in `/status` contains `database-garbage-collector`
-  with a populated component status shortly after startup.
-- The collector never modifies the database.
-- No new config fields, routes, or threads outside the manager.
+- `concurrency.threads` in `/status` contains `database-garbage-collector`.
+- The collector does not run during startup; it runs on trigger and every 3
+  hours.
+- The collector never modifies the database and emits no events.
+- No new config fields and no threads outside the manager; the only new route
+  is `POST /admin/triggerCleanup`.
 
 ## Outdated information in the original documents
 
+- The design and migration ask for a 10-minute interval, no administrative
+  prod, and say nothing about the first run. This plan uses a 3-hour
+  interval, no run at startup, and an admin trigger route for timing-independent
+  testing.
 - The migration calls this a "lifecycle and DB-pool proof of concept"; the
   thread does not use `ConcurrentPools.JobsDb` (synchronous threads call
   jobs-DB helpers directly under the jobs lock, per the delivered Phase 2
   rules). It is a lifecycle and jobs-lock proof of concept.
-- The migration asks for "a stop request that wakes its sleep condition". With
-  the delivered manager (stop event set before any stop request), waiting on
-  the stop event is sufficient; a separate stop request would be redundant.
+- The migration recommends an "explicit-only capped restart policy". Since
+  Phase 4, explicit restarts bypass the policy (`reset_restart_count=True`),
+  and the policy only governs automated restarts, of which there are none;
+  the collector uses `NEVER_RESTART`.
 - The migration's Phase 7 says to extend this PoC to emit a
   `notification.emitted` event after each query. Phase 7 was delivered as a
   real websocket notification system (`domain/notification`), where any
   emitted `ClientNotificationSource` payload is pushed to every connected
-  client. Emitting from this thread would show a client notification every 10
-  minutes, so this plan does not emit anything (see open question 1).
+  client. The collector stays silent.
 - The design's `ActiveWebsocketClientRegistry` does not exist; its role is
   played by `domain/notification/service.py`.
-
-## Open questions
-
-1. **Notification emission.** Should the collector emit anything through the
-   event dispatcher? This plan says no, because the delivered notification
-   path would broadcast to clients. If a dispatcher round trip is still
-   wanted as part of the PoC, it should be a non-notification event with no
-   handler (or a debug-only handler), which proves little; recommend leaving
-   it out.
-   > answer: no notifications, we want this to be silent
-2. **Query choice.** A blueprint row summary is proposed because it is the
-   most obvious future GC target. Any other single read-only aggregate (e.g.
-   runs by status) would serve equally; confirm blueprint is fine.
-   > answer: yes you can start with blueprints
-3. **Immediate first run.** The plan runs the query at startup rather than
-   after the first 10-minute sleep, for observability. Confirm this is
-   acceptable (it adds one trivial locked query during startup).
-   > answer: this is a very interesting question -- so generally I would not want this to fire early, because the startup itself is a very busy time and I dont want anything unnecessary to run by then. I would even argue that it should run every 3 hours, not 10 minutes, I dont want this to cause any pressure (and I don't think this needs to go to the `utility.config`, just hardcode it for now, but to a single named global constant). However, you point out a good observability case. I think we may want to add `POST triggerCleanup` to `routes.admin` -- not that we expect a real usage but would allow us to add a nice timing-independent integration test as we will develop a real cleaning capabiliy

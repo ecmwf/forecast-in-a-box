@@ -115,12 +115,15 @@ Known defects in the current code, fixed as part of this phase:
    can exceed the shutdown budget.
 4. `logger.error("Skipping {experiment_id} at {scheduled_at}: ...")` is
    missing the `f` prefix.
-5. Async request paths in `domain/experiment/service.py` acquire the
-   *threading* `scheduler_lock` with a 3 s blocking timeout *on the event loop*
-   and then hold it across `await`s. A second concurrent request then blocks the
-   whole loop for up to 3 s (the first request cannot make progress while the
-   loop thread is blocked), and a scheduler iteration holding the lock blocks
-   the loop the same way.
+
+Known defect that is **not** fixed in this phase (only marked with a TODO,
+see step 5): async request paths in `domain/experiment/service.py` acquire the
+*threading* `scheduler_lock` with a 3 s blocking timeout *on the event loop*
+and then hold it across `await`s. A second concurrent request then blocks the
+whole loop for up to 3 s (the first request cannot make progress while the
+loop thread is blocked), and a scheduler iteration holding the lock blocks
+the loop the same way. Keep the 3 s timeout; changing it would change
+behaviour.
 
 ## Target module layout
 
@@ -240,12 +243,16 @@ Functions:
     `not config.backend.allow_scheduler`;
   - `execution_manager.stop_thread(ConcurrentThreads.Scheduler, timeout=SCHEDULER_STOP_TIMEOUT_SECONDS)`
     (module constant, `10.0`);
-  - `execution_manager.restart_thread(ConcurrentThreads.Scheduler)`;
+  - `execution_manager.restart_thread(ConcurrentThreads.Scheduler, reset_restart_count=True)`
+    (see step 3: an explicit, human-initiated restart is not limited by the
+    restart policy and resets the counter);
   - translate `LifecycleError` into `SchedulerRestartRefused(str(error))`
-    (new exception; covers "still alive after stop", "restart budget
-    exhausted", "manager not running").
-- `SCHEDULER_RESTART_POLICY = RestartPolicy(max_restarts=10)` - see open
-  question 1.
+    (new exception; covers "still alive after stop" and "manager not
+    running").
+
+The scheduler is registered with the default `NEVER_RESTART` policy: there
+is no automated restart; the only way to restart it is the explicit admin
+route.
 
 Use a module-level `_publish(**changes)` helper that does
 `SchedulerRuntime.status = SchedulerRuntime.status.model_copy(update=changes)`;
@@ -259,15 +266,29 @@ via the restart route), and that the status is a lock-free snapshot.
 
 ### 3. Manager adjustments (`utility/concurrency/manager.py`)
 
-Small changes needed for restartable threads to report correctly:
+Small changes needed for restartable threads:
 
-1. In `_start_thread`, reset `record.uncaught_exception`, `record.traceback`,
+1. Extend `restart_thread` with a keyword argument:
+
+   ```python
+   def restart_thread(self, thread_name: ConcurrentThreads, *, reset_restart_count: bool = False) -> ThreadStatus:
+   ```
+
+   With `reset_restart_count=False` (default) the behaviour is unchanged:
+   refuse when `restart_count >= restart_policy.max_restarts`, otherwise
+   increment. With `reset_restart_count=True` the restart-policy check is
+   skipped and `restart_count` is set to `0`; this is for explicit,
+   operator-initiated restarts, which must not be limited by the policy meant
+   for automated restarts. All other checks (lifecycle `running`, thread not
+   alive, thread registered) still apply. Document both modes in the
+   docstring.
+2. In `_start_thread`, reset `record.uncaught_exception`, `record.traceback`,
    and `record.stopped_at` to `None` before starting the new thread. Otherwise
    `ExecutionStatus.healthy` stays `False` forever after a successful restart.
-2. In the `run()` wrapper, log the uncaught exception
+3. In the `run()` wrapper, log the uncaught exception
    (`logger.exception(f"managed thread {record.thread_name} failed")`) so the
    failure is not lost when a restart clears the record.
-3. No other manager changes. In particular do not add automatic restarts.
+4. No other manager changes. In particular do not add automatic restarts.
 
 ### 4. Entrypoint wiring (`entrypoint/initializers.py`)
 
@@ -296,7 +317,6 @@ Small changes needed for restartable threads to report correctly:
            status_provider=scheduler_status,
            stop_request=scheduler_stop_request,
            stage=1,
-           restart_policy=SCHEDULER_RESTART_POLICY,
        )
    ```
 
@@ -327,11 +347,16 @@ Small changes needed for restartable threads to report correctly:
 
 - `domain/experiment/service.py`: import `prod_scheduler` from
   `scheduling.runtime`, keep `scheduler_lock` from `scheduling.background`.
-  Fix defect 5: change `timeout_acquire_request` from `3` to `0` (a
-  non-blocking acquire, so the event loop is never blocked; contention
-  surfaces immediately as `SchedulerBusy` -> 503, which the frontend already
-  retries). Update the comment next to the constant accordingly. Delete
-  `timeout_acquire_lifecycle` (no remaining users).
+  Keep `timeout_acquire_request = 3` unchanged. At each of the two
+  `with timed_acquire(scheduler_lock, timeout_acquire_request)` sites
+  (`update_schedule`, `delete_schedule`) add:
+
+  ```python
+  # TODO rework the whole update to run in a pool to not block the loop / not hold the lock for too long
+  ```
+
+  Delete `timeout_acquire_lifecycle` from `background.py` (no remaining
+  users).
 - `routes/experiment.py::restart_scheduler`:
 
   ```python
@@ -349,7 +374,14 @@ Small changes needed for restartable threads to report correctly:
 - `routes/status.py`: import `status_scheduler` from `scheduling.runtime`;
   otherwise unchanged. The scheduler's full detail is now automatically
   present under `concurrency.threads.scheduler` (its `component_status` is the
-  `SchedulerStatus`). See open question 2 about the top-level field.
+  `SchedulerStatus`). The top-level `scheduler` field stays in the response
+  (the frontend and the CLI read it) but is derived from the managed
+  thread's status by `status_scheduler()`. Add next to the field in
+  `StatusResponse`:
+
+  ```python
+  # TODO deprecated field, migrate clients to directly query the managed thread status, then remove this
+  ```
 
 ### 6. Documentation and docstrings
 
@@ -388,8 +420,12 @@ Unit tests (new `tests/unit/scheduling/test_runtime.py`; reset
    not use the global one; the unit `conftest.py` monkeypatches some of its
    methods): register a thread whose entrypoint raises, start, wait for death,
    assert `healthy is False`; `restart_thread` -> the new run clears
-   `uncaught_exception` and `healthy` is `True` again; exhausting
-   `max_restarts` raises `LifecycleError`. Shut the manager down at the end.
+   `uncaught_exception` and `healthy` is `True` again. With
+   `RestartPolicy(max_restarts=1)`: a second plain `restart_thread` raises
+   `LifecycleError`, while `restart_thread(..., reset_restart_count=True)`
+   succeeds and leaves `restart_count == 0`; with `NEVER_RESTART`, a plain
+   restart is refused and a reset restart succeeds. Shut the manager down at
+   the end.
 7. `restart_scheduler()` raises `SchedulerDisabled` when disabled, and maps a
    `LifecycleError` from the manager into `SchedulerRestartRefused`
    (monkeypatch `execution_manager.stop_thread`/`restart_thread`).
@@ -407,8 +443,10 @@ Integration tests (`tests/integration`, scheduler is enabled in
    `concurrency.threads.scheduler.alive is True`, and
    `component_status.state in {"sleeping", "scheduling"}`.
 3. New test: `POST /experiment/operational/scheduler/restart` as admin
-   returns 200, then `GET /status` eventually shows `scheduler == "up"` and
-   `restart_count` increased by one; as a non-admin it returns 403.
+   returns 200, then `GET /status` eventually shows `scheduler == "up"`,
+   `concurrency.threads.scheduler.started_at` later than before the restart,
+   and `restart_count == 0`; calling it twice in a row succeeds both times
+   (no budget); as a non-admin it returns 403.
 
 Then `just val` and `uv run prek`.
 
@@ -429,8 +467,11 @@ Then `just val` and `uv run prek`.
   scheduler already calls `experiment2runnable` and `submit_run_sync`
   directly.
 - The design's `RestartPolicy` has `minimum_interval_seconds`; the delivered
-  manager has only `max_restarts`. Since restarts are explicit-only (admin
-  route), this plan does not add the interval.
+  manager has only `max_restarts`. The scheduler uses `NEVER_RESTART` and is
+  restarted only through the explicit admin route, which bypasses and resets
+  the restart budget (`reset_restart_count=True`), so this plan does not add
+  the interval. The migration's "capped on-failure restart" recommendation is
+  thereby replaced by "no automated restart, unlimited explicit restarts".
 - The design names the status-provider type `ThreadStatusProvider` returning
   `ComponentStatus`; the delivered manager uses `ComponentStatusProvider`
   returning any `StatusModel` with `is_ready()`.
@@ -440,32 +481,15 @@ Then `just val` and `uv run prek`.
 - The migration says to drop the top-level `scheduler` status field. The
   frontend (`frontend/src/types/status.types.ts`) and the CLI
   (`cli/crates/fiab-lib-client/src/models/status.rs`, a required serde field)
-  both read it; see open question 2.
+  both read it. It is kept, derived from the managed thread status, and
+  marked with a deprecation TODO (step 5).
 
-## Open questions
+## Notes
 
-1. **Restart budget.** Today the admin restart route is unlimited. The
-   manager requires a finite `max_restarts`; this plan picks `10` per process
-   lifetime, and exhausting it yields 409 until the backend is restarted. Is a
-   lower cap (e.g. 3, as the design suggests "capped") preferred, or should the
-   cap be effectively unlimited for the admin route?
-   > answer: I wonder why we don't allow arbitrary amount of restarts? I mean, if the restart is like automated / self-healing, then I understand it, we don't want to end up in a forever aggressive crash-start-loop. But this is explicit, deliberate, human-initiated restart/reset, which should even null the counter. Maybe we add reset_restart_count: bool = False to the concurrency manager api and utilize here? And the thread itself can be with restart never for automated restarts
-2. **Top-level `scheduler` status field.** This plan keeps it (now derived
-   from the managed thread's component status) because removing it breaks
-   the frontend schema and the CLI deserialization. The migration document
-   asked for its removal; if that is still wanted, it should be coordinated
-   with frontend/CLI changes, likely in Phase 8.
-    > answer: keeping it in the outward facing api is ok as long as we derive it from the managed thread status. However expand the plan to include a `# TODO deprecated field, migrate clients to directly query the managed thread status, then remove this` comment to be added to the code afterwards
-3. **Non-blocking `scheduler_lock` acquisition in async paths (defect 5).**
-   The plan changes the request timeout to `0`. The cleaner long-term fix is to
-   not hold a threading lock across `await`s at all (e.g. run the whole
-   locked update as one synchronous function on a pool worker), but that is a
-   larger refactor of `domain/experiment/service.py`. Is the minimal fix
-   acceptable for now?
-    > answer: we prefer to keep the request timeout 3, not 0, that would change the behaviour. So no fix at all, but expand the plan to include a `# TODO rework the whole update to run in a pool to not block the loop / not hold the lock for too long` comment to be added to the code afterwards
-4. **Iteration failures kill the thread.** Preserved from today: any exception
-   in `schedule_due_experiments` ends the thread until an admin restart. An
-   alternative is catching per iteration, recording the error in
-   `SchedulerStatus`, and retrying after a backoff. Kept as-is to avoid a
-   behavioural change; confirm.
-    > answer: keep as is
+- Iteration failures keep today's semantics: any exception in
+  `schedule_due_experiments` ends the thread until an admin restart. Do not add
+  per-iteration catch-and-retry.
+- The `scheduler_lock` / event-loop blocking issue described under "Current
+  state" is intentionally left as is (only the TODO comments from step 5 are
+  added); a later change should run the whole schedule update as one
+  synchronous function on a pool worker.
