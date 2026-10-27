@@ -479,7 +479,7 @@ class WeeklyStatistics(Product):
         return Either.ok(action)
 
     def intersect(self, other: QubedOutput) -> bool:
-        if not contains(other, STEP) or max(axes(other)[STEP]) < 7*24:
+        if not contains(other, STEP): # or max(axes(other)[STEP]) < 7*24:
             return False
         cubes = list(datacubes(other))
         coords = {dim: list(values) for dim, values in axes(other).items() if (len(values) == 1 and dim not in [ENSEMBLE, PARAM])}
