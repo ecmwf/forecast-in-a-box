@@ -405,6 +405,7 @@ Then `just val` and `uv run prek`.
    the remaining plugins and fails the operation at the end; today the first
    failure aborts the loop. Both leave `updater_error` set. Confirm the
    change is welcome.
+> answer: if there is issue in template in a single plan, we want to continue the others, and the updater_erorr would ideally be a concatenation of the errors (but this is not critical, say if template ingests fail in one plugin and a regular load fail for another plugin, then if only a single of these survives as the updater_error its ok -- but both would ideally send failure notification to the client)
 2. **Who should own `asset_ingest_needed` and `template_errors` writes.** The
    plan keeps them in the blueprint handler (calls into
    `domain/plugin/db.py`), as the migration prescribes and so that a rejected
@@ -412,6 +413,8 @@ Then `just val` and `uv run prek`.
    producer checking/clearing the flag before emitting, which keeps plugin
    state writes inside the plugin domain but loses that "retry next time"
    property. Confirm.
+> answer: blueprint calling into plugin domain is ok, but ideally not the db.py itself, but through a service.py or some other higher level module in domain/plugin
 3. **Timeout value.** `TEMPLATE_DISPATCH_TIMEOUT_SECONDS = 600` per plugin is
    a guess at "never hit in practice" for large template sets. Is there a known
    upper bound for ingestion time of the ECMWF plugin?
+> answer: it is usually a few seconds tops, so 600 is a good idea

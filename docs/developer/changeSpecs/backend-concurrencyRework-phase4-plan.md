@@ -449,19 +449,23 @@ Then `just val` and `uv run prek`.
    lifetime, and exhausting it yields 409 until the backend is restarted. Is a
    lower cap (e.g. 3, as the design suggests "capped") preferred, or should the
    cap be effectively unlimited for the admin route?
+   > answer: I wonder why we don't allow arbitrary amount of restarts? I mean, if the restart is like automated / self-healing, then I understand it, we don't want to end up in a forever aggressive crash-start-loop. But this is explicit, deliberate, human-initiated restart/reset, which should even null the counter. Maybe we add reset_restart_count: bool = False to the concurrency manager api and utilize here? And the thread itself can be with restart never for automated restarts
 2. **Top-level `scheduler` status field.** This plan keeps it (now derived
    from the managed thread's component status) because removing it breaks
    the frontend schema and the CLI deserialization. The migration document
    asked for its removal; if that is still wanted, it should be coordinated
    with frontend/CLI changes, likely in Phase 8.
+    > answer: keeping it in the outward facing api is ok as long as we derive it from the managed thread status. However expand the plan to include a `# TODO deprecated field, migrate clients to directly query the managed thread status, then remove this` comment to be added to the code afterwards
 3. **Non-blocking `scheduler_lock` acquisition in async paths (defect 5).**
    The plan changes the request timeout to `0`. The cleaner long-term fix is to
    not hold a threading lock across `await`s at all (e.g. run the whole
    locked update as one synchronous function on a pool worker), but that is a
    larger refactor of `domain/experiment/service.py`. Is the minimal fix
    acceptable for now?
+    > answer: we prefer to keep the request timeout 3, not 0, that would change the behaviour. So no fix at all, but expand the plan to include a `# TODO rework the whole update to run in a pool to not block the loop / not hold the lock for too long` comment to be added to the code afterwards
 4. **Iteration failures kill the thread.** Preserved from today: any exception
    in `schedule_due_experiments` ends the thread until an admin restart. An
    alternative is catching per iteration, recording the error in
    `SchedulerStatus`, and retrying after a backoff. Kept as-is to avoid a
    behavioural change; confirm.
+    > answer: keep as is

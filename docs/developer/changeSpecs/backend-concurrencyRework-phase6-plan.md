@@ -289,9 +289,12 @@ Then `just val` and `uv run prek`.
    wanted as part of the PoC, it should be a non-notification event with no
    handler (or a debug-only handler), which proves little; recommend leaving
    it out.
+   > answer: no notifications, we want this to be silent
 2. **Query choice.** A blueprint row summary is proposed because it is the
    most obvious future GC target. Any other single read-only aggregate (e.g.
    runs by status) would serve equally; confirm blueprint is fine.
+   > answer: yes you can start with blueprints
 3. **Immediate first run.** The plan runs the query at startup rather than
    after the first 10-minute sleep, for observability. Confirm this is
    acceptable (it adds one trivial locked query during startup).
+   > answer: this is a very interesting question -- so generally I would not want this to fire early, because the startup itself is a very busy time and I dont want anything unnecessary to run by then. I would even argue that it should run every 3 hours, not 10 minutes, I dont want this to cause any pressure (and I don't think this needs to go to the `utility.config`, just hardcode it for now, but to a single named global constant). However, you point out a good observability case. I think we may want to add `POST triggerCleanup` to `routes.admin` -- not that we expect a real usage but would allow us to add a nice timing-independent integration test as we will develop a real cleaning capabiliy
