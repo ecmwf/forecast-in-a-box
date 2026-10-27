@@ -40,3 +40,15 @@ class CompilationDetailNotFound(Exception):
 
 class CompilationDetailCorrupted(Exception):
     """Raised when the cached CompilationDetail cannot be deserialized correctly."""
+
+
+class RunLogsArchiveFailed(Exception):
+    """Raised when the run logs archive could not be built."""
+
+
+class RunOutputRetrievalFailed(Exception):
+    """Raised when retrieving or decoding a run output from the gateway failed. The message is user-facing."""
+
+
+class OutputPathNotFound(Exception):
+    """Raised when the output path to be archived does not exist."""

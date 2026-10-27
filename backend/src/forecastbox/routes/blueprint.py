@@ -455,7 +455,7 @@ async def delete_blueprint(
 
 
 @router.get("/catalogue")
-def get_catalogue() -> dict[PluginCompositeId, BlockFactoryCatalogue]:
+async def get_catalogue() -> dict[PluginCompositeId, BlockFactoryCatalogue]:
     """All blocks this backend is capable of evaluating within a blueprint."""
     if not plugins_ready():
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Plugins not ready")
@@ -583,7 +583,7 @@ async def list_available_glyphs(
 
 
 @router.get("/glyphs/functions")
-def list_glyph_functions() -> GlyphFunctionsResponse:
+async def list_glyph_functions() -> GlyphFunctionsResponse:
     """Return all custom functions available in glyph interpolation expressions.
 
     Includes both filters (pipe syntax, e.g. ``${dt | add_days(1)}``) and globals

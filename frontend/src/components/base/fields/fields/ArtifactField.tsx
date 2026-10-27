@@ -14,7 +14,12 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { GlyphFieldWrapper } from './GlyphFieldWrapper'
 import type { ArtifactInfo } from '@/api/types/artifacts.types'
-import { artifactIdToWire, artifactLabels } from '@/api/types/artifacts.types'
+import {
+  MATURITY_TAG,
+  artifactIdToWire,
+  artifactLabels,
+  artifactMaturity,
+} from '@/api/types/artifacts.types'
 import { useArtifacts, useDownloadProgress } from '@/api/hooks/useArtifacts'
 import { Badge } from '@/components/ui/badge'
 import { ArtifactCompatibilityBadge } from '@/features/artifacts/components/ArtifactCompatibilityBadge'
@@ -50,7 +55,45 @@ interface Choice {
   artifact: ArtifactInfo | null
 }
 
-/** Quiet note on downloaded models; every model stays selectable. */
+const NOTE = 'font-normal text-muted-foreground'
+
+function maturityLabel(artifact: ArtifactInfo): string | null {
+  const maturity = artifactMaturity(artifact.tags)
+  return maturity === null ? null : `${MATURITY_TAG}: ${maturity}`
+}
+
+/** Maturity chip; invisible peers size the column to its widest label. */
+function MaturityNote({
+  label,
+  peers,
+}: {
+  label: string | null
+  peers: ReadonlyArray<string>
+}) {
+  return (
+    <span className="grid justify-items-start *:col-start-1 *:row-start-1">
+      {peers
+        .filter((peer) => peer !== label)
+        .map((peer) => (
+          <Badge
+            key={peer}
+            variant="outline"
+            aria-hidden
+            className={cn(NOTE, 'invisible')}
+          >
+            {peer}
+          </Badge>
+        ))}
+      {label !== null && (
+        <Badge variant="outline" className={NOTE}>
+          {label}
+        </Badge>
+      )}
+    </span>
+  )
+}
+
+/** In-flight or failed download. */
 function DownloadStatus({ artifact }: { artifact: ArtifactInfo }) {
   const { t } = useTranslation('artifacts')
   const { isDownloading, progress, error } = useDownloadProgress(artifact.id)
@@ -59,10 +102,7 @@ function DownloadStatus({ artifact }: { artifact: ArtifactInfo }) {
       <Tooltip>
         <TooltipTrigger
           render={
-            <Badge
-              variant="outline"
-              className="ml-auto shrink-0 font-normal text-danger"
-            />
+            <Badge variant="outline" className="font-normal text-danger" />
           }
         >
           {t('status.downloadFailed')}
@@ -71,15 +111,10 @@ function DownloadStatus({ artifact }: { artifact: ArtifactInfo }) {
       </Tooltip>
     )
   }
-  if (!isDownloading && !artifact.isAvailable) return null
+  if (!isDownloading) return null
   return (
-    <Badge
-      variant="outline"
-      className="ml-auto shrink-0 font-normal text-muted-foreground tabular-nums"
-    >
-      {isDownloading
-        ? t('status.downloading', { progress: Math.round(progress ?? 0) })
-        : t('status.downloaded')}
+    <Badge variant="outline" className={cn(NOTE, 'tabular-nums')}>
+      {t('status.downloading', { progress: Math.round(progress ?? 0) })}
     </Badge>
   )
 }
@@ -119,6 +154,17 @@ export function ArtifactField({
       artifactLabels(
         choices.flatMap(({ artifact }) => (artifact ? [artifact] : [])),
       ),
+    [choices],
+  )
+  const maturityLabels = useMemo(
+    () => [
+      ...new Set(
+        choices.flatMap(({ artifact }) => {
+          const label = artifact && maturityLabel(artifact)
+          return label ? [label] : []
+        }),
+      ),
+    ],
     [choices],
   )
 
@@ -162,7 +208,15 @@ export function ArtifactField({
                   className="shrink-0 px-1.5 text-xs"
                 />
               )}
-              {artifact && <DownloadStatus artifact={artifact} />}
+              {artifact && (
+                <span className="ml-auto flex shrink-0 items-center gap-1.5">
+                  <DownloadStatus artifact={artifact} />
+                  <MaturityNote
+                    label={maturityLabel(artifact)}
+                    peers={maturityLabels}
+                  />
+                </span>
+              )}
             </SelectItem>
           ))}
         </SelectContent>

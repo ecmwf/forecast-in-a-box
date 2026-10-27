@@ -35,7 +35,7 @@ from forecastbox.domain.auth.users import get_auth_context
 from forecastbox.domain.lens import metadata_db
 from forecastbox.domain.lens import proxy as lens_proxy
 from forecastbox.domain.lens.core import PREFIX
-from forecastbox.domain.lens.exceptions import LensFailure, LensStarting, NoLensFound, UnproxyableLens
+from forecastbox.domain.lens.exceptions import LensFailure, LensPathNotFound, LensStarting, NoLensFound, UnproxyableLens
 from forecastbox.domain.lens.manager import (
     LensInstanceDetail,
     LensInstanceId,
@@ -47,8 +47,9 @@ from forecastbox.domain.lens.manager import (
     stop_instance,
 )
 from forecastbox.utility.auth import AuthContext
-from forecastbox.utility.concurrency.manager import execution_manager
+from forecastbox.utility.concurrency.manager import TaskName, execution_manager
 from forecastbox.utility.concurrency.ports import NoFreePortsException
+from forecastbox.utility.config import ConcurrentPools
 from forecastbox.utility.pagination import PaginationSpec
 from forecastbox.utility.pydantic import FiabBaseModel
 from forecastbox.utility.time import value_dt2str
@@ -107,15 +108,23 @@ class SupportedLensDetail(FiabBaseModel):
     params: dict[str, str]
 
 
+def _start_skinny_wms_checked(local_path: str) -> LensInstanceId:
+    if not pathlib.Path(local_path).exists():
+        raise LensPathNotFound(local_path)
+    return start_skinny_wms(local_path)
+
+
 @router.post("/start/skinnyWMS")
-def start_skinny_wms_endpoint(local_path: str) -> LensInstanceId:
+async def start_skinny_wms_endpoint(local_path: str) -> LensInstanceId:
     """Start a skinnyWMS lens instance serving data from the given local path."""
     if not is_skinny_available:
         raise HTTPException(status_code=400, detail="SkinnyWMS installation not found")
     try:
-        if not pathlib.Path(local_path).exists():
-            raise HTTPException(status_code=400, detail="Provided path does not exist")
-        return start_skinny_wms(local_path)
+        return await execution_manager.awaitable_submit(
+            ConcurrentPools.General, TaskName("lens.start"), partial(_start_skinny_wms_checked, local_path)
+        )
+    except LensPathNotFound:
+        raise HTTPException(status_code=400, detail="Provided path does not exist")
     except NoFreePortsException:
         raise HTTPException(status_code=503, detail="No free ports available for a new lens instance")
     except TimeoutError:
@@ -123,7 +132,7 @@ def start_skinny_wms_endpoint(local_path: str) -> LensInstanceId:
 
 
 @router.get("/status")
-def get_lens_status(lens_instance_id: LensInstanceId) -> LensInstanceDetailResponse:
+async def get_lens_status(lens_instance_id: LensInstanceId) -> LensInstanceDetailResponse:
     """Get the status of a lens instance."""
     try:
         return LensInstanceDetailResponse.from_detail(lens_instance_id, get_status(lens_instance_id))
@@ -132,10 +141,10 @@ def get_lens_status(lens_instance_id: LensInstanceId) -> LensInstanceDetailRespo
 
 
 @router.delete("/stop")
-def stop_lens(lens_instance_id: LensInstanceId) -> str:
+async def stop_lens(lens_instance_id: LensInstanceId) -> str:
     """Stop and remove a lens instance."""
     try:
-        stop_instance(lens_instance_id)
+        await execution_manager.awaitable_submit(ConcurrentPools.General, TaskName("lens.stop"), partial(stop_instance, lens_instance_id))
     except NoLensFound:
         raise HTTPException(status_code=404, detail=f"Lens instance {lens_instance_id!r} not found")
     except TimeoutError:
@@ -144,7 +153,7 @@ def stop_lens(lens_instance_id: LensInstanceId) -> str:
 
 
 @router.get("/list")
-def list_lenses() -> list[LensInstanceDetailResponse]:
+async def list_lenses() -> list[LensInstanceDetailResponse]:
     """List all active lens instances with their current status."""
     return [LensInstanceDetailResponse.from_detail(iid, detail) for iid, detail in list_instances()]
 
@@ -179,7 +188,7 @@ async def proxy_lens(
 
 
 @router.get("/supported")
-def list_supported_lenses() -> list[SupportedLensDetail]:
+async def list_supported_lenses() -> list[SupportedLensDetail]:
     """List all supported lens types with their start route and parameters."""
     supported = []
     if is_skinny_available:

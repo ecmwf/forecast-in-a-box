@@ -307,6 +307,21 @@
     "externalHint": "Copies a standard WMS GetCapabilities URL — paste it into QGIS, ArcGIS, or any other WMS-aware client to inspect the data there. The server keeps running until you stop it on this row.",
     "wmsUnavailable": "The WMS viewer is not available on this server (SkinnyWMS not installed)"
   },
+  "zipDownload": {
+    "download": "Download .zip",
+    "moreOptions": "More download options",
+    "preparing": "Preparing the zip",
+    "preparingHint": "The download starts once the server has packed the files.",
+    "notReady": "Available when the run finishes",
+    "sharedFolder": "The zip includes files from other runs in this folder.",
+    "copyCommand": "Copy download command",
+    "copyCommandHint": "A curl command for a terminal or script",
+    "copyLink": "Copy download link",
+    "copyLinkHint": "Works in a browser where you're signed in",
+    "commandCopied": "Download command copied",
+    "linkCopied": "Download link copied",
+    "copyFailed": "Could not copy to the clipboard"
+  },
   "lens": {
     "layers": "Layers",
     "loadingLayers": "Loading layers…",

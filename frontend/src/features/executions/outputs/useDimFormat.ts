@@ -10,12 +10,17 @@
 
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { orderDims } from './dims'
+import { SETTING_PREFIX, orderDims } from './dims'
+import type { BlockSetting, BlockSettings } from './block-settings'
 import type { OutputDim } from './dims'
 import type { RunOutputs } from '@/api/types/job.types'
 import type { ParamLabelVariant } from '@/components/base/fields/param-display'
 import { useParamLabels } from '@/api/hooks/useFable'
-import { paramLabel } from '@/components/base/fields/param-display'
+import {
+  listItems,
+  paramLabel,
+  paramListLabel,
+} from '@/components/base/fields/param-display'
 
 export interface DimFormat {
   /** Dimension name, e.g. "Parameter". */
@@ -28,22 +33,47 @@ export interface DimFormat {
   dims: (dims: ReadonlyArray<OutputDim>, variant: ParamLabelVariant) => string
 }
 
-/** Labels for the run's split coordinates; param ids resolve to GRIB names. */
-export function useDimFormat(outputs: RunOutputs | null): DimFormat {
+/** Coordinate and setting labels; param ids as GRIB names. */
+export function useDimFormat(
+  outputs: RunOutputs | null,
+  blockSettings?: BlockSettings,
+): DimFormat {
   const { t } = useTranslation('executions')
+  /** Title and kind per setting key. */
+  const settingByKey = useMemo(() => {
+    const byKey = new Map<string, BlockSetting>()
+    for (const setting of Object.values(blockSettings ?? {}).flat()) {
+      const k = `${SETTING_PREFIX}${setting.key}`
+      if (!byKey.has(k)) byKey.set(k, setting)
+    }
+    return byKey
+  }, [blockSettings])
   const paramIds = useMemo(
-    () =>
-      Object.values(outputs ?? {}).flatMap((meta) =>
+    () => [
+      ...Object.values(outputs ?? {}).flatMap((meta) =>
         (meta.dimension_kvs ?? [])
           .filter(([key]) => key === 'param')
           .map(([, value]) => value),
       ),
-    [outputs],
+      ...Object.values(blockSettings ?? {})
+        .flat()
+        .flatMap((setting) =>
+          setting.isParam ? listItems(setting.value) : [],
+        ),
+    ],
+    [outputs, blockSettings],
   )
   const labels = useParamLabels(paramIds)
 
   return useMemo(() => {
+    const settingLabel = (
+      setting: BlockSetting,
+      v: string,
+      variant: ParamLabelVariant,
+    ): string => (setting.isParam ? paramListLabel(v, labels, variant) : v)
     const key = (k: string): string => {
+      const setting = settingByKey.get(k)
+      if (setting) return setting.title
       switch (k) {
         case 'param':
           return t('outputs.dims.param')
@@ -62,6 +92,13 @@ export function useDimFormat(outputs: RunOutputs | null): DimFormat {
       v: string,
       variant: ParamLabelVariant,
     ): string => {
+      const setting = settingByKey.get(k)
+      if (setting) {
+        return t('outputs.dims.otherValue', {
+          key: setting.title.toLowerCase(),
+          value: settingLabel(setting, v, variant),
+        })
+      }
       switch (k) {
         case 'param':
           return paramLabel(v, labels, variant)
@@ -78,11 +115,15 @@ export function useDimFormat(outputs: RunOutputs | null): DimFormat {
     return {
       key,
       value,
-      short: (k, v) => (k === 'param' ? paramLabel(v, labels, 'compact') : v),
+      short: (k, v) => {
+        const setting = settingByKey.get(k)
+        if (setting) return settingLabel(setting, v, 'compact')
+        return k === 'param' ? paramLabel(v, labels, 'compact') : v
+      },
       dims: (dims, variant) =>
         orderDims(dims)
           .map(([k, v]) => value(k, v, variant))
           .join(' · '),
     }
-  }, [t, labels])
+  }, [t, labels, settingByKey])
 }

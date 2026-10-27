@@ -79,4 +79,14 @@ describe('output adapter registry', () => {
     // The streamed payload is a directory path, not GRIB bytes — no actions.
     expect(adapter.actions).toHaveLength(0)
   })
+
+  it('ignores extra mime parameters when no exact match exists', () => {
+    registerOutputAdapter(gribStoredAdapter)
+    expect(
+      resolveAdapter('text/plain; fiab-format=gribdir; fiab-fetchable=1').id,
+    ).toBe('grib-stored')
+    expect(
+      resolveAdapter('text/plain; fiab-format=zarr; fiab-fetchable=1'),
+    ).toBe(GENERIC_ADAPTER)
+  })
 })

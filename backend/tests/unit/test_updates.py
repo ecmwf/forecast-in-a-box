@@ -29,9 +29,8 @@ def test_release_from_string_invalid() -> None:
 
 @pytest_asyncio.fixture
 async def mock_httpx_client() -> AsyncGenerator[AsyncMock, None]:
-    with patch("httpx.AsyncClient") as mock_client_class:
-        mock_client = AsyncMock()
-        mock_client_class.return_value.__aenter__.return_value = mock_client
+    mock_client = AsyncMock()
+    with patch("forecastbox.domain.admin.get_async", lambda profile: mock_client):
         yield mock_client
 
 

@@ -14,7 +14,13 @@
  * Job detail page with status header, execution canvas, and tabbed panels.
  */
 
-import { useCallback, useEffect, useLayoutEffect, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+} from 'react'
 import {
   ArrowLeft,
   FileJson,
@@ -39,6 +45,7 @@ import type { CSSProperties, ReactNode } from 'react'
 import { useBlockDisplayNames } from '@/features/fable-builder/hooks/useBlockDisplayNames'
 import { RunMetadataDialog } from '@/features/journal/components/RunMetadataDialog'
 import { useExecutionHoverStore } from '@/features/executions/stores/executionHoverStore'
+import { distinguishingSettings } from '@/features/executions/outputs/block-settings'
 import { useViewportFill } from '@/hooks/useViewportFill'
 import { useSplitLayout } from '@/hooks/useSplitLayout'
 import { useMedia } from '@/hooks/useMedia'
@@ -125,7 +132,13 @@ export function RunDetailPage() {
 
   const jobData = statusQuery.data
   const { data: fableData } = useFableRetrieve(jobData?.blueprint_id)
-  const blockNames = useBlockDisplayNames(fableData?.builder)
+  // Builder as run; name and metadata from latest.
+  const { data: runBlueprint } = useFableRetrieve(
+    jobData?.blueprint_id,
+    jobData?.blueprint_version,
+  )
+  const runBuilder = runBlueprint?.builder
+  const blockNames = useBlockDisplayNames(runBuilder)
 
   // Cross-panel selection is per-run; clear it on mount and on jobId change.
   const resetExecutionSelection = useExecutionHoverStore(
@@ -153,6 +166,13 @@ export function RunDetailPage() {
   const { data: catalogue } = useBlockCatalogue()
   // As-run values off the run detail (#640); null on older runs.
   const resolvedConfig = jobData?.resolution ?? undefined
+  const blockSettings = useMemo(
+    () =>
+      runBuilder
+        ? distinguishingSettings(runBuilder, catalogue, resolvedConfig)
+        : undefined,
+    [runBuilder, catalogue, resolvedConfig],
+  )
 
   // Sync scroll-to-top before paint — a tall /configure scroll position
   // otherwise clamps into the shorter loading layout and exposes the footer.
@@ -332,9 +352,9 @@ export function RunDetailPage() {
           onStartPctChange={onStartPctChange}
           canvas={
             <div className={WIDE_COLUMN}>
-              {fableData?.builder && catalogue ? (
+              {runBuilder && catalogue ? (
                 <RunCanvas
-                  fable={fableData.builder}
+                  fable={runBuilder}
                   catalogue={catalogue}
                   status={jobData.status}
                   completedBlockIds={jobData.completed_block_ids}
@@ -404,7 +424,7 @@ export function RunDetailPage() {
                     attempt={jobData.attempt_count}
                     outputs={jobData.outputs}
                     lostTaskIds={jobData.lost_task_ids}
-                    fable={fableData?.builder}
+                    fable={runBuilder}
                     catalogue={catalogue}
                     runName={fableData?.display_name ?? undefined}
                   />
@@ -416,6 +436,7 @@ export function RunDetailPage() {
                     completedBlockIds={jobData.completed_block_ids}
                     plannedBlockIds={jobData.planned_block_ids}
                     blockNames={blockNames}
+                    blockSettings={blockSettings}
                     toolbarSlot={toolbarSlot}
                     onViewLogs={() => setActiveTab('logs')}
                   />
@@ -427,7 +448,7 @@ export function RunDetailPage() {
                   <CompilationPanel
                     jobId={jobId}
                     status={jobData.status}
-                    fable={fableData?.builder}
+                    fable={runBuilder}
                     catalogue={catalogue}
                     onSwitchTab={setActiveTab}
                   />
@@ -436,12 +457,12 @@ export function RunDetailPage() {
                   <CompilationForceGraph
                     jobId={jobId}
                     status={jobData.status}
-                    fable={fableData?.builder}
+                    fable={runBuilder}
                     catalogue={catalogue}
                   />
                 </TabsContent>
                 <TabsContent value="specification" className={WIDE_TAB_CONTENT}>
-                  <SpecificationPanel fableSnapshot={fableData?.builder} />
+                  <SpecificationPanel fableSnapshot={runBuilder} />
                 </TabsContent>
               </Tabs>
             </div>

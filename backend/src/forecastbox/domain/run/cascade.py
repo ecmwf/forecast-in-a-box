@@ -9,11 +9,11 @@
 
 import logging
 import tempfile
-import time
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 from cascade.controller.report import JobId
+from cascade.gateway import api
 from cascade.gateway.api import (
     JobSpec,
     LocalProcesses,
@@ -24,13 +24,14 @@ from cascade.gateway.api import (
     SubmitJobResponse,
 )
 from cascade.gateway.client import request_response
-from cascade.low.core import JobInstance, JobInstanceRich, TaskId
+from cascade.low.core import DatasetId, JobInstance, JobInstanceRich, TaskId
+from cascade.low.func import assert_never
 from fiab_core.fable import BlockInstanceId
 from pydantic import Field
 
-from forecastbox.domain.artifact.manager import ArtifactManager, submit_artifact_download
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.gateway.service import get_gateway_url
+from forecastbox.domain.run.exceptions import RunOutputRetrievalFailed
 from forecastbox.utility.config import CascadeInfrastructureType, UnmanagedGateway, config
 from forecastbox.utility.pydantic import FiabBaseModel
 
@@ -73,7 +74,7 @@ def _build_infra_spec(
         )
 
     else:
-        assert_never(request_infra)
+        assert_never(requested_infra)
 
 
 class RawCascadeJob(FiabBaseModel):
@@ -109,39 +110,10 @@ def execute_cascade(spec: ExecutionSpecification) -> SubmitJobResponse:
     """Convert spec to JobInstance and submit to cascade api.
 
     ``spec.job.job_instance.ext_outputs`` must already be set by the caller
-    (``compile_builder`` sets it as part of compilation).
+    (``compile_builder`` sets it as part of compilation) and all runtime artifacts
+    of ``spec.environment`` must already be available locally. Gateway exceptions
+    are returned as a ``SubmitJobResponse`` with ``job_id=None``.
     """
-    runtime_artifacts = spec.environment.runtime_artifacts
-    if runtime_artifacts:
-        missing_artifacts = [art for art in runtime_artifacts if art not in ArtifactManager.locally_available]
-
-        download_ids = []
-        for artifact_id in missing_artifacts:
-            result = submit_artifact_download(artifact_id)
-            if result.e:
-                error_msg = f"Failed to submit download for {artifact_id}: {result.e}"
-                logger.error(error_msg)
-                return SubmitJobResponse(job_id=None, error=error_msg)
-            download_ids.append(artifact_id)
-
-        if download_ids:
-            max_wait_seconds = 3600
-            start_time = time.time()
-
-            while True:
-                remaining = {e for e in download_ids if e not in ArtifactManager.locally_available}
-
-                if not remaining:
-                    logger.info(f"All runtime artifacts downloaded: {download_ids}")
-                    break
-
-                if time.time() - start_time > max_wait_seconds:
-                    error_msg = "Timeout waiting for runtime artifacts to download"
-                    logger.error(error_msg)
-                    return SubmitJobResponse(job_id=None, error=error_msg)
-
-                time.sleep(1)
-
     job = spec.job.job_instance
 
     environment = spec.environment
@@ -171,3 +143,21 @@ def delete_cascade_datasets(cascade_job_id: str) -> None:
     """Delete all datasets of the given job in the gateway. Errors reported by the gateway are ignored."""
     request = ResultDeletionRequest(datasets={JobId(cascade_job_id): []})
     request_response(request, get_gateway_url())
+
+
+def retrieve_output_bytes(cascade_job_id: str, dataset: DatasetId) -> bytes:
+    """Blocking gateway retrieval and decode of a dataset. Raises RunOutputRetrievalFailed with a user-facing message on failure."""
+    response = request_response(
+        api.ResultRetrievalRequest(job_id=JobId(cascade_job_id), dataset_id=dataset),
+        get_gateway_url(),
+    )
+    response = cast(api.ResultRetrievalResponse, response)
+    if response.error:
+        raise RunOutputRetrievalFailed(f"Result retrieval failed: {response.error}")
+    try:
+        decoded = api.decoded_result(response, job=None)  # type: ignore[attr-defined]
+    except Exception as e:
+        raise RunOutputRetrievalFailed(f"Result decoding failed: {e}")
+    if not isinstance(decoded, bytes):
+        raise RunOutputRetrievalFailed(f"Result decoding failed: expected bytes, got {type(decoded).__name__}")
+    return decoded

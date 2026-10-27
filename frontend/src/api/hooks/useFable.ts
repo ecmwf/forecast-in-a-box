@@ -99,8 +99,13 @@ export function useBlockCatalogue(language?: string) {
 }
 
 /** Query key shared by useFable and useFableRetrieve — one request per fable. */
-const fableRetrieveKey = (fableId: string | null | undefined) =>
-  [...fableKeys.detail(fableId ?? ''), 'full'] as const
+const fableRetrieveKey = (
+  fableId: string | null | undefined,
+  version?: number,
+) =>
+  version === undefined
+    ? ([...fableKeys.detail(fableId ?? ''), 'full'] as const)
+    : ([...fableKeys.detail(fableId ?? ''), 'full', version] as const)
 
 /** Don't retry 4xx (e.g. 404 not found) — only retry server errors. */
 function retryRetrieve(failureCount: number, error: Error): boolean {
@@ -124,10 +129,14 @@ export function useFable(fableId: string | null | undefined) {
   })
 }
 
-export function useFableRetrieve(fableId: string | null | undefined) {
+/** Blueprint at `version`, else latest. */
+export function useFableRetrieve(
+  fableId: string | null | undefined,
+  version?: number,
+) {
   return useQuery<FableRetrieveResponse>({
-    queryKey: fableRetrieveKey(fableId),
-    queryFn: () => retrieveFable(fableId!),
+    queryKey: fableRetrieveKey(fableId, version),
+    queryFn: () => retrieveFable(fableId!, version),
     enabled: !!fableId,
     staleTime: Infinity,
     retry: retryRetrieve,

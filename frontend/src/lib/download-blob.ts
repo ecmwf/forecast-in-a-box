@@ -24,3 +24,13 @@ export function downloadBlob(blob: Blob, filename: string): void {
   document.body.removeChild(anchor)
   URL.revokeObjectURL(url)
 }
+
+/** Download a URL; the server names the file. */
+export function downloadUrl(url: string): void {
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = ''
+  document.body.appendChild(anchor)
+  anchor.click()
+  document.body.removeChild(anchor)
+}

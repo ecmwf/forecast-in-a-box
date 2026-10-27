@@ -18,7 +18,7 @@ import type {
 import type { ForecastRunViewModel } from '@/features/journal/types'
 import { getBlocksByKind, getFactory } from '@/api/types/fable.types'
 import { stripSystemTags } from '@/lib/system-tags'
-import { GRIB_DIR_MIME } from '@/features/executions/outputs/adapters/grib'
+import { isGribDirMime } from '@/features/executions/outputs/adapters/grib'
 
 /** Title of the run's first source block. */
 export function deriveModelLabel(
@@ -138,7 +138,7 @@ export function runDetailToViewModel({
     lostOutputs: Object.keys(run.lost_task_ids).length,
     hasComparableOutput: Object.entries(run.outputs ?? {}).some(
       ([taskId, meta]) =>
-        meta.mime_type === GRIB_DIR_MIME && !(taskId in run.lost_task_ids),
+        isGribDirMime(meta.mime_type) && !(taskId in run.lost_task_ids),
     ),
     errorMessage: run.status === 'failed' ? run.error : null,
   })

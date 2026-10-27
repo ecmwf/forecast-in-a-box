@@ -15,44 +15,39 @@ Contains three categories of routes:
  - Further detail endpoints -- inspecting outputs, getting logs, and retrieving compilation detail
 """
 
-import asyncio
-import io
 import logging
-import os
 import pathlib
-import zipfile
-from dataclasses import asdict
 from functools import partial
 from typing import Annotated, Literal, cast
 
-import orjson
-from cascade.controller.report import JobId
-from cascade.gateway import api, client
 from cascade.low.core import DatasetId, TaskId
 from fastapi import APIRouter, Depends, Response
 from fastapi.exceptions import HTTPException
-from fiab_core.fable import BlockInstanceId
+from fiab_core.fable import BlockInstanceId, is_fetchable_mime
 from pydantic import Field
 
 from forecastbox.domain.auth.users import get_auth_context
 from forecastbox.domain.blueprint.types import BlueprintId
-from forecastbox.domain.gateway.service import get_gateway_url, get_logs_directory
 from forecastbox.domain.run import db, service, stop
-from forecastbox.domain.run.cascade import RunOutputs, delete_cascade_datasets
+from forecastbox.domain.run.cascade import RunOutputs, delete_cascade_datasets, retrieve_output_bytes
 from forecastbox.domain.run.detail import retrieve_compilation_detail
 from forecastbox.domain.run.exceptions import (
     CompilationDetailCorrupted,
     CompilationDetailNotFound,
+    OutputPathNotFound,
     RunAccessDenied,
     RunConcurrencyIssue,
+    RunLogsArchiveFailed,
     RunNotDeletable,
     RunNotFound,
     RunNotStoppable,
+    RunOutputRetrievalFailed,
 )
+from forecastbox.domain.run.logs import get_output_archive, get_run_logs_archive
 from forecastbox.domain.run.types import RunId
 from forecastbox.utility.auth import AuthContext
-from forecastbox.utility.concurrency.manager import SubmissionRejected, execution_manager
-from forecastbox.utility.config import ROUTE_PREFIX
+from forecastbox.utility.concurrency.manager import SubmissionRejected, TaskName, execution_manager
+from forecastbox.utility.config import ROUTE_PREFIX, ConcurrentPools
 from forecastbox.utility.httpx import get_encoding
 from forecastbox.utility.pagination import PaginationSpec
 from forecastbox.utility.pydantic import FiabBaseModel
@@ -220,6 +215,13 @@ def _to_run_detail(domain_detail: service.RunDetail) -> RunDetailResponse:
     )
 
 
+async def _poll_run(execution: db.RunRecord, detailed_report: bool = False) -> service.RunDetail:
+    """Run the blocking poll of a Run as a single task on the General pool."""
+    return await execution_manager.awaitable_submit(
+        ConcurrentPools.General, TaskName("run.poll"), partial(service.poll_and_update, execution, detailed_report)
+    )
+
+
 async def _resolve_run_record(
     execution_spec: RunLookup,
     auth_context: AuthContext,
@@ -239,44 +241,36 @@ async def _resolve_run_record(
     return execution
 
 
-async def _build_run_logs_response(cascade_job_id: str, db_entity_ser: bytes) -> Response:
-    try:
-        request = api.JobProgressRequest(job_ids=[JobId(cascade_job_id)])
-        gw_state = client.request_response(request, get_gateway_url()).model_dump()
-    except TimeoutError:
-        gw_state = {"progresses": {}, "datasets": {}, "error": "TimeoutError"}
-    except Exception as e:
-        gw_state = {"progresses": {}, "datasets": {}, "error": repr(e)}
+async def _retrieve_output_bytes(execution: db.RunRecord, spec: RunLookup, dataset_id: str) -> tuple[bytes, str]:
+    """Retrieve the value and the mime type of an output, from the local cache if possible, otherwise from cascade.
 
-    def _build_zip() -> tuple[bytes, str]:
+    Raises HTTPException if the run has not been submitted, or the output is not available.
+    """
+    if execution.cascade_job_id is None:
+        raise HTTPException(status_code=409, detail=f"Run {spec.run_id!r} has not been submitted to cascade yet.")
+    dataset = DatasetId(task=TaskId(dataset_id), output="0")
+
+    # Serve from locally cached value when available, without contacting cascade.
+    raw_outputs = cast(dict | None, execution.outputs)
+    if raw_outputs is not None:
         try:
-            buffer = io.BytesIO()
-            with zipfile.ZipFile(buffer, "a", zipfile.ZIP_DEFLATED) as zf:
-                zf.writestr("db_entity.json", db_entity_ser)
-                zf.writestr("gw_state.json", orjson.dumps(gw_state))
-                maybe_logs_directory = get_logs_directory()
-                if maybe_logs_directory.t is None:
-                    zf.writestr("logs_directory.error.txt", "logs directory missing: {maybe_logs_directory.e}")
-                else:
-                    p = pathlib.Path(maybe_logs_directory.t.name)
-                    f = ""
-                    try:
-                        for f in os.listdir(p):
-                            j_pref = f"job_{cascade_job_id}"
-                            if f == "backend.logs.txt" or f.startswith("gateway") or f.startswith(j_pref):
-                                zf.write(f"{p / f}", arcname=f)
-                    except Exception as e:
-                        zf.writestr("logs_directory.error.txt", f"{f} => {repr(e)}")
-            return buffer.getvalue(), ""
-        except Exception as e:
-            logger.exception("building zip")
-            return b"", repr(e)
+            outputs_model = RunOutputs.model_validate(raw_outputs)
+            char = outputs_model.outputs.get(TaskId(dataset_id))
+            if char is not None and char.value is not None:
+                return char.value.encode(get_encoding(char.mime_type)), char.mime_type
+        except Exception:
+            pass  # fall through to cascade
 
-    loop = asyncio.get_running_loop()
-    bytez, error = await loop.run_in_executor(None, _build_zip)
-    if not error:
-        return Response(content=bytez, status_code=200, media_type="application/zip")
-    return Response(content=error, status_code=500, media_type="text/plain")
+    mime_result = service.get_mime_of_output(execution, dataset)
+    if mime_result.t is None:
+        raise HTTPException(500, f"Result mime lookup failed: {mime_result.e}")
+    try:
+        decoded = await execution_manager.awaitable_submit(
+            ConcurrentPools.General, TaskName("run.output.retrieve"), partial(retrieve_output_bytes, execution.cascade_job_id, dataset)
+        )
+    except RunOutputRetrievalFailed as e:
+        raise HTTPException(500, str(e))
+    return decoded, mime_result.t
 
 
 # ---------------------------------------------------------------------------
@@ -328,7 +322,7 @@ async def list_runs(
     details = []
     for e in executions:
         try:
-            details.append(_to_run_detail(await service.poll_and_update(e)))
+            details.append(_to_run_detail(await _poll_run(e)))
         except RunNotFound:
             continue  # NOTE deleted while we were polling
         except RunConcurrencyIssue as ex:
@@ -348,7 +342,7 @@ async def get_run(
                 "run.get", partial(db.get_run, spec.run_id, spec.attempt_count, auth_context=auth_context)
             ),
         )
-        domain_detail = await service.poll_and_update(execution, detailed_report=True)
+        domain_detail = await _poll_run(execution, detailed_report=True)
     except RunNotFound:
         raise HTTPException(status_code=404, detail=f"Run {spec.run_id!r} not found.")
     except RunAccessDenied:
@@ -411,7 +405,9 @@ async def delete_run(
         try:
             # NOTE errors reported by gateway are ignored, most likely the job has been evicted already.
             # A timeout, such as due to a busy gateway, is reported, and we dont delete the db entity to not increase inconsistency
-            delete_cascade_datasets(run_record.cascade_job_id)
+            await execution_manager.awaitable_submit(
+                ConcurrentPools.General, TaskName("run.delete.datasets"), partial(delete_cascade_datasets, run_record.cascade_job_id)
+            )
         except Exception as e:
             raise HTTPException(500, f"Job deletion failed: {e}")
     try:
@@ -511,39 +507,48 @@ async def get_run_output_content(
 ) -> Response:
     """Retrieve the result of a specific output task, encoded as bytes."""
     execution = await _resolve_run_record(spec, auth_context)
+    decoded, mime_type = await _retrieve_output_bytes(execution, spec, dataset_id)
+    return Response(decoded, media_type=mime_type)
+
+
+@router.get("/outputZipped")
+async def get_run_output_zipped(
+    spec: Annotated[RunLookup, Depends()],
+    dataset_id: str,
+    auth_context: AuthContext = Depends(get_auth_context),
+) -> Response:
+    """Retrieve a fetchable output, ie, one whose value is a path to a file or a directory tree, as a zip archive.
+
+    The archive is named after the last component of the path, and contains that file, or the whole directory
+    tree below it with relative paths preserved. Returns 400 if the output is not of a fetchable mime type.
+    """
+    execution = await _resolve_run_record(spec, auth_context)
     if execution.cascade_job_id is None:
         raise HTTPException(status_code=409, detail=f"Run {spec.run_id!r} has not been submitted to cascade yet.")
-    dataset = DatasetId(task=TaskId(dataset_id), output="0")
-
-    # Serve from locally cached value when available, without contacting cascade.
-    raw_outputs = cast(dict | None, execution.outputs)
-    if raw_outputs is not None:
-        try:
-            outputs_model = RunOutputs.model_validate(raw_outputs)
-            char = outputs_model.outputs.get(TaskId(dataset_id))
-            if char is not None and char.value is not None:
-                encoding = get_encoding(char.mime_type)
-                return Response(char.value.encode(encoding), media_type=char.mime_type)
-        except Exception:
-            pass  # fall through to cascade
-
-    mime_result = service.get_mime_of_output(execution, dataset)
+    mime_result = service.get_mime_of_output(execution, DatasetId(task=TaskId(dataset_id), output="0"))
     if mime_result.t is None:
         raise HTTPException(500, f"Result mime lookup failed: {mime_result.e}")
-    response = client.request_response(
-        api.ResultRetrievalRequest(job_id=JobId(execution.cascade_job_id), dataset_id=dataset),
-        get_gateway_url(),
-    )
-    response = cast(api.ResultRetrievalResponse, response)
-    if response.error:
-        raise HTTPException(500, f"Result retrieval failed: {response.error}")
+    if not is_fetchable_mime(mime_result.t):
+        raise HTTPException(400, f"Output {dataset_id!r} of mime type {mime_result.t!r} is not fetchable as a zip.")
+    decoded, _ = await _retrieve_output_bytes(execution, spec, dataset_id)
     try:
-        decoded = api.decoded_result(response, job=None)  # type: ignore[attr-defined]
+        path_str = decoded.decode(get_encoding(mime_result.t)).strip()
     except Exception as e:
-        raise HTTPException(500, f"Result decoding failed: {e}")
-    if not isinstance(decoded, bytes):
-        raise HTTPException(500, f"Result decoding failed: expected bytes, got {type(decoded).__name__}")
-    return Response(decoded, media_type=mime_result.t)
+        raise HTTPException(500, f"Output path decoding failed: {e}")
+    if path_str.startswith("file://"):
+        path_str = path_str[len("file://") :]
+    try:
+        archive, root_name = await get_output_archive(pathlib.Path(path_str))
+    except OutputPathNotFound:
+        raise HTTPException(status_code=404, detail=f"Output path {path_str!r} does not exist.")
+    except RunLogsArchiveFailed as e:
+        return Response(content=repr(e.__cause__ or e), status_code=500, media_type="text/plain")
+    return Response(
+        content=archive,
+        status_code=200,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{root_name}.zip"'},
+    )
 
 
 @router.get("/logs")
@@ -555,5 +560,8 @@ async def get_run_logs(
     run_record = await _resolve_run_record(spec, auth_context)
     if run_record.cascade_job_id is None:
         raise HTTPException(status_code=409, detail=f"Run {spec.run_id!r} has not been submitted to cascade yet.")
-    entity_dict = asdict(run_record)
-    return await _build_run_logs_response(run_record.cascade_job_id, orjson.dumps(entity_dict))
+    try:
+        archive = await get_run_logs_archive(run_record)
+    except RunLogsArchiveFailed as e:
+        return Response(content=repr(e.__cause__ or e), status_code=500, media_type="text/plain")
+    return Response(content=archive, status_code=200, media_type="application/zip")

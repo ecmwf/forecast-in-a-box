@@ -15,7 +15,7 @@
   },
   "filters": {
     "searchPlaceholder": "Search models",
-    "statusLabel": "Filter by status",
+    "availabilityLabel": "Filter by availability",
     "all": "All",
     "downloaded": "Downloaded",
     "available": "Available"
@@ -29,7 +29,7 @@
   "table": {
     "model": "Model",
     "size": "Size",
-    "status": "Status",
+    "availability": "Availability",
     "actions": "Actions"
   },
   "detail": {

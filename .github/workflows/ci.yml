@@ -207,10 +207,9 @@ jobs:
         working-directory: cli
     steps:
       - uses: actions/checkout@v6
-      # TODO this needs to be fixed -- the setup rust action *fails* on cleanup due to cache command not being there, and even though there should be cargo install on runners, it was not at the time I tried that
-      # - uses: moonrepo/setup-rust@v1
+      - uses: moonrepo/setup-rust@v1 # `cargo` should be set up on the runner, including this causes a issue in the Post step
       - name: Cargo tests
-        run: echo "disabled until cargo fixed" # cargo test # TODO we actually have no tests, neither unit nor integration!
+        run: cargo test
 
   cicd-scripts:
     name: CI/CD scripts

@@ -28,7 +28,7 @@ import type { JobExecutionDetail } from '@/api/types/job.types'
 import type { OutputAvailability } from '@/features/executions/outputs/availability'
 import { useJobsStatus } from '@/api/hooks/useJobs'
 import { storedDirQueryOptions } from '@/features/executions/outputs/stored-dir'
-import { GRIB_DIR_MIME } from '@/features/executions/outputs/adapters/grib'
+import { isGribDirMime } from '@/features/executions/outputs/adapters/grib'
 import { classifyOutput } from '@/features/executions/outputs/availability'
 
 /** Most-recent runs scanned for GRIB markers. */
@@ -59,7 +59,7 @@ export function gribMarkerRows(
     if (!run.outputs) continue
     const byBlock = new Map<string, GribMarkerRow>()
     for (const [taskId, meta] of Object.entries(run.outputs)) {
-      if (meta.mime_type !== GRIB_DIR_MIME) continue
+      if (!isGribDirMime(meta.mime_type)) continue
       const availability = classifyOutput(
         meta.is_available,
         taskId,

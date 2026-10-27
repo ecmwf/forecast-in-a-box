@@ -163,6 +163,8 @@ export const API_ENDPOINTS = {
     restart: `${API_PREFIX}/run/restart`,
     /** GET - Get a single output's content (query: run_id, dataset_id) */
     outputContent: `${API_PREFIX}/run/outputContent`,
+    /** GET - Fetchable output folder as ZIP (query: run_id, dataset_id) */
+    outputZipped: `${API_PREFIX}/run/outputZipped`,
     /** GET - Download job logs as ZIP (query: run_id) */
     logs: `${API_PREFIX}/run/logs`,
     /** POST - Delete an execution (body: { run_id, attempt_count }) */

@@ -9,10 +9,16 @@
  */
 
 import { HardDrive } from 'lucide-react'
+import { canonicalMime } from '../mime'
 import type { OutputAdapter } from '../types'
 
 /** `GRIB_MIME` in the ecmwf plugin — tags GribSink marker outputs. */
 export const GRIB_DIR_MIME = 'text/plain; fiab-format=gribdir'
+
+/** GribSink marker, ignoring extra mime parameters. */
+export function isGribDirMime(mime: string | null | undefined): boolean {
+  return !!mime && canonicalMime(mime) === GRIB_DIR_MIME
+}
 
 /**
  * GRIB sink marker outputs. The sink writes the actual GRIB file(s) into its

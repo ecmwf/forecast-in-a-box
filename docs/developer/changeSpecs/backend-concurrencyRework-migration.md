@@ -107,8 +107,8 @@ Recommended initial pools:
 
 | Pool | Workers | Initial consumers |
 | --- | ---: | --- |
-| `ConcurrentPools.General` | 2 | Archive creation and short blocking setup |
-| `ConcurrentPools.Io` | 4 | Store HTTP, status probes, and general network/disk transfers |
+| `ConcurrentPools.General` | 2 | Short blocking setup and light gateway queries |
+| `ConcurrentPools.Io` | 4 | Store HTTP, status probes, archive creation, and general network/disk transfers |
 | `ConcurrentPools.RunSubmission` | 2 | Long run compilation/submission tasks and artifact waits |
 | `ConcurrentPools.ArtifactIo` | 1 | Catalog scans and downloads while one SSH command handle is shared |
 | `ConcurrentPools.PluginManagement` | 1 | Pip/install/import/reload operations that must not overlap |

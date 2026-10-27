@@ -175,12 +175,12 @@ export function CronExpressionInput({
                 className="w-20"
               />
               <span className="text-sm text-muted-foreground">
-                {timeZoneOffsetLabel(timeZone)}
+                {timeZoneOffsetLabel(timeZone, now)}
               </span>
               <span className="ml-auto text-xs whitespace-nowrap text-muted-foreground tabular-nums">
                 {t('cron.now', {
                   time: formatInZone(now, timeZone, 'HH:mm'),
-                  zone: timeZoneOffsetLabel(timeZone),
+                  zone: timeZoneOffsetLabel(timeZone, now),
                 })}
               </span>
             </>

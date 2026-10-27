@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   convertNaive,
   formatInZone,
+  formatInZoneWithOffset,
   getAppTimeZone,
   instantToZonedNaive,
   isValidTimeZone,
@@ -191,6 +192,29 @@ describe('timeZoneOffsetLabel', () => {
 
   it('renders sub-hour offsets', () => {
     expect(timeZoneOffsetLabel('Asia/Kolkata', summer)).toBe('UTC+5:30')
+  })
+})
+
+describe('formatInZoneWithOffset', () => {
+  it('labels each instant with its own DST offset', () => {
+    expect(
+      formatInZoneWithOffset(
+        '2026-07-15T12:00:00Z',
+        'Europe/Berlin',
+        'yyyy-MM-dd HH:mm',
+      ),
+    ).toBe('2026-07-15 14:00 UTC+2')
+    expect(
+      formatInZoneWithOffset(
+        '2026-01-15T12:00:00Z',
+        'Europe/Berlin',
+        'yyyy-MM-dd HH:mm',
+      ),
+    ).toBe('2026-01-15 13:00 UTC+1')
+  })
+
+  it('returns an empty string for an invalid input', () => {
+    expect(formatInZoneWithOffset('not a date', 'UTC', 'HH:mm')).toBe('')
   })
 })
 
