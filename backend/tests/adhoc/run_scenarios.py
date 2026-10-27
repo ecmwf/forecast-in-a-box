@@ -420,7 +420,7 @@ def main() -> int:
     try:
         seed_baseline(scratch)
         for scenario in SCENARIOS:
-            name = scenario.__name__
+            name = scenario.__name__  # ty: ignore
             try:
                 scenario(scratch)
                 outcomes.append((name, True, ""))

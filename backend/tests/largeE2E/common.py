@@ -88,7 +88,7 @@ def retry_until(
     raise AssertionError(error_msg)
 
 
-def wait_for_backend_ready(client: httpx.Client, attempts: int = 150, sleep: float = 2.0) -> dict:
+def wait_for_backend_ready(client: httpx.Client, attempts: int = 150, sleep: float = 2.0) -> dict | None:
     """Poll GET /status until the backend is reachable, plugins are loaded ("ok"), and the cascade
     gateway is reachable ("up").
 

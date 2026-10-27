@@ -127,7 +127,7 @@ def _build_blueprint_builder(plugin: dict[str, str]) -> dict:
     }
 
 
-def _ensure_run_completed(client: httpx.Client, run_id: str, *, attempts: int = 900, sleep: float = 2.0) -> dict:
+def _ensure_run_completed(client: httpx.Client, run_id: str, *, attempts: int = 900, sleep: float = 2.0) -> dict | None:
     def do_action() -> httpx.Response:
         return client.get("/run/get", params={"run_id": run_id}, timeout=10)
 
