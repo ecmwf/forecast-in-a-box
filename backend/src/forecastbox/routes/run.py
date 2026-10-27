@@ -20,8 +20,6 @@ import pathlib
 from functools import partial
 from typing import Annotated, Literal, cast
 
-from cascade.controller.report import JobId
-from cascade.gateway import api, client
 from cascade.low.core import DatasetId, TaskId
 from fastapi import APIRouter, Depends, Response
 from fastapi.exceptions import HTTPException
@@ -30,9 +28,8 @@ from pydantic import Field
 
 from forecastbox.domain.auth.users import get_auth_context
 from forecastbox.domain.blueprint.types import BlueprintId
-from forecastbox.domain.gateway.service import get_gateway_url
 from forecastbox.domain.run import db, service, stop
-from forecastbox.domain.run.cascade import RunOutputs, delete_cascade_datasets
+from forecastbox.domain.run.cascade import RunOutputs, delete_cascade_datasets, retrieve_output_bytes
 from forecastbox.domain.run.detail import retrieve_compilation_detail
 from forecastbox.domain.run.exceptions import (
     CompilationDetailCorrupted,
@@ -44,12 +41,13 @@ from forecastbox.domain.run.exceptions import (
     RunNotDeletable,
     RunNotFound,
     RunNotStoppable,
+    RunOutputRetrievalFailed,
 )
 from forecastbox.domain.run.logs import get_output_archive, get_run_logs_archive
 from forecastbox.domain.run.types import RunId
 from forecastbox.utility.auth import AuthContext
-from forecastbox.utility.concurrency.manager import SubmissionRejected, execution_manager
-from forecastbox.utility.config import ROUTE_PREFIX
+from forecastbox.utility.concurrency.manager import SubmissionRejected, TaskName, execution_manager
+from forecastbox.utility.config import ROUTE_PREFIX, ConcurrentPools
 from forecastbox.utility.httpx import get_encoding
 from forecastbox.utility.pagination import PaginationSpec
 from forecastbox.utility.pydantic import FiabBaseModel
@@ -217,6 +215,13 @@ def _to_run_detail(domain_detail: service.RunDetail) -> RunDetailResponse:
     )
 
 
+async def _poll_run(execution: db.RunRecord, detailed_report: bool = False) -> service.RunDetail:
+    """Run the blocking poll of a Run as a single task on the General pool."""
+    return await execution_manager.awaitable_submit(
+        ConcurrentPools.General, TaskName("run.poll"), partial(service.poll_and_update, execution, detailed_report)
+    )
+
+
 async def _resolve_run_record(
     execution_spec: RunLookup,
     auth_context: AuthContext,
@@ -236,7 +241,7 @@ async def _resolve_run_record(
     return execution
 
 
-def _retrieve_output_bytes(execution: db.RunRecord, spec: RunLookup, dataset_id: str) -> tuple[bytes, str]:
+async def _retrieve_output_bytes(execution: db.RunRecord, spec: RunLookup, dataset_id: str) -> tuple[bytes, str]:
     """Retrieve the value and the mime type of an output, from the local cache if possible, otherwise from cascade.
 
     Raises HTTPException if the run has not been submitted, or the output is not available.
@@ -259,19 +264,12 @@ def _retrieve_output_bytes(execution: db.RunRecord, spec: RunLookup, dataset_id:
     mime_result = service.get_mime_of_output(execution, dataset)
     if mime_result.t is None:
         raise HTTPException(500, f"Result mime lookup failed: {mime_result.e}")
-    response = client.request_response(
-        api.ResultRetrievalRequest(job_id=JobId(execution.cascade_job_id), dataset_id=dataset),
-        get_gateway_url(),
-    )
-    response = cast(api.ResultRetrievalResponse, response)
-    if response.error:
-        raise HTTPException(500, f"Result retrieval failed: {response.error}")
     try:
-        decoded = api.decoded_result(response, job=None)  # type: ignore[attr-defined]
-    except Exception as e:
-        raise HTTPException(500, f"Result decoding failed: {e}")
-    if not isinstance(decoded, bytes):
-        raise HTTPException(500, f"Result decoding failed: expected bytes, got {type(decoded).__name__}")
+        decoded = await execution_manager.awaitable_submit(
+            ConcurrentPools.General, TaskName("run.output.retrieve"), partial(retrieve_output_bytes, execution.cascade_job_id, dataset)
+        )
+    except RunOutputRetrievalFailed as e:
+        raise HTTPException(500, str(e))
     return decoded, mime_result.t
 
 
@@ -324,7 +322,7 @@ async def list_runs(
     details = []
     for e in executions:
         try:
-            details.append(_to_run_detail(await service.poll_and_update(e)))
+            details.append(_to_run_detail(await _poll_run(e)))
         except RunNotFound:
             continue  # NOTE deleted while we were polling
         except RunConcurrencyIssue as ex:
@@ -344,7 +342,7 @@ async def get_run(
                 "run.get", partial(db.get_run, spec.run_id, spec.attempt_count, auth_context=auth_context)
             ),
         )
-        domain_detail = await service.poll_and_update(execution, detailed_report=True)
+        domain_detail = await _poll_run(execution, detailed_report=True)
     except RunNotFound:
         raise HTTPException(status_code=404, detail=f"Run {spec.run_id!r} not found.")
     except RunAccessDenied:
@@ -407,7 +405,9 @@ async def delete_run(
         try:
             # NOTE errors reported by gateway are ignored, most likely the job has been evicted already.
             # A timeout, such as due to a busy gateway, is reported, and we dont delete the db entity to not increase inconsistency
-            delete_cascade_datasets(run_record.cascade_job_id)
+            await execution_manager.awaitable_submit(
+                ConcurrentPools.General, TaskName("run.delete.datasets"), partial(delete_cascade_datasets, run_record.cascade_job_id)
+            )
         except Exception as e:
             raise HTTPException(500, f"Job deletion failed: {e}")
     try:
@@ -507,7 +507,7 @@ async def get_run_output_content(
 ) -> Response:
     """Retrieve the result of a specific output task, encoded as bytes."""
     execution = await _resolve_run_record(spec, auth_context)
-    decoded, mime_type = _retrieve_output_bytes(execution, spec, dataset_id)
+    decoded, mime_type = await _retrieve_output_bytes(execution, spec, dataset_id)
     return Response(decoded, media_type=mime_type)
 
 
@@ -530,7 +530,7 @@ async def get_run_output_zipped(
         raise HTTPException(500, f"Result mime lookup failed: {mime_result.e}")
     if not is_fetchable_mime(mime_result.t):
         raise HTTPException(400, f"Output {dataset_id!r} of mime type {mime_result.t!r} is not fetchable as a zip.")
-    decoded, _ = _retrieve_output_bytes(execution, spec, dataset_id)
+    decoded, _ = await _retrieve_output_bytes(execution, spec, dataset_id)
     try:
         path_str = decoded.decode(get_encoding(mime_result.t)).strip()
     except Exception as e:

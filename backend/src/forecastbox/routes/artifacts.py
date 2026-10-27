@@ -13,13 +13,16 @@ Artifacts routes — /artifacts/*. Corresponds to the `domain.artifact` domain.
 Contains CRUD routes for artifacts (models): list, get, download (which is effectively a create), delete.
 """
 
+from functools import partial
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from forecastbox.domain.artifact.base import CompositeArtifactId, MlModelDetail, MlModelOverview
 from forecastbox.domain.artifact.manager import delete_model, get_model_details, list_models, submit_artifact_download
 from forecastbox.domain.auth.users import UserRead
 from forecastbox.routes.admin import get_admin_user
-from forecastbox.utility.config import ROUTE_PREFIX
+from forecastbox.utility.concurrency.manager import TaskName, execution_manager
+from forecastbox.utility.config import ROUTE_PREFIX, ConcurrentPools
 
 PREFIX = f"{ROUTE_PREFIX}/artifacts"
 
@@ -30,7 +33,7 @@ router = APIRouter(
 
 
 @router.get("/list_models")
-def list_models_endpoint() -> list[MlModelOverview]:
+async def list_models_endpoint() -> list[MlModelOverview]:
     """List all available ML models with overview information."""
     try:
         return list_models()
@@ -39,7 +42,7 @@ def list_models_endpoint() -> list[MlModelOverview]:
 
 
 @router.post("/model_details")
-def get_model_details_endpoint(composite_id: CompositeArtifactId) -> MlModelDetail:
+async def get_model_details_endpoint(composite_id: CompositeArtifactId) -> MlModelDetail:
     """Get detailed information for a specific ML model."""
     try:
         detail = get_model_details(composite_id)
@@ -51,7 +54,7 @@ def get_model_details_endpoint(composite_id: CompositeArtifactId) -> MlModelDeta
 
 
 @router.post("/download_model")
-def download_model_endpoint(
+async def download_model_endpoint(
     composite_id: CompositeArtifactId,
     retry: bool = False,
     admin: UserRead | None = Depends(get_admin_user),
@@ -70,10 +73,12 @@ def download_model_endpoint(
 
 
 @router.post("/delete_model")
-def delete_model_endpoint(composite_id: CompositeArtifactId, admin: UserRead | None = Depends(get_admin_user)) -> dict[str, str]:
+async def delete_model_endpoint(composite_id: CompositeArtifactId, admin: UserRead | None = Depends(get_admin_user)) -> dict[str, str]:
     """Delete a locally available ML model."""
     try:
-        result = delete_model(composite_id)
+        result = await execution_manager.awaitable_submit(
+            ConcurrentPools.General, TaskName("artifact.delete"), partial(delete_model, composite_id)
+        )
     except TimeoutError:
         raise HTTPException(status_code=503, detail="Corresponding internal component is busy")
     except KeyError:

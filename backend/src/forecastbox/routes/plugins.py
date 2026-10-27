@@ -36,8 +36,8 @@ from forecastbox.domain.plugin.submit import submit_uninstall_single, submit_unl
 from forecastbox.routes.admin import get_admin_user
 from forecastbox.utility.concurrency.manager import execution_manager
 from forecastbox.utility.config import ROUTE_PREFIX
-from forecastbox.utility.http_pools import HttpProfile, get_sync
-from forecastbox.utility.packages import get_package_versions
+from forecastbox.utility.http_pools import HttpProfile, get_async
+from forecastbox.utility.packages import get_package_versions_async
 from forecastbox.utility.pydantic import FiabBaseModel
 
 logger = logging.getLogger(__name__)
@@ -95,7 +95,7 @@ async def update_plugin(
         settings = await _pluginId2settings(pluginCompositeId)
         if settings is None:
             raise HTTPException(status_code=404, detail=f"Plugin {pluginCompositeId!r} not found")
-        versions = _source2Versions(settings.pip_source)
+        versions = await _source2Versions(settings.pip_source)
         if not versions.versions:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -126,10 +126,10 @@ async def _pluginId2settings(pluginCompositeId: PluginCompositeId) -> PluginSett
     return None
 
 
-def _source2Versions(pipSource: str) -> PluginVersions:
-    client = get_sync(HttpProfile.Default)
-    available = get_package_versions(pipSource, client)
-    compatible = get_compatible_versions(pipSource, available)
+async def _source2Versions(pipSource: str) -> PluginVersions:
+    client = get_async(HttpProfile.Default)
+    available = await get_package_versions_async(pipSource, client)
+    compatible = get_compatible_versions(pipSource, iter(available))
     sorted_versions = sorted(compatible, key=lambda v: Version(v), reverse=True)
     return PluginVersions(versions=sorted_versions)
 
@@ -145,7 +145,7 @@ async def get_plugin_versions(pluginCompositeId: Annotated[PluginCompositeId, De
     settings = await _pluginId2settings(pluginCompositeId)
     if settings is None:
         raise HTTPException(status_code=404, detail=f"Plugin {pluginCompositeId!r} not found")
-    return _source2Versions(settings.pip_source)
+    return await _source2Versions(settings.pip_source)
 
 
 @router.post("/install")

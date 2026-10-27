@@ -67,3 +67,15 @@ async def test_status_reports_external_repository_http_error_as_down(monkeypatch
     response = await _get_status(monkeypatch, fake_client)
 
     assert response.ecmwf == "down"
+
+
+@pytest.mark.asyncio
+async def test_status_reports_cascade_down_when_submission_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    from forecastbox.utility.concurrency.manager import SubmissionRejected, execution_manager
+
+    async def _reject(pool: object, name: object, task: object) -> object:
+        raise SubmissionRejected("full")
+
+    monkeypatch.setattr(execution_manager, "awaitable_submit", _reject)
+    response = await _get_status(monkeypatch, FakeAsyncClient(httpx.Response(200)))
+    assert response.cascade == "down"
