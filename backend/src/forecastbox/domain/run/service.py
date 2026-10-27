@@ -305,8 +305,8 @@ def _fetch_textual_values(job_id: JobId, candidates: dict[TaskId, str]) -> dict[
     return values
 
 
-async def poll_and_update(execution: RunRecord, detailed_report: bool = False) -> RunDetail:
-    """Poll cascade for a Run's status, update db if changed, and return current detail.
+def poll_and_update(execution: RunRecord, detailed_report: bool = False) -> RunDetail:
+    """Blocking: poll cascade for a Run's status, update db if changed, and return current detail.
 
     Every status write is a compare-and-swap against the status in ``execution``. If it loses,
     the Run is read again and the whole poll is redone on the fresh record, up to a few times.
@@ -320,21 +320,16 @@ async def poll_and_update(execution: RunRecord, detailed_report: bool = False) -
     """
     for _ in range(_POLL_ATTEMPTS):
         try:
-            return await _poll_and_update_once(execution, detailed_report)
+            return _poll_and_update_once(execution, detailed_report)
         except _StaleRecord:
-            fresh = cast(
-                RunRecord | None,
-                await execution_manager.await_jobs_db(
-                    "run.get", partial(run_db.get_run_unchecked, execution.run_id, execution.attempt_count)
-                ),
-            )
+            fresh = run_db.get_run_unchecked(execution.run_id, execution.attempt_count)
             if fresh is None:
                 raise RunNotFound(f"Run {execution.run_id!r} not found.")
             execution = fresh
     raise RunConcurrencyIssue(f"Run {execution.run_id!r} is being modified concurrently, retry later.")
 
 
-async def _poll_and_update_once(execution: RunRecord, detailed_report: bool) -> RunDetail:
+def _poll_and_update_once(execution: RunRecord, detailed_report: bool) -> RunDetail:
     run_id = execution.run_id
     actual_attempt = execution.attempt_count
     cascade_job_id = execution.cascade_job_id
@@ -348,9 +343,7 @@ async def _poll_and_update_once(execution: RunRecord, detailed_report: bool) -> 
     available_task_ids: list[TaskId] | None
     lost_task_ids: dict[TaskId, str] = {}
     if status == "completed":
-        current_cascade_proc = await execution_manager.awaitable_submit(
-            ConcurrentPools.General, TaskName("run.poll.cascade-proc"), _current_cascade_proc_or_none
-        )
+        current_cascade_proc = _current_cascade_proc_or_none()
         if current_cascade_proc is not None and stored_cascade_proc == current_cascade_proc:
             available_task_ids = [TaskId(k) for k in (raw_outputs or {}).get("outputs", {}).keys()]
         elif raw_outputs:
@@ -401,11 +394,8 @@ async def _poll_and_update_once(execution: RunRecord, detailed_report: bool) -> 
             resolution=execution.compiler_runtime_context.get("resolution") or None,
         )
 
-    async def write_status(new_status: RunStatus, **fields: object) -> None:
-        updated = await execution_manager.await_jobs_db(
-            "run.runtime.update",
-            partial(run_db.update_run_runtime, run_id, actual_attempt, expected_status=status, status=new_status, **fields),
-        )
+    def write_status(new_status: RunStatus, **fields: object) -> None:
+        updated = run_db.update_run_runtime(run_id, actual_attempt, expected_status=status, status=new_status, **fields)
         if not updated:
             raise _StaleRecord
 
@@ -423,9 +413,7 @@ async def _poll_and_update_once(execution: RunRecord, detailed_report: bool) -> 
                 warning_error = f"unable to provide completed/planned tasks: {repr(e)}"
 
         try:
-            response = await execution_manager.awaitable_submit(
-                ConcurrentPools.General, TaskName("run.poll.progress"), partial(_request_job_progress, job_id, detailed_report)
-            )
+            response = _request_job_progress(job_id, detailed_report)
         except TimeoutError:
             return _build(status_override="unknown", error_override="failed to communicate with gateway")
         except Exception as e:
@@ -453,9 +441,7 @@ async def _poll_and_update_once(execution: RunRecord, detailed_report: bool) -> 
                         continue
                     candidates[task_id] = char.mime_type
                 if candidates:
-                    fetched = await execution_manager.awaitable_submit(
-                        ConcurrentPools.General, TaskName("run.poll.textual-outputs"), partial(_fetch_textual_values, job_id, candidates)
-                    )
+                    fetched = _fetch_textual_values(job_id, candidates)
                     for task_id, value in fetched.items():
                         outputs_model.outputs[task_id].value = value
                         updated_outputs = outputs_model
@@ -485,22 +471,22 @@ async def _poll_and_update_once(execution: RunRecord, detailed_report: bool) -> 
         if jobprogress is None:
             if status == "stopping":
                 # TODO -- uncertain, have cascade properly report stopped jobs
-                await write_status("stopped", **outputs_kwargs)
+                write_status("stopped", **outputs_kwargs)
                 available_task_ids = cached_available()
                 pop_memcache(run_id)
                 return _build(status_override="stopped")
-            await write_status("failed", error="evicted from gateway", **outputs_kwargs)
+            write_status("failed", error="evicted from gateway", **outputs_kwargs)
             available_task_ids = cached_available()
             pop_memcache(run_id)
             return _build(status_override="failed", error_override="evicted from gateway")
         elif jobprogress.failure:
             # NOTE for a stopping run this means the stop did not come first, or the gateway reports stops as failures
-            await write_status("failed", error=jobprogress.failure, **outputs_kwargs)
+            write_status("failed", error=jobprogress.failure, **outputs_kwargs)
             available_task_ids = cached_available()
             pop_memcache(run_id)
             return _build(status_override="failed", error_override=jobprogress.failure)
         elif jobprogress.completed or jobprogress.pct == "100.00":
-            await write_status("completed", progress="100.00", **outputs_kwargs)
+            write_status("completed", progress="100.00", **outputs_kwargs)
             return _build(status_override="completed", progress_override="100.00")
         elif status == "stopping":
             # NOTE the earlier stop attempt has apparently not succeeded -- try again. Quick if gateway is already stopping the job
@@ -509,12 +495,10 @@ async def _poll_and_update_once(execution: RunRecord, detailed_report: bool) -> 
             except Exception as e:
                 logger.warning(f"failed to enqueue repeated cascade stop of {run_id=}, {actual_attempt=}: {e!r}")
             if updated_outputs is not None:
-                await execution_manager.await_jobs_db(
-                    "run.runtime.update", partial(run_db.update_run_runtime, run_id, actual_attempt, outputs=raw_outputs)
-                )
+                run_db.update_run_runtime(run_id, actual_attempt, outputs=raw_outputs)
             return _build(status_override="stopping", progress_override=jobprogress.pct)
         else:
-            await write_status("running", progress=jobprogress.pct, **outputs_kwargs)
+            write_status("running", progress=jobprogress.pct, **outputs_kwargs)
             return _build(
                 status_override="running",
                 error_override=warning_error,

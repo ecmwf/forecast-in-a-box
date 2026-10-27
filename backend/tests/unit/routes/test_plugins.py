@@ -134,12 +134,12 @@ _REMOTE_INFO = PluginRemoteInfo(version="1.2.0")
 
 @pytest.fixture(autouse=True)
 def mock_http_pool() -> Iterator[None]:
-    with patch("forecastbox.routes.plugins.get_sync", return_value=MagicMock(spec=httpx.Client)):
+    with patch("forecastbox.routes.plugins.get_async", return_value=MagicMock(spec=httpx.AsyncClient)):
         yield
 
 
 def _patch_versions(versions: list[str]) -> PatchType:
-    return patch("forecastbox.routes.plugins.get_package_versions", return_value=iter(versions))
+    return patch("forecastbox.routes.plugins.get_package_versions_async", new=AsyncMock(return_value=list(versions)))
 
 
 def _patch_store(entry: PluginStoreEntry = _STORE_ENTRY) -> PatchType:
@@ -194,13 +194,13 @@ async def test_versions_falls_back_to_db_when_not_in_store() -> None:
 
 
 @pytest.mark.asyncio
-async def test_versions_pip_source_passed_to_get_package_versions() -> None:
-    client = MagicMock(spec=httpx.Client)
+async def test_versions_pip_source_passed_to_get_package_versions_async() -> None:
+    client = MagicMock(spec=httpx.AsyncClient)
     with (
         _patch_store(),
         _patch_fiabcore("1.0.0"),
-        patch("forecastbox.routes.plugins.get_sync", return_value=client) as mock_get_sync,
-        patch("forecastbox.routes.plugins.get_package_versions", return_value=iter([])) as mock_gpv,
+        patch("forecastbox.routes.plugins.get_async", return_value=client) as mock_get_sync,
+        patch("forecastbox.routes.plugins.get_package_versions_async", new=AsyncMock(return_value=[])) as mock_gpv,
     ):
         await get_plugin_versions(_COMPOSITE_ID)
     mock_get_sync.assert_called_once_with(HttpProfile.Default)

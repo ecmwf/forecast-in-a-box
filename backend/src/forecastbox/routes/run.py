@@ -215,6 +215,13 @@ def _to_run_detail(domain_detail: service.RunDetail) -> RunDetailResponse:
     )
 
 
+async def _poll_run(execution: db.RunRecord, detailed_report: bool = False) -> service.RunDetail:
+    """Run the blocking poll of a Run as a single task on the General pool."""
+    return await execution_manager.awaitable_submit(
+        ConcurrentPools.General, TaskName("run.poll"), partial(service.poll_and_update, execution, detailed_report)
+    )
+
+
 async def _resolve_run_record(
     execution_spec: RunLookup,
     auth_context: AuthContext,
@@ -315,7 +322,7 @@ async def list_runs(
     details = []
     for e in executions:
         try:
-            details.append(_to_run_detail(await service.poll_and_update(e)))
+            details.append(_to_run_detail(await _poll_run(e)))
         except RunNotFound:
             continue  # NOTE deleted while we were polling
         except RunConcurrencyIssue as ex:
@@ -335,7 +342,7 @@ async def get_run(
                 "run.get", partial(db.get_run, spec.run_id, spec.attempt_count, auth_context=auth_context)
             ),
         )
-        domain_detail = await service.poll_and_update(execution, detailed_report=True)
+        domain_detail = await _poll_run(execution, detailed_report=True)
     except RunNotFound:
         raise HTTPException(status_code=404, detail=f"Run {spec.run_id!r} not found.")
     except RunAccessDenied:

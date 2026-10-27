@@ -28,6 +28,7 @@ from forecastbox.utility.packages import (
     extract_editable_local_requirements,
     freeze_environment,
     get_package_versions,
+    get_package_versions_async,
     parse_frozen_environment,
     parse_install_output,
     query_module_distribution_map,
@@ -665,3 +666,16 @@ def test_get_package_versions_is_iterator() -> None:
     import inspect
 
     assert inspect.isgenerator(result)
+
+
+@pytest.mark.asyncio
+async def test_get_package_versions_async_returns_all_releases() -> None:
+    handler = lambda request: httpx.Response(200, json={"releases": {"1.0.0": [], "1.1.0": []}})
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        assert await get_package_versions_async("some-plugin", client) == ["1.0.0", "1.1.0"]
+
+
+@pytest.mark.asyncio
+async def test_get_package_versions_async_non_200_returns_empty() -> None:
+    async with httpx.AsyncClient(transport=httpx.MockTransport(lambda request: httpx.Response(404))) as client:
+        assert await get_package_versions_async("nonexistent-plugin", client) == []
