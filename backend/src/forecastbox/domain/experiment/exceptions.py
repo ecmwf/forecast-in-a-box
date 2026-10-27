@@ -24,3 +24,11 @@ class ExperimentVersionConflict(Exception):
 
 class SchedulerBusy(Exception):
     """Raised when the scheduler lock cannot be acquired within the timeout."""
+
+
+class SchedulerDisabled(Exception):
+    """Raised when a scheduler operation is requested but the scheduler is disabled in the configuration."""
+
+
+class SchedulerRestartRefused(Exception):
+    """Raised when the managed scheduler thread cannot be restarted in the current state."""

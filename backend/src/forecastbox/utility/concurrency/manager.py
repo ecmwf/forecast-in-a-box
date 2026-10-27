@@ -378,6 +378,9 @@ class ExecutionManager:
     def _start_thread(self, record: _ThreadRecord) -> None:
         stop_event = threading.Event()
         record.stop_event = stop_event
+        record.uncaught_exception = None
+        record.traceback = None
+        record.stopped_at = None
 
         def run() -> None:
             record.started_at = time.time()
@@ -386,6 +389,7 @@ class ExecutionManager:
             except BaseException as error:
                 record.uncaught_exception = repr(error)
                 record.traceback = traceback.format_exc()
+                logger.exception(f"managed thread {record.thread_name} failed")
             finally:
                 record.stopped_at = time.time()
 
@@ -503,7 +507,14 @@ class ExecutionManager:
         self._stop_record(record, time.monotonic() + max(timeout, 0))
         return self._thread_snapshot(record)
 
-    def restart_thread(self, thread_name: ConcurrentThreads) -> ThreadStatus:
+    def restart_thread(self, thread_name: ConcurrentThreads, *, reset_restart_count: bool = False) -> ThreadStatus:
+        """Start a new run of a dead managed thread, only while the manager is running.
+
+        With ``reset_restart_count=False`` the restart is refused once the restart policy budget is
+        exhausted, otherwise the restart count is incremented. With ``reset_restart_count=True``
+        (explicit, operator-initiated restart) the policy check is skipped and the restart count is
+        set to zero.
+        """
         with self._lock:
             if self._lifecycle is not ExecutionLifecycle.running:
                 raise LifecycleError("threads can only be restarted while the manager is running")
@@ -512,9 +523,12 @@ class ExecutionManager:
                 raise KeyError(f"unknown managed thread: {thread_name}")
             if record.thread is not None and record.thread.is_alive():
                 raise LifecycleError(f"thread is still alive: {thread_name}")
-            if record.restart_count >= record.restart_policy.max_restarts:
+            if reset_restart_count:
+                record.restart_count = 0
+            elif record.restart_count >= record.restart_policy.max_restarts:
                 raise LifecycleError(f"restart policy exhausted: {thread_name}")
-            record.restart_count += 1
+            else:
+                record.restart_count += 1
         self._start_thread(record)
         return self._thread_snapshot(record)
 

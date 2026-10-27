@@ -16,7 +16,7 @@ import httpx
 from cascade.gateway import api, client
 from fastapi import APIRouter, Request
 
-from forecastbox.domain.experiment.scheduling.background import status_scheduler
+from forecastbox.domain.experiment.scheduling.runtime import status_scheduler
 from forecastbox.domain.gateway.service import get_gateway_url
 from forecastbox.domain.plugin.status import status_brief
 from forecastbox.utility.concurrency.manager import ExecutionStatus, SubmissionRejected, TaskName, execution_manager
@@ -35,6 +35,7 @@ class StatusResponse:
     api: str
     cascade: str
     ecmwf: str
+    # TODO deprecated field, migrate clients to directly query the managed thread status, then remove this
     scheduler: str
     version: str
     plugins: str

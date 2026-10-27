@@ -28,12 +28,20 @@ from forecastbox.domain.auth.users import get_auth_context
 from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.experiment import db as experiment_db
 from forecastbox.domain.experiment import service
-from forecastbox.domain.experiment.exceptions import ExperimentAccessDenied, ExperimentNotFound, ExperimentVersionConflict, SchedulerBusy
-from forecastbox.domain.experiment.scheduling.background import start_scheduler, stop_scheduler
+from forecastbox.domain.experiment.exceptions import (
+    ExperimentAccessDenied,
+    ExperimentNotFound,
+    ExperimentVersionConflict,
+    SchedulerBusy,
+    SchedulerDisabled,
+    SchedulerRestartRefused,
+)
+from forecastbox.domain.experiment.scheduling.runtime import restart_scheduler as restart_scheduler_sync
 from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.domain.run.types import RunId
 from forecastbox.utility.auth import AuthContext
-from forecastbox.utility.config import ROUTE_PREFIX
+from forecastbox.utility.concurrency.manager import TaskName, execution_manager
+from forecastbox.utility.config import ROUTE_PREFIX, ConcurrentPools
 from forecastbox.utility.pagination import PaginationSpec
 from forecastbox.utility.pydantic import FiabBaseModel
 from forecastbox.utility.time import current_time, value_dt2str
@@ -357,6 +365,9 @@ async def restart_scheduler(auth_context: AuthContext = Depends(get_auth_context
     """Restart the scheduler thread. Requires admin access."""
     if not auth_context.has_admin():
         raise HTTPException(status_code=403, detail="Only admins may restart the scheduler.")
-    # TODO(concurrency phase 4): joins the scheduler thread on the event loop; replaced by a managed thread
-    stop_scheduler()
-    start_scheduler()
+    try:
+        await execution_manager.awaitable_submit(ConcurrentPools.General, TaskName("scheduler.restart"), restart_scheduler_sync)
+    except SchedulerDisabled as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except SchedulerRestartRefused as e:
+        raise HTTPException(status_code=409, detail=str(e))
