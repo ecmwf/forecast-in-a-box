@@ -360,6 +360,19 @@ from pool workers only."
 Template removal failures (unload/uninstall) take the generic `_run_managed`
 path: one `updater_error`, one notification.
 
+9. Per-plugin install/load failures do not notify clients today (see Notes).
+   Do not fix this now, but add the following comment at each of these
+   three places in `loading.py`:
+   - `load_plugins`, the `if install_error is not None:` branch;
+   - `load_plugins`, the `else` branch that records the
+     `PluginError(source="load", severity="error", ...)` for a failed
+     `_load_single`;
+   - `update_single`, where `load_err` is built for a failed `_load_single`.
+
+   ```python
+   # TODO if a load/install fails, we want a notification as well
+   ```
+
 ### 6. Readiness
 
 No code change is needed: `load_plugins` runs inside the managed
@@ -492,23 +505,23 @@ Then `just val` and `uv run prek`.
 
 ## Notes
 
-- "Regular" per-plugin install/load problems in `load_plugins` are recorded
-  as `PluginErrors` (shown in plugin detail) and are not operation failures;
-  they neither set `updater_error` nor send a notification today, and this
-  phase does not change that. Only failures that abort an operation (which
-  overwrite `updater_error`) and template ingestion failures (step 5) are
-  notified.
+- Verified in the code: `PluginGlobalErrorEvent` is instantiated only in
+  `submit.py::_notify_failure`, which is called only from `_run_managed`, i.e.
+  only when a managed operation raises. Consequently:
+  - in `load_plugins`, install failures and import/load failures of
+    individual plugins are recorded as `PluginErrors` (persisted state and
+    in-memory `PluginManager.errors`, shown in plugin detail) and send **no**
+    notification;
+  - in `update_single`, an install failure raises and is notified, but an
+    import/load failure after a successful install does not raise, so the
+    operation completes normally and `_run_managed` even emits the success
+    notification (`PluginInstalledEvent` / `PluginUpdatedEvent` /
+    `PluginSettingsAppliedEvent`);
+  - `submit_load_all`'s refused reservation and failed catalog dependency set
+    `updater_error` via `finish_with_error` without a notification.
+
+  This phase does not change any of that; step 5.9 only marks the first two
+  with TODO comments. Only failures that abort an operation and template
+  ingestion failures (step 5) are notified.
 - `TEMPLATE_DISPATCH_TIMEOUT_SECONDS = 600` is deliberately far above the
   observed ingestion time (a few seconds per plugin).
-
-## Open questions
-
-1. **Notifications for per-plugin load errors.** Your answer mentioned that a
-   "regular load fail" for a plugin should ideally notify clients too. As
-   noted above, such failures are per-plugin `PluginErrors` (e.g. import
-   failure, install failure during the initial load), not operation
-   failures, and currently send nothing. Should this phase also emit one
-   `PluginGlobalErrorEvent` per plugin whose initial load/install ended with
-   an `error`-severity `PluginErrors` entry (and likewise in `update_single`)?
-   It is a small addition in `load_plugins`, but it is a behaviour change
-   unrelated to the event decoupling, so the plan currently leaves it out.
