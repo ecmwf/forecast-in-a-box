@@ -218,7 +218,8 @@ const mockModels: Array<MlModelDetail> = [
     display_author: 'ECMWF',
     disk_size_bytes: 2_147_483_648,
     supported_platforms: ['cpu', 'cuda'],
-    tags: { resolution: 'o96', deterministic: null },
+    // `status` is the catalogue's maturity key
+    tags: { status: 'demo', resolution: 'o96', deterministic: null },
     is_available: true,
     is_locally_compatible: true,
     local_compatibility_detail: null,
@@ -297,7 +298,7 @@ const mockModels: Array<MlModelDetail> = [
     display_author: 'ECMWF',
     disk_size_bytes: 921_584_533,
     supported_platforms: ['linux', 'macos'],
-    tags: { resolution: 'n320', ensemble: null },
+    tags: { status: 'operational', resolution: 'n320', ensemble: null },
     is_available: true,
     is_locally_compatible: true,
     local_compatibility_detail: null,
