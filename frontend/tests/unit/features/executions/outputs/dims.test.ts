@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest'
 import type { OutputItem } from '@/features/executions/outputs/types'
 import type { OutputDim } from '@/features/executions/outputs/dims'
 import {
+  SETTING_PREFIX,
   compareDimValues,
   compareDims,
   dimLine,
@@ -118,6 +119,24 @@ describe('dimValueCounts', () => {
       ['12', 2],
     ])
   })
+
+  it('lists block settings before coordinates', () => {
+    const style = `${SETTING_PREFIX}style`
+    const styled = (taskId: string, value: string): OutputItem => ({
+      ...item(taskId, [['step', '6']]),
+      settings: [[style, value]],
+    })
+    const counts = dimValueCounts([
+      styled('a', 'MetNorway'),
+      styled('b', 'ECMWF'),
+      styled('c', 'ECMWF'),
+    ])
+    expect([...counts.keys()]).toEqual([style, 'step'])
+    expect(counts.get(style)).toEqual([
+      ['ECMWF', 2],
+      ['MetNorway', 1],
+    ])
+  })
 })
 
 describe('dimNeighbor', () => {
@@ -174,6 +193,30 @@ describe('dim filter', () => {
     expect(serializeDimFilter({ step: [] })).toBe('step=')
     expect(parseDimFilter('step=;=6')).toEqual({ step: [] })
     expect(matchesDimFilter(grid[0], { step: [] })).toBe(false)
+  })
+
+  it('encodes list separators inside values', () => {
+    const filter = { [`${SETTING_PREFIX}param`]: ['2t,msl', '100%=a;b'] }
+    const raw = serializeDimFilter(filter)
+    expect(raw).toBe('setting:param=2t%2cmsl,100%25%3da%3bb')
+    expect(parseDimFilter(raw)).toEqual(filter)
+  })
+
+  it('matches block settings like coordinates', () => {
+    const styled: OutputItem = {
+      ...grid[0],
+      settings: [[`${SETTING_PREFIX}style`, 'ECMWF']],
+    }
+    expect(
+      matchesDimFilter(styled, { [`${SETTING_PREFIX}style`]: ['ECMWF'] }),
+    ).toBe(true)
+    expect(
+      matchesDimFilter(styled, { [`${SETTING_PREFIX}style`]: ['MetNorway'] }),
+    ).toBe(false)
+    // Setting keys never read coordinates.
+    expect(
+      matchesDimFilter(styled, { [`${SETTING_PREFIX}param`]: ['151'] }),
+    ).toBe(false)
   })
 
   it('matches every filtered coordinate', () => {

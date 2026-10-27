@@ -10,6 +10,7 @@
 
 import type { JobStatus, RunOutputs } from '@/api/types/job.types'
 import type { LostTaskIds } from '@/features/executions/outputs/availability'
+import type { BlockSettings } from '@/features/executions/outputs/block-settings'
 import { OutputsView } from '@/features/executions/outputs/OutputsView'
 
 interface OutputsPanelProps {
@@ -24,6 +25,8 @@ interface OutputsPanelProps {
   plannedBlockIds?: ReadonlyArray<string> | null
   /** Display name per block id, from the run's workflow. */
   blockNames?: Readonly<Record<string, string>>
+  /** Options differing between same-type blocks. */
+  blockSettings?: BlockSettings
   /** Portal target so the filter row can sit alongside the parent's tabs. */
   toolbarSlot?: HTMLElement | null
   /** Switches to the Logs tab from the failed-run notice. */
@@ -38,6 +41,7 @@ export function OutputsPanel({
   completedBlockIds,
   plannedBlockIds,
   blockNames,
+  blockSettings,
   toolbarSlot,
   onViewLogs,
 }: OutputsPanelProps) {
@@ -53,6 +57,7 @@ export function OutputsPanel({
       completedBlockIds={completedBlockIds}
       plannedBlockIds={plannedBlockIds}
       blockNames={blockNames}
+      blockSettings={blockSettings}
       toolbarSlot={toolbarSlot}
       onViewLogs={onViewLogs}
     />

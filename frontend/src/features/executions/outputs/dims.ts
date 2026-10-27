@@ -18,6 +18,9 @@ export type OutputDim = readonly [key: string, value: string]
 /** Selected values per dimension; an absent key is unfiltered, [] keeps none. */
 export type DimFilter = Readonly<Record<string, ReadonlyArray<string>>>
 
+/** Key prefix of block settings. */
+export const SETTING_PREFIX = 'setting:'
+
 /** Dimensions ordered innermost. */
 const TIME_DIMS: ReadonlySet<string> = new Set([
   'step',
@@ -52,7 +55,8 @@ export function outputTitle(item: OutputItem): string {
 }
 
 export function dimValue(item: OutputItem, key: string): string | undefined {
-  return item.dims?.find(([k]) => k === key)?.[1]
+  const pairs = key.startsWith(SETTING_PREFIX) ? item.settings : item.dims
+  return pairs?.find(([k]) => k === key)?.[1]
 }
 
 /** Compares the coordinates both items share, outer to inner. */
@@ -66,13 +70,16 @@ export function compareDims(a: OutputItem, b: OutputItem): number {
   return 0
 }
 
-/** Distinct values per dimension in display order, with item counts. */
+/** Distinct values per setting then dimension, with counts. */
 export function dimValueCounts(
   items: ReadonlyArray<OutputItem>,
 ): Map<string, Array<[value: string, count: number]>> {
   const counts = new Map<string, Map<string, number>>()
   for (const item of items) {
-    for (const [key, value] of orderDims(item.dims ?? [])) {
+    for (const [key, value] of [
+      ...(item.settings ?? []),
+      ...orderDims(item.dims ?? []),
+    ]) {
       const byValue = counts.get(key) ?? new Map<string, number>()
       byValue.set(value, (byValue.get(value) ?? 0) + 1)
       counts.set(key, byValue)
@@ -132,12 +139,26 @@ export function segmentKey(item: OutputItem): string {
   ])
 }
 
-/** `param=167,151;step=6`; values must not contain `,` `;` or `=`. */
+/** Percent-encodes `,` `;` `=` `%`. */
+const encodeValue = (value: string): string =>
+  value.replace(/[%,;=]/g, (c) => `%${c.charCodeAt(0).toString(16)}`)
+
+const decodeValue = (value: string): string =>
+  value.replace(/%(25|2c|3b|3d)/gi, (_, hex: string) =>
+    String.fromCharCode(parseInt(hex, 16)),
+  )
+
+/** `param=167,151;step=6`; values percent-encoded. */
 export function parseDimFilter(raw: string | undefined): DimFilter {
   const filter: Record<string, Array<string>> = {}
   for (const entry of raw?.split(';') ?? []) {
     const [key, values = ''] = entry.split('=')
-    if (key) filter[key] = values.split(',').filter((v) => v.length > 0)
+    if (key) {
+      filter[key] = values
+        .split(',')
+        .filter((v) => v.length > 0)
+        .map(decodeValue)
+    }
   }
   return filter
 }
@@ -145,7 +166,9 @@ export function parseDimFilter(raw: string | undefined): DimFilter {
 export function serializeDimFilter(filter: DimFilter): string | undefined {
   const entries = Object.entries(filter)
   if (entries.length === 0) return undefined
-  return entries.map(([key, v]) => `${key}=${v.join(',')}`).join(';')
+  return entries
+    .map(([key, v]) => `${key}=${v.map(encodeValue).join(',')}`)
+    .join(';')
 }
 
 export function matchesDimFilter(item: OutputItem, filter: DimFilter): boolean {
