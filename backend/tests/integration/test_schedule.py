@@ -452,3 +452,44 @@ def test_schedule_v2_execute(tmpdir: Any, backend_client_user: httpx.Client) -> 
     _time_parts = _time_line.split(";")
     assert _time_parts[0] == expected_submit
     assert compare_with_tolerance(_time_parts[1], dt.datetime.fromisoformat(created_at_sec))
+
+
+# *** scheduler managed thread ***
+
+
+def _scheduler_thread_status(client: httpx.Client) -> tuple[str, dict[str, Any]]:
+    response = client.get("/status", timeout=10)
+    assert response.is_success, response.text
+    data = response.json()
+    return data["scheduler"], data["concurrency"]["threads"]["scheduler"]
+
+
+def _await_scheduler_up(client: httpx.Client) -> dict[str, Any]:
+    def do_action() -> Any:
+        return _scheduler_thread_status(client)
+
+    def verify(data: Any) -> Any:
+        top, thread = data
+        if top == "up" and thread["alive"] and thread["component_status"]["state"] in {"sleeping", "scheduling"}:
+            return thread
+        return None
+
+    return retry_until(do_action, verify, attempts=40, sleep=0.5, error_msg="scheduler did not come up")
+
+
+def test_scheduler_status_up(backend_client_admin: httpx.Client) -> None:
+    thread = _await_scheduler_up(backend_client_admin)
+    assert thread["alive"] is True
+
+
+def test_scheduler_restart(backend_client_admin: httpx.Client, backend_client_user: httpx.Client) -> None:
+    before = _await_scheduler_up(backend_client_admin)
+    for _ in range(2):
+        response = backend_client_admin.post("/experiment/operational/scheduler/restart", timeout=30)
+        assert response.status_code == 200, response.text
+        after = _await_scheduler_up(backend_client_admin)
+        assert after["started_at"] > before["started_at"]
+        assert after["restart_count"] == 0
+        before = after
+    response = backend_client_user.post("/experiment/operational/scheduler/restart", timeout=30)
+    assert response.status_code == 403

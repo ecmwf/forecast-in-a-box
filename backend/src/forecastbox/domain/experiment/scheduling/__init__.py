@@ -6,3 +6,7 @@
 # In applying this licence, ECMWF does not waive the privileges and immunities
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
+
+"""Cron scheduling of experiments: `db.py` persistence of next-run rows, `background.py` one
+scheduling iteration, `runtime.py` the managed scheduler thread, `job_utils.py`/`dt_utils.py`
+helpers."""

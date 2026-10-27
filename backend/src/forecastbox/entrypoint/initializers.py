@@ -20,7 +20,8 @@ import importlib
 import inspect
 import logging
 import pkgutil
-from collections.abc import Callable
+import threading
+from collections.abc import Callable, Sequence
 from concurrent.futures import Future
 from typing import TypeVar
 
@@ -31,7 +32,13 @@ import forecastbox.domain
 import forecastbox.schemata
 from forecastbox.domain.artifact.base import get_artifact_local_path
 from forecastbox.domain.artifact.manager import ArtifactManager, submit_refresh_catalog
-from forecastbox.domain.experiment.scheduling.background import start_scheduler, stop_scheduler
+from forecastbox.domain.experiment.scheduling.runtime import (
+    SCHEDULER_STOP_TIMEOUT_SECONDS,
+    arm_start_gate,
+    scheduler_entrypoint,
+    scheduler_status,
+    scheduler_stop_request,
+)
 from forecastbox.domain.gateway.service import ensure_gateway, launch_gateway, shutdown_processes
 from forecastbox.domain.lens.manager import shutdown_all_lens_instances
 from forecastbox.domain.notification.service import init_broadcaster
@@ -103,6 +110,19 @@ def _discover_dispatchers() -> None:
     freeze_registration()
 
 
+def _register_scheduler() -> None:
+    if not config.backend.allow_scheduler:
+        return
+    arm_start_gate(SchedulerPrerequisitesMet)
+    execution_manager.register_thread(
+        ConcurrentThreads.Scheduler,
+        scheduler_entrypoint,
+        status_provider=scheduler_status,
+        stop_request=scheduler_stop_request,
+        stage=1,
+    )
+
+
 def _start_execution_runtime() -> None:
     try:
         _discover_dispatchers()
@@ -122,6 +142,7 @@ def _start_execution_runtime() -> None:
             stop_request=dispatcher_stop_request,
             stage=0,
         )
+        _register_scheduler()
         execution_manager.start(timeout=config.backend.concurrency.startup_timeout_seconds)
     except BaseException:
         # NOTE partial registration may have happened above -- make sure it's cleaned up, since
@@ -152,21 +173,20 @@ def register_fiabcore_providers() -> None:
 # The two barriers below let independent `Initializer` steps be gated on one another
 # without coupling their domain functions together (see `submit_load_all`, which is
 # unaware that its `start_after` future ultimately traces back to the artifact catalog
-# refresh, and `start_scheduler`, which is unaware of the plugin catalog at all).
+# refresh, and the scheduler, which is unaware of the plugin catalog at all).
 #
 # Each barrier is acked with the *same outcome* as the upstream step it is attached to,
 # via `_forward_to_barrier`: a successful upstream resolves the barrier with `None`, a
 # failed (or cancelled) upstream resolves the barrier with that same failure. This way,
 # a step gated on a barrier observes a failure early (and can choose to log-and-skip, as
-# `start_scheduler` does) rather than blocking forever or failing later on some
+# the scheduler does) rather than blocking forever or failing later on some
 # unrelated `None` value.
 #
 # TODO rework into better alignment with execution manager / initializers after concurrency migration concluded
 # In particular, we dont want to consume a thread by awaiting on a future, we want sequential task graphs
-# TODO the scheduler prerequisite waiter still blocks a General worker, as it waits on two futures and
-# the manager has no `submit_after_all`
 ArtifactsCatalogInitialized: Future[None] = Future()
 PluginsCatalogInitialized: Future[None] = Future()
+SchedulerPrerequisitesMet: Future[None] = Future()
 _T = TypeVar("_T")
 
 
@@ -191,6 +211,32 @@ def _forward_to_barrier(barrier: Future[None]) -> Callable[[Future[_T]], None]:
     return _forward
 
 
+def _forward_all_to_barrier(barrier: Future[None], upstreams: Sequence[Future[None]]) -> None:
+    """Resolve ``barrier`` with None once all ``upstreams`` succeeded, or with the first failure
+    or cancellation. Uses non-blocking done-callbacks."""
+    lock = threading.Lock()
+    remaining = len(upstreams)
+
+    def _on_done(done: Future[None]) -> None:
+        nonlocal remaining
+        with lock:
+            if barrier.done():
+                return
+            if done.cancelled():
+                barrier.cancel()
+                return
+            error = done.exception()
+            if error is not None:
+                barrier.set_exception(error)
+                return
+            remaining -= 1
+            if remaining == 0:
+                barrier.set_result(None)
+
+    for upstream in upstreams:
+        upstream.add_done_callback(_on_done)
+
+
 def _start_artifact_manager() -> None:
     catalog_ready = submit_refresh_catalog()
     catalog_ready.add_done_callback(_forward_to_barrier(ArtifactsCatalogInitialized))
@@ -202,6 +248,7 @@ def _start_plugin_catalog() -> None:
 
 
 GatewayInitialized: Future[None] = Future()
+_forward_all_to_barrier(SchedulerPrerequisitesMet, [PluginsCatalogInitialized, GatewayInitialized])
 
 
 def _run_gateway_startup() -> None:
@@ -214,24 +261,8 @@ def _start_gateway() -> None:
     startup.add_done_callback(_forward_to_barrier(GatewayInitialized))
 
 
-def _await_scheduler_prereqs() -> None:
-    # NOTE if both futures failed, only the plugins failure is surfaced here -- the gateway
-    # failure was already logged via its own barrier's done-callback, so nothing is lost.
-    PluginsCatalogInitialized.result()
-    GatewayInitialized.result()
-
-
-def _start_scheduler() -> None:
-    prereqs_ready = execution_manager.submit_unmonitored(
-        ConcurrentPools.General,
-        TaskName("scheduler.await-prereqs"),
-        _await_scheduler_prereqs,
-    )
-    prereqs_ready.add_done_callback(start_scheduler)
-
-
 def _stop_scheduler() -> None:
-    stop_scheduler()
+    execution_manager.stop_thread(ConcurrentThreads.Scheduler, timeout=SCHEDULER_STOP_TIMEOUT_SECONDS)
 
 
 def _stop_tunnels() -> None:
@@ -264,7 +295,7 @@ def build_initializers() -> Initializers:
         Initializer("gateway", start=_start_gateway),
     ]
     if config.backend.allow_scheduler:
-        initializers.append(Initializer("scheduler", start=_start_scheduler, stop=_stop_scheduler))
+        initializers.append(Initializer("scheduler", stop=_stop_scheduler))
     initializers.extend(
         [
             Initializer("tunnels", stop=_stop_tunnels),
