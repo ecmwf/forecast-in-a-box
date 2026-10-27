@@ -61,7 +61,7 @@ def get_qubes(checkpoint_path: str) -> dict[str, Any]:
     mapped_out_qube = Qube.empty()
     for datacube in out_qube.datacubes():
         datacube["param"] = [str(paramdb.shortname_to_param_id(x, context={**extra_output_keys, "class": "od", "levtype": datacube.get("levtype")})) for x in datacube["param"]]
-        mapped_out_qube = mapped_out_qube | Qube.from_datacube(dict(sorted(datacube.items())))
+        mapped_out_qube = mapped_out_qube | Qube.from_datacube(datacube)
 
     return {"input_qube": in_qube.to_json(), "output_qube": mapped_out_qube.to_json()}
 
