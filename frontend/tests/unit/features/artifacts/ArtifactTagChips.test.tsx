@@ -36,6 +36,13 @@ describe('ArtifactTagChips', () => {
     await expect.element(screen.getByText('resolution: n320')).toBeVisible()
   })
 
+  it('shows the status tag as maturity', async () => {
+    const screen = await renderWithProviders(
+      <ArtifactTagChips tags={{ status: 'demo' }} />,
+    )
+    await expect.element(screen.getByText('maturity: demo')).toBeVisible()
+  })
+
   it('keeps long details in the tooltip, label stays the key', async () => {
     const long = 'scaled dot-product attention (sdpa) variant'
     const screen = await renderWithProviders(
