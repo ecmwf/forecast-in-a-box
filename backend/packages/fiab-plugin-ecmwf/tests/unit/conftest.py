@@ -69,10 +69,11 @@ class MockedForecastDataset(ForecastDataset):
                     "140232",
                     "131",
                     "132",
+                    "228",
                     "228246",
                     "228247",
                 ],
-                STEP: ["0", "6", "12"],
+                STEP: list(map(str, range(0, 193, 6))),
                 ENSEMBLE: ["0", "1", "2", "3", "4"],
             }
         )
@@ -98,7 +99,7 @@ def dummy_blockinstance() -> BlockInstance:
             configuration_values={
                 SOURCE: "opendata",
                 BASE_TIME: datetime(2024, 1, 1),
-                FORECAST: "aifs-ens",
+                FORECAST: "ifs-ens",
             },
         ),
         OperationalForecastSource.configuration_options,

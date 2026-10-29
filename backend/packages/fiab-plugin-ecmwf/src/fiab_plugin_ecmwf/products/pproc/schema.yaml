@@ -440,12 +440,6 @@ config:
         "default":
           filter:param:
             "131060/131061/131062/131063/131064/131098/131099/131085":
-              filter:class:
-                ai:
-                  preprocessing:
-                    - operation: scale
-                      value: 0.001
-                "*": {}
               accumulations:
                 step:
                   operation: difference
@@ -632,6 +626,120 @@ config:
                   comparison: "<="
                   value: 273.15
                   scale_factor: 2
+    fcmean:
+      metadata_from_output: ["param", "stream", "date", "type"]
+      filter:param:
+        "228004":
+          accumulations:
+            step:
+              name:
+                type: default
+                length: "{steplength}:int"
+              operation: mean
+              metadata:
+                paramId: "{param}:int"
+                type: fcmean
+                typeOfStatisticalProcessing: 0
+                typeOfTimeIncrement: 2
+                # indicatorOfUnitForTimeRange: 1
+                # lengthOfTimeRange: "{coords_span}"
+                # indicatorOfUnitForTimeIncrement: 1
+                # timeIncrement: "{coords_increment}"
+                # typeOfGeneratingProcess: 4
+                # typeOfProcessedData: 10
+                # bitsPerValue: 16
+                # stepType: avg
+        "235055": 
+          preprocessing:
+            - operation: scale
+              value: 0.00001157407
+          accumulations:
+            step:
+              deaccumulate: true
+              name:
+                type: default
+                length: "{steplength}:int"
+              operation: mean
+              metadata:
+                paramId: "{param}:int"
+                type: fcmean
+                typeOfStatisticalProcessing: 0
+                typeOfTimeIncrement: 2
+                # indicatorOfUnitForTimeRange: 1
+                # lengthOfTimeRange: "{coords_span}"
+                # indicatorOfUnitForTimeIncrement: 1
+                # timeIncrement: "{coords_increment}"
+                # typeOfGeneratingProcess: 4
+                # typeOfProcessedData: 10
+                # bitsPerValue: 16
+                # stepType: avg
+    fcmax:
+      metadata_from_output: ["param", "stream", "date", "type"]
+      filter:param:
+        "237167":
+          accumulations:
+            step:
+              name:
+                type: default
+                length: "{steplength}:int"
+              operation: maximum
+              metadata:
+                paramId: "{param}:int"
+                type: fcmax
+                typeOfStatisticalProcessing: 2
+                typeOfTimeIncrement: 2
+                # indicatorOfUnitForTimeRange: 1
+                # lengthOfTimeRange: "{coords_span}"
+                # indicatorOfUnitForTimeIncrement: 1
+                # timeIncrement: "{coords_increment}"
+                # typeOfGeneratingProcess: 4
+                # typeOfProcessedData: 10
+                # bitsPerValue: 16
+                # stepType: max
+    fcmin:
+      metadata_from_output: ["param", "stream", "date", "type"]
+      filter:param:
+        "238167":
+          accumulations:
+            step:
+              name:
+                type: default
+                length: "{steplength}:int"
+              operation: minimum
+              metadata:
+                paramId: "{param}:int"
+                type: fcmin
+                typeOfStatisticalProcessing: 3
+                typeOfTimeIncrement: 2
+                # indicatorOfUnitForTimeRange: 1
+                # lengthOfTimeRange: "{coords_span}"
+                # indicatorOfUnitForTimeIncrement: 1
+                # timeIncrement: "{coords_increment}"
+                # typeOfGeneratingProcess: 4
+                # typeOfProcessedData: 10
+                # bitsPerValue: 16
+                # stepType: min
+    fcstdev:
+      metadata_from_output: ["param", "stream", "date", "type"]
+      accumulations:
+        step:
+          name:
+            type: default
+            length: "{steplength}:int"
+          operation: standard_deviation
+          metadata:
+            paramId: "{param}:int"
+            type: fcstdev
+            typeOfStatisticalProcessing: 6
+            typeOfTimeIncrement: 2
+            # indicatorOfUnitForTimeRange: 1
+            # lengthOfTimeRange: "{coords_span}"
+            # indicatorOfUnitForTimeIncrement: 1
+            # timeIncrement: "{coords_increment}"
+            # typeOfGeneratingProcess: 4
+            # typeOfProcessedData: 10
+            # bitsPerValue: 16
+            # stepType: sd
 windows:
   filter:stream:
     oper/wave/enfo/waef:
@@ -647,6 +755,7 @@ windows:
             "*":
               out_steps:
                 - type: instantaneous
+                  start: 0
                   end: 90
                   interval: 3
                 - type: instantaneous
@@ -656,6 +765,7 @@ windows:
         efhs/wehs/eehs:
           out_steps:
             type: instantaneous
+            start: 0
             interval: 12
     fc/cf/pf:
       filter:stream:
@@ -673,6 +783,7 @@ windows:
         "enfo/eefo/oper/eefh/weef":
           out_steps:
             type: range
+            start: 0
             interval: 24
             width: 168
         "enfh/enwh":
@@ -681,13 +792,16 @@ windows:
               "*":
                 out_steps:
                   - type: range
+                    start: 0
                     width: 24
                     interval: 24
                   - type: range
+                    start: 0
                     width: 72
                     end: 240
                     interval: 24
                   - type: range
+                    start: 0
                     width: 120
                     end: 240
                     interval: 24
@@ -697,6 +811,7 @@ windows:
               121/122/123/140229/59/228044/140249/164:
                 out_steps:
                   type: range
+                  start: 0
                   end: 168
                   width: 24
                   interval: 24
@@ -705,6 +820,7 @@ windows:
             "*":
               out_steps:
                 type: range
+                start: 0
                 interval: 24
                 width: 168
     taem/taes:
@@ -712,6 +828,7 @@ windows:
         "enfo/eefo/oper/efhs/eehs":
           out_steps:
             type: range
+            start: 0
             interval: 24
             width: 168
     ep:
@@ -719,6 +836,7 @@ windows:
         131060/131061/131062/131063/131098/131099/131085/131070/131071/131072/131100:
           out_steps:
             type: range
+            start: 0
             width: 24
             interval: 12
         131064/131065/131066/131067/131070/131071/131072/131100/131020/131021/131073:
@@ -751,6 +869,7 @@ windows:
         "eefo/weef":
           out_steps:
             type: range
+            start: 0
             interval: 24
             width: 168
         "enfo/waef":
@@ -784,13 +903,16 @@ windows:
                 "0000":
                   out_steps:
                     - type: range
+                      start: 0
                       width: 24
                       interval: 24
                     - type: range
+                      start: 0
                       width: 72
                       end: 240
                       interval: 24
                     - type: range
+                      start: 0
                       width: 120
                       end: 240
                       interval: 24
@@ -800,6 +922,7 @@ windows:
                 "0600/1800":
                   out_steps:
                     - type: range
+                      start: 0
                       width: 24
                       end: 144
                       interval: 12
@@ -831,13 +954,16 @@ windows:
             "*":
               out_steps:
                 - type: range
+                  start: 0
                   width: 24
                   interval: 12
                 - type: range
+                  start: 0
                   width: 72
                   end: 240
                   interval: 12
                 - type: range
+                  start: 0
                   width: 120
                   end: 240
                   interval: 12
@@ -847,17 +973,21 @@ windows:
             "228004/228":
               out_steps:
                 - type: range
+                  start: 0
                   width: 24
                   interval: 12
                 - type: range
+                  start: 0
                   width: 72
                   end: 240
                   interval: 12
                 - type: range
+                  start: 0
                   width: 120
                   end: 240
                   interval: 12
                 - type: range
+                  start: 0
                   width: 168
                   interval: 24
                 - "0-240"
@@ -866,11 +996,13 @@ windows:
             "202/201/49/140200/59/228044/140249/228006":
               out_steps:
                 type: range
+                start: 0
                 width: 24
                 interval: 12
         eehs:
           out_steps:
             type: range
+            start: 0
             width: 168
             interval: 24
 datasets: {}
@@ -986,21 +1118,12 @@ inputs:
         default:
           filter:param:
             131060/131061/131062/131063/131064/131065/131066/131067/131098/131099/131085:
-              filter:class:
-                ai:
-                  fc_inputs:
-                    select:
-                      param: "228228"
-                    derive:
-                      step:
-                        name: step_deaccumulate
-                od:
-                  fc_inputs:
-                    select:
-                      param: "228"
-                    derive:
-                      step:
-                        name: step_deaccumulate
+              fc_inputs:
+                select:
+                  param: "228"
+                derive:
+                  step:
+                    name: step_deaccumulate
             131068/131069:
               fc_inputs:
                 select:
@@ -1029,3 +1152,55 @@ inputs:
       fc_inputs:
         select:
           ensemble: True
+    fcmean:
+      filter:param: 
+        "228004":
+          fc_inputs: 
+            select: 
+              param: "167"
+              number: "{number}"
+            derive:
+              step:
+                name: step_default
+        "235055":
+          fc_inputs: 
+            select: 
+              param: "228"
+              number: "{number}"
+            derive:
+              step:
+                name: step_default
+                by: 24
+                include_start: True
+                allow_missing_zero: True
+    fcmax:
+      filter:param: 
+        "237167":
+          fc_inputs: 
+            select: 
+              param: "167"
+              number: "{number}"
+            derive:
+              step:
+                name: step_default
+    fcmin:
+      filter:param: 
+        "238167":
+          fc_inputs: 
+            select: 
+              param: "167"
+              number: "{number}"
+            derive:
+              step:
+                name: step_default
+    fcstdev:
+      filter:param: 
+        "239167":
+          fc_inputs: 
+            select: 
+              select: 
+                param: "167"
+                number: "{number}"
+              derive:
+                step:
+                  name: step_default

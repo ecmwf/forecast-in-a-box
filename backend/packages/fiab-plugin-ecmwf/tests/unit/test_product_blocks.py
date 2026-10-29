@@ -13,7 +13,7 @@ from typing import Any, cast
 
 import pytest
 from earthkit.workflows import nodetree
-from earthkit.workflows.fluent import Action
+from earthkit.workflows.fluent import Action, merge
 from earthkit.workflows.plugins.pproc.fluent import from_source
 from fiab_core.artifacts import CompositeArtifactId
 from fiab_core.fable import (
@@ -39,9 +39,11 @@ from fiab_plugin_ecmwf.constants import (
     ENSEMBLE,
     INPUT_SOURCE,
     LEAD_TIME,
+    LEVEL,
     LEVTYPE,
     PARAM,
     QUANTILE,
+    STATISTIC,
     STEP,
     THRESHOLD,
     TYPE,
@@ -52,6 +54,7 @@ from fiab_plugin_ecmwf.products.blocks import (
     PredefinedThresholdProbability,
     Quantiles,
     ThermalIndices,
+    WeeklyStatistics,
     WindSpeed,
 )
 from fiab_plugin_ecmwf.qubed_utils import axes, collapse, contains, coxpand, datacubes, select
@@ -144,6 +147,65 @@ def quantiles_configuration() -> BlockInstance:
             },
         ),
         Quantiles.configuration_options,
+    )
+
+
+@pytest.fixture
+def anemoi_source_subseasonal_configuration(dummy_checkpoint: CompositeArtifactId) -> BlockInstance:
+    return BlockInstance.from_block(
+        BlockFactoryId("anemoiSource"),
+        BlockInstanceBase(
+            input_ids={},
+            configuration_values={
+                CHECKPOINT: dummy_checkpoint,
+                INPUT_SOURCE: "opendata",
+                LEAD_TIME: 192,
+                BASE_TIME: datetime(2024, 1, 1),
+                ENSEMBLE: 3,
+            },
+        ),
+        AnemoiSource.configuration_options,
+    )
+
+
+@pytest.fixture
+def anemoi_source_subseasonal_output(anemoi_source_subseasonal_configuration: BlockInstance) -> QubedOutput:
+    return AnemoiSource().validate(block=anemoi_source_subseasonal_configuration, inputs={}, restrictions={})  # type: ignore[return-value]
+
+
+@pytest.fixture
+def anemoi_source_subseasonal_action(anemoi_source_subseasonal_configuration: BlockInstance) -> Action:
+    return AnemoiSource().compile(inputs={}, block=anemoi_source_subseasonal_configuration).get_or_raise()
+
+
+@pytest.fixture
+def operational_forecast_subseasonal_output(dummy_blockinstance: BlockInstance) -> QubedOutput:
+    oper_output = cast(QubedOutput, OperationalForecastSource().validate(block=dummy_blockinstance, inputs={}, restrictions={}))
+    return select(
+        oper_output, {PARAM: ["167", "151", "131", "228"], STEP: list(range(0, 193, 6)), ENSEMBLE: [0, 1, 2, 3, 4], LEVEL: [100, 200]}
+    )
+
+
+@pytest.fixture
+def operational_forecast_subseasonal_action(mock_forecast_preset: pytest.FixtureRequest, dummy_blockinstance: BlockInstance) -> Action:
+    oper_action = OperationalForecastSource().compile(inputs={}, block=dummy_blockinstance).get_or_raise()
+    sfc_action = oper_action.select({PARAM: ["167", "151", "228"], STEP: list(range(0, 193, 6)), ENSEMBLE: [0, 1, 2, 3, 4]})
+    pl_action = oper_action.select({PARAM: ["131"], STEP: list(range(0, 193, 6)), ENSEMBLE: [0, 1, 2, 3, 4], LEVEL: [100, 200]})
+    return merge(sfc_action, pl_action)
+
+
+@pytest.fixture
+def weekly_statistics_configuration() -> BlockInstance:
+    return BlockInstance.from_block(
+        BlockFactoryId("weeklyStatistics"),
+        BlockInstanceBase(
+            input_ids={"dataset": BlockInstanceId("source_output")},
+            configuration_values={
+                STATISTIC: "mean",
+                PARAM: ["228004"],
+            },
+        ),
+        WeeklyStatistics.configuration_options,
     )
 
 
@@ -827,3 +889,136 @@ class TestQuantiles:
     def test_expansion(self, ensemble_statistics_output: QubedOutput) -> None:
         for expansion in plugin().expander(ensemble_statistics_output):
             assert expansion.factory not in PRODUCT_BLOCKS
+
+
+class TestWeeklyStatistics:
+    @pytest.mark.parametrize(
+        "forecast_output, expected",
+        [
+            (
+                lf("operational_forecast_subseasonal_output"),
+                {"param": {"228004"}, "type": {"fcmean"}, "step": {"0-168", "24-192"}, "levtype": {"sfc"}},
+            ),
+            (
+                lf("anemoi_source_subseasonal_output"),
+                {"param": {"228004"}, "type": {"fcmean"}, "step": {"0-168", "24-192"}, "levtype": {"sfc"}},
+            ),
+        ],
+    )
+    def test_from_forecast_source(
+        self, weekly_statistics_configuration: BlockInstance, forecast_output: QubedOutput, expected: dict[str, set[Any]]
+    ) -> None:
+        block = WeeklyStatistics()
+
+        assert block.intersect(other=forecast_output)  # type: ignore[arg-type]
+        output = block.validate(  # type: ignore[assignment]
+            block=weekly_statistics_configuration,
+            inputs={"dataset": forecast_output},  # type: ignore[dict-item],
+            restrictions={},
+        )
+        assert isinstance(output, QubedOutput)
+        assert output.dataqube is not None
+        assert contains(output, PARAM)
+        output_axes = axes(output)
+        for dim, values in expected.items():
+            assert output_axes[dim] == values
+
+    @pytest.mark.parametrize(
+        "forecast_output, source_action, expected, identical_qubes",
+        [
+            (
+                lf("operational_forecast_subseasonal_output"),
+                lf("operational_forecast_subseasonal_action"),
+                {PARAM: ["228004"], TYPE: ["fcmean"], STEP: ["0-168", "24-192"], LEVTYPE: ["sfc"]},
+                True,
+            ),
+        ],
+    )
+    @pytest.mark.parametrize(
+        "ensemble_selection",
+        [
+            [0],
+            [0, 1, 2],
+        ],
+        ids=["single", "ensemble"],
+    )
+    def test_operational_forecast_compile(
+        self,
+        forecast_output: QubedOutput,
+        source_action: Action,
+        weekly_statistics_configuration: BlockInstance,
+        expected: dict[str, set[Any]],
+        identical_qubes: bool,
+        ensemble_selection: list[int],
+    ) -> None:
+        block = WeeklyStatistics()
+        forecast_output = select(forecast_output, {ENSEMBLE: ensemble_selection})
+        if len(ensemble_selection) == 1:
+            forecast_output = collapse(forecast_output, ENSEMBLE)
+        output = block.validate(block=weekly_statistics_configuration, inputs={"dataset": forecast_output}, restrictions={})  # type: ignore[dict-item]
+        action = block.compile(
+            inputs={BlockInstanceId("source_output"): source_action.select({ENSEMBLE: ensemble_selection})},
+            block=weekly_statistics_configuration,
+        ).get_or_raise()
+        requests = nodetree.datacubes(action.nodes)
+        assert len(requests) == 1
+        assert "class" in requests[0]
+        for dim, value in expected.items():
+            assert requests[0][dim] == value
+        if identical_qubes:
+            for qube in datacubes(output):
+                assert qube in requests
+
+    @pytest.mark.parametrize(
+        "forecast_output, source_action, expected, identical_qubes",
+        [
+            (
+                lf("operational_forecast_subseasonal_output"),
+                lf("operational_forecast_subseasonal_action"),
+                {PARAM: ["228004"], TYPE: ["fcmean"], STEP: ["0-168", "24-192"], LEVTYPE: ["sfc"]},
+                True,
+            ),
+            (
+                lf("anemoi_source_subseasonal_output"),
+                lf("anemoi_source_subseasonal_action"),
+                {PARAM: ["228004"], TYPE: ["fcmean"], STEP: ["0-168", "24-192"], LEVTYPE: ["sfc"]},
+                False,
+            ),
+        ],
+    )
+    def test_anemoi_source_compile(
+        self,
+        forecast_output: QubedOutput,
+        source_action: Action,
+        weekly_statistics_configuration: BlockInstance,
+        expected: dict[str, set[Any]],
+        identical_qubes: bool,
+    ) -> None:
+        block = WeeklyStatistics()
+        output = block.validate(block=weekly_statistics_configuration, inputs={"dataset": forecast_output}, restrictions={})  # type: ignore[dict-item]
+        action = block.compile(
+            inputs={BlockInstanceId("source_output"): source_action},
+            block=weekly_statistics_configuration,
+        ).get_or_raise()
+        requests = nodetree.datacubes(action.nodes)
+        assert len(requests) == 1
+        assert "class" in requests[0]
+        for dim, value in expected.items():
+            assert requests[0][dim] == value
+        if identical_qubes:
+            for qube in datacubes(output):
+                assert qube in requests
+
+    def test_validator_adds_parameters_restrictions(
+        self, weekly_statistics_configuration: BlockInstance, operational_forecast_subseasonal_output: QubedOutput
+    ) -> None:
+        restrictions = (
+            plugin()
+            .validator(
+                BlockFactoryId("weeklyStatistics"),
+                weekly_statistics_configuration.block,
+                {"dataset": operational_forecast_subseasonal_output},
+            )
+            .restrictions
+        )
+        assert restrictions[PARAM].serialize() == "list[enumClosed[param]('228004','235055')]"

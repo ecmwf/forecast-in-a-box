@@ -27,6 +27,7 @@ from fiab_plugin_ecmwf.products.blocks import (
     PredefinedThresholdProbability,
     Quantiles,
     ThermalIndices,
+    WeeklyStatistics,
     WindSpeed,
 )
 from fiab_plugin_ecmwf.templates.aifs_forecast import template as _aifs_forecast_template
@@ -48,6 +49,7 @@ blocks: dict[BlockFactoryId, QubedBlockBuilder] = {
     BlockFactoryId("anemoiInputSource"): AnemoiInputSource(),
     BlockFactoryId("anemoiTransform"): AnemoiTransform(),
     BlockFactoryId("mapPlotSink"): MapPlotSink(),
+    BlockFactoryId("weeklyStatistics"): WeeklyStatistics(),
 }
 
 _base_plugin = QubedPluginBuilder(block_builders=blocks, base_environment=["fiab-plugin-ecmwf"]).as_plugin()
