@@ -424,6 +424,7 @@ class Quantiles(Product):
     def intersect(self, other: QubedOutput) -> bool:
         return contains(other, ENSEMBLE) and len(axes(other)[ENSEMBLE]) > 1 and contains(other, PARAM)
 
+
 class WeeklyStatistics(Product):
     title: str = "Weekly Statistics"
     description: str = "Computes weekly statistics"
@@ -448,18 +449,18 @@ class WeeklyStatistics(Product):
         input_dataset = _extract_dataset(inputs, "dataset")
         coords = {dim: list(values) for dim, values in axes(input_dataset).items() if (len(values) == 1 and dim not in [ENSEMBLE, PARAM])}
 
-        prob_qube = Qube.empty()
+        output_qube = Qube.empty()
         for output, _ in PPROC_SCHEMA.outputs_from_inputs(
             forecast=ForecastDefinition(
                 datacubes=list(datacubes(input_dataset)),
             ),
             output_template={**coords, TYPE: self.stat_type[block.config_as_str(STATISTIC)]},
         ):
-            prob_qube = prob_qube | Qube.from_datacube(output)
-        restrictions[PARAM] = ListType(ClosedEnumType(list(axes(prob_qube)[PARAM]), subtype=ParameterType()))
+            output_qube = output_qube | Qube.from_datacube(output)
+        restrictions[PARAM] = ListType(ClosedEnumType(sorted(axes(output_qube)[PARAM]), subtype=ParameterType()))
 
         selected_param_ids = block.config_as_list(PARAM, str)
-        return QubedOutput(dataqube=prob_qube.select({PARAM: selected_param_ids}))
+        return QubedOutput(dataqube=output_qube.select({PARAM: selected_param_ids}))
 
     def compile(
         self,
@@ -479,7 +480,7 @@ class WeeklyStatistics(Product):
         return Either.ok(action)
 
     def intersect(self, other: QubedOutput) -> bool:
-        if not contains(other, STEP): # or max(axes(other)[STEP]) < 7*24:
+        if not contains(other, STEP):  # or max(axes(other)[STEP]) < 7*24:
             return False
         cubes = list(datacubes(other))
         coords = {dim: list(values) for dim, values in axes(other).items() if (len(values) == 1 and dim not in [ENSEMBLE, PARAM])}

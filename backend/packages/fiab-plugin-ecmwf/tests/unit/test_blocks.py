@@ -169,7 +169,7 @@ class TestOperationalForecastSource:
         datacubes = list(nodetree_datacubes(action.nodes))
 
         assert set.union(*[set(cube[PARAM]) for cube in datacubes]).issuperset({"167", "151", "140232", "131", "132"})
-        assert len(set.union(*[set(cube[STEP]) for cube in datacubes])) == 3
+        assert len(set.union(*[set(cube[STEP]) for cube in datacubes])) == (25 if forecast == "ifs-ens" and time == 6 else 33)
         assert len(set.union(*[set(cube[ENSEMBLE]) for cube in datacubes])) == 5
         assert "levelist" in nodetree_dimensions(action.nodes)
 

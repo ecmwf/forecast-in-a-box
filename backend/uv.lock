@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'darwin'",
@@ -53,7 +53,7 @@ wheels = [
 
 [[package]]
 name = "anemoi-inference"
-version = "0.11.0"
+version = "0.13.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anemoi-transform" },
@@ -72,9 +72,9 @@ dependencies = [
     { name = "semantic-version" },
     { name = "torch" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/1c/8c/3c42f93ad864e2ef30780e1acb7d6360f88c8650a52ba556db37fc43ef79/anemoi_inference-0.11.0.tar.gz", hash = "sha256:d6a5d8882d13b627e85650b8d6ccfa39fceb744a1172418bf12443ed61c6f4a3", size = 1517391, upload-time = "2026-05-13T15:37:30.75Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/bb/f5/ea73e6f42f3704168b43bf9f7f6f3e2ccf9097b27b9b49dd3f739458630d/anemoi_inference-0.13.0.tar.gz", hash = "sha256:68c2f169eab2402572b8209c8dc53003c31ef844c2231ca299c3d86ae6ff82b6", size = 1614405, upload-time = "2026-10-21T14:12:31.858Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0e/d2/4ebe6662905c846e5088758f1f62d314f831f8936061f8b7c89557b79514/anemoi_inference-0.11.0-py3-none-any.whl", hash = "sha256:3b5eb580a2a58366538b80ab4a74aede877b2eecc333eb052d8fc1b776e41b45", size = 227233, upload-time = "2026-05-13T15:37:29.227Z" },
+    { url = "https://files.pythonhosted.org/packages/49/30/c8ffb39f58047eafc66b83f535179938944508161564ed3d4bd73e929c57/anemoi_inference-0.13.0-py3-none-any.whl", hash = "sha256:5a8d52fdbe07f16937d5511236a0b70ef83d026ae91c3b60433338e3fe830c81", size = 257471, upload-time = "2026-10-21T14:12:30.211Z" },
 ]
 
 [[package]]
@@ -98,7 +98,7 @@ wheels = [
 
 [[package]]
 name = "anemoi-utils"
-version = "0.5.0"
+version = "0.5.14"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aniso8601" },
@@ -107,15 +107,17 @@ dependencies = [
     { name = "filelock" },
     { name = "multiurl" },
     { name = "numpy" },
+    { name = "peekle" },
     { name = "pydantic" },
+    { name = "pydantic-settings" },
     { name = "python-dateutil" },
     { name = "pyyaml" },
     { name = "rich" },
     { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c2/6f/08aedc4e745ca64f06e4fc23df844793a84cc0f8446ab69fa5fc18d5bf83/anemoi_utils-0.5.0.tar.gz", hash = "sha256:8047cc893e4a9c3ef6119795062a90ffcb9129ec5b96c5ab0b234fe53a34a61f", size = 146794, upload-time = "2026-02-10T14:05:58.511Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7a/6f/e758b84f050fbb8b41fb133cebaab880654180c58b44851f6ad44903d12d/anemoi_utils-0.5.14.tar.gz", hash = "sha256:55e0f2c68893018dbd90486cafba1edf5f94a8d579a5de612d949d36106d059a", size = 187464, upload-time = "2026-10-14T08:15:50.586Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/fe/9d/e40db2217669e098c61b0c365ade408ea19652f5dfe4816202275abd80a8/anemoi_utils-0.5.0-py3-none-any.whl", hash = "sha256:6cb95ba40300501400285510b8271bf4e1646fd21c54a3a9c2aa40ced633e006", size = 93828, upload-time = "2026-02-10T14:05:57.562Z" },
+    { url = "https://files.pythonhosted.org/packages/46/72/2273b1b7d47625372e160e57cef58d5b00ae37882545ad53eee32eeacf29/anemoi_utils-0.5.14-py3-none-any.whl", hash = "sha256:fe83da8e6f3326d18c25926a39e07b2913db2f6bf9066da2bd93975c4d7582ed", size = 121279, upload-time = "2026-10-14T08:15:49.079Z" },
 ]
 
 [package.optional-dependencies]
@@ -1288,6 +1290,7 @@ source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "attrs" },
     { name = "cffi" },
+    { name = "eccodeslib" },
     { name = "findlibs" },
     { name = "numpy" },
 ]
@@ -1617,10 +1620,10 @@ requires-dist = [
     { name = "earthkit-data", marker = "extra == 'runtime'", specifier = ">=0.18.2,<1" },
     { name = "earthkit-plots", marker = "extra == 'runtime'", specifier = ">=0.3.5,<1.0" },
     { name = "earthkit-workflows", specifier = ">=0.18.0" },
-    { name = "earthkit-workflows-anemoi", specifier = ">=0.8.0" },
+    { name = "earthkit-workflows-anemoi", specifier = ">=0.9.0" },
     { name = "earthkit-workflows-anemoi", extras = ["runtime-inference"], marker = "extra == 'runtime'" },
     { name = "fiab-core", editable = "packages/fiab-core" },
-    { name = "pproc-core", specifier = ">=0.4.0" },
+    { name = "pproc-core", specifier = ">=0.4.0,<0.5.0" },
 ]
 provides-extras = ["runtime"]
 
@@ -3082,6 +3085,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/ac/e9/e633c3ac1856ba04d1329eda9ac0b4cf2e4f4df964df869226af5b9d1f6f/pdbufr-0.14.2.tar.gz", hash = "sha256:5fd40f4dd07ef7b56f5d0c065debddb4afd45ddaa453addc731249ced8d31d13", size = 8761763, upload-time = "2026-02-26T17:03:46.376Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/0d/20/f2b98b18200c304f04f7839732298a786d121dba6b7cd79aa406c8c9000d/pdbufr-0.14.2-py3-none-any.whl", hash = "sha256:8d9eb74e65fe1b4b89ffe5e7ad8ee0e854ac2efbed5b64ac17cff287ea86a838", size = 52633, upload-time = "2026-02-26T17:03:45.16Z" },
+]
+
+[[package]]
+name = "peekle"
+version = "0.0.5"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/49/17/7b21410d2a02834389b698c40fceecf6b28f4f2c4b5e7ef6cbb9ef4b6cae/peekle-0.0.5.tar.gz", hash = "sha256:110e3cee71fa0f02b029a0ce2fff4b3fc72253dcc644f473f0f87238aea3315c", size = 26617, upload-time = "2026-09-03T16:28:03.658Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/68/7d/44958480d232bfe83018c20b73a49aa5e8b2958ecb6ba31530cc65e6b9bc/peekle-0.0.5-py3-none-any.whl", hash = "sha256:f7cd4d595e34a49a53be5e3963f7f00b076dbab3ce96d4732400774e38d72859", size = 21382, upload-time = "2026-09-03T16:28:02.66Z" },
 ]
 
 [[package]]
