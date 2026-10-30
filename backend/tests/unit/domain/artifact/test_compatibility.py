@@ -85,7 +85,7 @@ def test_linux_total_memory_respects_visible_gpu(monkeypatch: pytest.MonkeyPatch
     assert compatibility._linux_total_memory() == 8192
 
 
-@pytest.mark.parametrize("query_result", [["N/A"], ["Not Supported"]])
+@pytest.mark.parametrize("query_result", [["N/A"], ["[N/A]"], ["Not Supported"], ["[Not Supported]"]])
 @pytest.mark.parametrize(
     ("meminfo_line", "expected_memory"),
     [("MemTotal:       16777216 kB", 16 * 1024), ("MemTotal:       16384 mB", 16 * 1024)],
