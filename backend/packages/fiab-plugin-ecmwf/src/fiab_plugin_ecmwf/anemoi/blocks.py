@@ -53,6 +53,17 @@ def strip_timezone(dt: datetime) -> datetime:
     return dt
 
 
+def _param_id_to_param(array: Any) -> Any:
+    """Replace the paramId coordinate of an xarray object by a param dimension, with the paramIds as strings.
+
+    A scalar paramId coordinate, as found on a branch of the output with a single param, becomes a param dimension of length one.
+    """
+    param_ids = array.coords["paramId"].data
+    if param_ids.ndim == 0:
+        return array.drop_vars("paramId").expand_dims({"param": [str(param_ids.item())]})
+    return array.rename({"paramId": "param"}).assign_coords({"param": [str(x) for x in param_ids.tolist()]})
+
+
 class AnemoiBuilder:
     """Utility to build an Inference from an Anemoi checkpoint, for use in both Source and Transform blocks"""
 
@@ -75,16 +86,7 @@ class AnemoiBuilder:
 
         if "paramId" in nodetree_dimensions(action.nodes):
             # Rename paramId axis to param in the action
-            action = type(action)(
-                nodetree_from_dict(
-                    {
-                        path: array.rename({"paramId": "param"}).assign_coords(
-                            {"param": [str(x) for x in array.coords["paramId"].data.tolist()]}
-                        )
-                        for path, array in nodetree_arrays(action.nodes)
-                    }
-                )
-            )
+            action = type(action)(nodetree_from_dict({path: _param_id_to_param(array) for path, array in nodetree_arrays(action.nodes)}))
         return action
 
     def inference(self, lead_time: int, *, extra_environment: list[str] | None = None) -> Inference:

@@ -16,10 +16,10 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-from fiab_core.artifacts import CompositeArtifactId
+from fiab_core.artifacts import AnemoiCheckpointConfiguration, CompositeArtifactId
 from fiab_core.types import OpenEnumType
 
-from fiab_plugin_ecmwf.anemoi.blocks import AnemoiBuilder, AnemoiInputSource, AnemoiSource
+from fiab_plugin_ecmwf.anemoi.blocks import AnemoiBuilder, AnemoiInputSource, AnemoiSource, _param_id_to_param
 from fiab_plugin_ecmwf.anemoi.utils import (
     INPUT_SOURCE_EXTRAS,
     CheckpointArtifact,
@@ -154,6 +154,61 @@ class TestGetInputConfiguration:
     def test_surplus_variant(self, checkpoint_artifact: CheckpointArtifact) -> None:
         with pytest.raises(ValueError, match="no further variants"):
             checkpoint_artifact.get_input_configuration({"polytope:mars:extra": {}})
+
+
+def _artifact_with_configuration(dummy_checkpoint: CompositeArtifactId, configuration: AnemoiCheckpointConfiguration) -> CheckpointArtifact:
+    mocked_checkpoint = MagicMock()
+    mocked_checkpoint.configuration = configuration
+    artifact = CheckpointArtifact(dummy_checkpoint)
+    artifact.checkpoint = MagicMock(return_value=mocked_checkpoint)  # type: ignore[method-assign]
+    return artifact
+
+
+class TestGetAdditionalKwargs:
+    def test_defaults(self, dummy_checkpoint: CompositeArtifactId) -> None:
+        artifact = _artifact_with_configuration(dummy_checkpoint, AnemoiCheckpointConfiguration())
+        assert artifact.get_additional_kwargs() == {"pre_processors": [], "post_processors": [], "env": {}}
+
+    def test_runner_options_are_passed_through(self, dummy_checkpoint: CompositeArtifactId) -> None:
+        runner_options = {
+            "typed_variables": {"mwd": {"mars": {"param": "mwd", "stream": "wave", "levtype": "sfc"}}},
+            "patch_metadata": {"dataset": {"constant_fields": ["z", "lsm"]}},
+            "use_grib_paramid": True,
+            "allow_nans": True,
+        }
+        configuration = AnemoiCheckpointConfiguration(
+            control_options={"ANEMOI_INFERENCE_NUM_CHUNKS": 8},
+            runner_options=runner_options,
+        )
+        result = _artifact_with_configuration(dummy_checkpoint, configuration).get_additional_kwargs()
+        assert result == {**runner_options, "pre_processors": [], "post_processors": [], "env": {"ANEMOI_INFERENCE_NUM_CHUNKS": 8}}
+
+    @pytest.mark.parametrize("key", ["pre_processors", "env", "input", "checkpoint", "environment"])
+    def test_reserved_runner_options_are_rejected(self, dummy_checkpoint: CompositeArtifactId, key: str) -> None:
+        configuration = AnemoiCheckpointConfiguration(runner_options={key: {}})
+        with pytest.raises(ValueError, match=key):
+            _artifact_with_configuration(dummy_checkpoint, configuration).get_additional_kwargs()
+
+
+class TestParamIdToParam:
+    def test_dimension_coordinate(self) -> None:
+        import xarray as xr
+
+        array = xr.DataArray([1, 2], dims=["paramId"], coords={"paramId": [129, 130]})
+        result = _param_id_to_param(array)
+        assert "paramId" not in result.coords
+        assert result.coords["param"].values.tolist() == ["129", "130"]
+
+    def test_scalar_coordinate(self) -> None:
+        import xarray as xr
+
+        array = xr.DataArray([1, 2, 3], dims=["level"], coords={"level": [500, 850, 1000], "paramId": 133})
+        result = _param_id_to_param(array)
+        assert "paramId" not in result.coords
+        assert "param" in result.dims
+        assert result.coords["param"].values.tolist() == ["133"]
+        assert result.sizes == {"param": 1, "level": 3}
+        assert result.sel(param="133").values.tolist() == [1, 2, 3]
 
 
 class TestInputSourceOption:

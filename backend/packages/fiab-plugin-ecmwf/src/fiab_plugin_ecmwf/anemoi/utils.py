@@ -53,6 +53,23 @@ INPUT_SOURCE_EXTRAS = {
 }
 """Additional environment dependencies for input sources."""
 
+RESERVED_RUNNER_OPTIONS = frozenset(
+    {
+        "checkpoint",
+        "input",
+        "output",
+        "lead_time",
+        "date",
+        "pre_processors",
+        "post_processors",
+        "env",
+        "ckpt",
+        "environment",
+        "expansion_qube",
+    }
+)
+"""Run configuration and inference keyword names set by the plugin itself, which checkpoint runner_options may not override."""
+
 logger = logging.getLogger(__name__)
 
 
@@ -220,9 +237,13 @@ class CheckpointArtifact:
         return _expand_qube(qube, {"step": steps})
 
     def get_additional_kwargs(self) -> dict[str, Any]:
-        """Get additional kwargs for the model inference from the checkpoint artifact, such as post processors and control options."""
+        """Get additional kwargs for the model inference from the checkpoint artifact, such as post processors, control options and runner options."""
         checkpoint = self.checkpoint()
         configuration = checkpoint.configuration
+
+        reserved = sorted(RESERVED_RUNNER_OPTIONS.intersection(configuration.runner_options))
+        if reserved:
+            raise ValueError(f"Checkpoint runner_options must not set {reserved}, use the dedicated configuration fields instead")
 
         post_processors = []
         if configuration.post_processors is not None:
@@ -243,6 +264,7 @@ class CheckpointArtifact:
             post_processors.append({"extract_from_state": configuration.region_of_interest})
 
         return {
+            **configuration.runner_options,
             "pre_processors": list(configuration.pre_processors),
             "post_processors": post_processors,
             "env": configuration.control_options or {},
