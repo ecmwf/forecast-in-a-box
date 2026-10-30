@@ -35,16 +35,15 @@ Every `case_*.py` module in this directory is one scenario. Each one:
     for completion rather than trying to coordinate this themselves;
   - a scenario must never write to a fixed, shared filesystem path -- use the intrinsic
     `${runId}`/`${attemptCount}` glyphs (or equivalent) to keep every run's output unique, the same
-    way `case_modelForecast.py` does for its zarr sink.
+    way `case_checkpointMatrix.py` does for its grib sink.
 
 ## Layout
 
 - `common.py` -- shared helpers: backend client construction, readiness polling, plugin-id
   resolution, a generic retry loop. No dependency beyond the standard library and `httpx`.
-- `case_modelForecast.py` -- downloads the real ECMWF AIFS o48 checkpoint and runs a short
-  forecast from a "dummy" initial-conditions source (so no MARS/opendata credentials/network are
-  needed beyond the one-off checkpoint download), then selects a single surface parameter/step and
-  writes the result to a zarr store.
+- `case_checkpointMatrix.py` -- opt-in (see below): runs a list of checkpoints, each against its
+  own list of input sources (eg opendata, polytope), through anemoiSource -> gribSink and
+  anemoiSource -> mapPlotSink (2t, msl, tp), and checks the grib files and png plots.
 - `case_scheduledJob.py` -- placeholder for now (trivially succeeds); the real scenario (create a
   schedule, observe the background scheduler actually produce a run) still needs reworking against
   the current `/experiment/*` API and a dedicated test plugin -- see the draft kept in that file.
@@ -75,7 +74,30 @@ just run
 ```
 
 By default scenarios talk to `http://localhost:8000/api/v1` (the default port for both `just dev`
-and `scripts/fiab.sh run`). Point at a different instance with `FIAB_E2E_BASE_URL`.
+and `scripts/fiab.sh run`). Point at a different instance with `FIAB_E2E_BASE_URL`. Pass scenario
+names to run only those, eg `just run checkpointMatrix`.
+
+### Checkpoint matrix
+
+`case_checkpointMatrix.py` does nothing unless `FIAB_E2E_CHECKPOINTS` is set, since its runs need
+real input data (and credentials, for polytope) and possibly a large GPU. The checkpoints and their
+input sources are listed in `MODELS` in that file. The variable is a `;`-separated list of entries:
+a checkpoint from `MODELS`, a preset from `PRESETS` (`oper` for every checkpoint in `MODELS`, `demo`
+for `aifs-global-o48` and `BRIS-Europe-2025.10` only), or `<checkpoint>=<source>,<source>` for any
+checkpoint the backend knows about. A checkpoint is its local id, looked up across the configured
+artifact stores, or `<store>:<local id>` to pick the store:
+
+```bash
+FIAB_E2E_CHECKPOINTS="aifs-global-o48" just run checkpointMatrix
+FIAB_E2E_CHECKPOINTS="demo" just run checkpointMatrix
+FIAB_E2E_CHECKPOINTS="oper" just run checkpointMatrix
+FIAB_E2E_CHECKPOINTS="graceful-gazelle-v2=polytope:mars;local:aifs-single-mse-2.0=opendata:ecmwf:highres" just run checkpointMatrix
+```
+
+Every combination is attempted and the results are summarised at the end; the scenario fails if
+any combination failed. Each run logs, once over, the wall time of each run phase -- input data fetch, model run, grib
+output and plots, read from the cascade task tracing markers in the run logs (`GET /run/logs`) -- and
+the total run time, for failed runs too; the summary lists them for all runs.
 
 ### Fully self-contained (CI-style)
 

@@ -12,7 +12,8 @@
 
 Discovers every `case_*.py` module in this directory and calls its `run(client)` entrypoint in
 turn, each against its own fresh `httpx.Client` (see common.make_client). Exits non-zero if any
-scenario raises.
+scenario raises. Scenario names given as arguments, with or without the `case_` prefix, restrict
+the run to those scenarios.
 
 Meant to be launched standalone, without the backend's own virtualenv or a `forecastbox` install::
 
@@ -49,6 +50,13 @@ def main() -> int:
     if not cases:
         logger.warning("no case_* scenarios found, nothing to run")
         return 0
+    requested = [name if name.startswith("case_") else f"case_{name}" for name in sys.argv[1:]]
+    if requested:
+        unknown = sorted(set(requested) - set(cases))
+        if unknown:
+            logger.error(f"unknown scenarios {unknown}, available: {cases}")
+            return 1
+        cases = [case for case in cases if case in requested]
 
     logger.info(f"discovered scenarios: {cases}")
     failures: list[str] = []
