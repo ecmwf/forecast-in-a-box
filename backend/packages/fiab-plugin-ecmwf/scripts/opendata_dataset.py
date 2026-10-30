@@ -99,7 +99,7 @@ if __name__ == "__main__":
             final_qcube[k] = sorted(v)
         final_qcube["param"] = sorted(
             [
-                str(paramdb.shortname_to_param_id(shortname, context={k: final_qcube[k] for k in ["class", "stream", "type"]}))
+                str(paramdb.shortname_to_param_id(shortname, context={k: final_qcube[k] for k in ["class", "stream", "type", "levtype"]}))
                 for shortname in final_qcube["param"]
             ]
         )
