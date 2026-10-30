@@ -14,7 +14,7 @@ from typing import Any
 
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Action
-from earthkit.workflows.metadata import Artifacts
+from earthkit.workflows.metadata import Artifacts, Requirements
 from earthkit.workflows.nodetree import nodetree_arrays, nodetree_dimensions, nodetree_from_dict
 from earthkit.workflows.plugins.anemoi.fluent import Inference, get_initial_conditions  # ty: ignore[unresolved-import]
 from fiab_core.artifacts import CompositeArtifactId
@@ -105,7 +105,7 @@ class AnemoiBuilder:
         return Inference(
             ckpt=self._local_path,
             lead_time=lead_time,
-            environment=env,
+            requirements=Requirements(environment=env),
             expansion_qube=checkpoint_output,
             **self.checkpoint.get_additional_kwargs(),
         )
@@ -138,7 +138,7 @@ class AnemoiBuilder:
             ckpt=self._local_path,
             input=self.checkpoint.get_input_configuration(input_source),
             date=strip_timezone(date),
-            environment=env,
+            requirements=Requirements(environment=env),
             ensemble_members=ensemble,
             artifacts=Artifacts(artifact_urls={CompositeArtifactId.to_str(self.artifact_id): self.checkpoint.get_url()}),
             **k,
