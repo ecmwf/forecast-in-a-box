@@ -27,9 +27,9 @@ from fiab_core.fable import (
     QubedOutput,
 )
 from fiab_core.plugin import Error
-from fiab_core.tools.blocks import BlockInstanceRich, Source, Transform
-from fiab_core.types import ClosedEnumType, DatetimeType, IntType, OpenEnumType
-from fiab_core.types.traits import DivisibleBy, Positive
+from fiab_core.tools.blocks import BlockInstanceConfigurationError, BlockInstanceRich, Source, Transform
+from fiab_core.types import ClosedEnumType, DatetimeType, IntType, ListType, OpenEnumType, UnionType
+from fiab_core.types.traits import DivisibleBy, NonNegative, Positive
 from qubed import Qube
 from qubed.value_types import QEnum
 
@@ -45,6 +45,18 @@ from fiab_plugin_ecmwf.constants import (
 from fiab_plugin_ecmwf.qubed_utils import axes, contains, expand
 
 from .utils import CheckpointArtifact, get_available_input_sources, get_checkpoint_enum_type, get_input_source_extras
+
+NO_ENSEMBLE_MEMBERS = "none"
+"""Sentinel value of the ensemble members option for no members. The frontend flags any empty option value as missing,
+so "no members" cannot be spelled as an empty string."""
+
+ENSEMBLE_MEMBERS_TYPE = UnionType([ClosedEnumType([NO_ENSEMBLE_MEMBERS]), ListType(IntType(traits=NonNegative()))])
+"""Either the sentinel "none" or a list of member ids. The sentinel is tried first so that it is never read as a list."""
+
+ENSEMBLE_MEMBERS_DESCRIPTION = (
+    'List of ensemble member ids to run, for ensemble models only, eg "1,2,3". "none" runs the control forecast (member 0)'
+    " of an ensemble model, or a deterministic model, which has no members."
+)
 
 
 def strip_timezone(dt: datetime) -> datetime:
@@ -110,13 +122,23 @@ class AnemoiBuilder:
             **self.checkpoint.get_additional_kwargs(),
         )
 
-    def from_input(self, input_source: str, date: datetime, lead_time: int, ensemble: int = 1, **k: Any) -> Action:
+    def _ensemble_members(self, ensemble: list[int] | None) -> list[int] | None:
+        """Members to pass to earthkit-workflows-anemoi, depending on the model type
+
+        Only ensemble models run members, defaulting to the control member 0 when none are given. Non-ensemble and
+        unknown models run deterministically, which is requested with `None`.
+        """
+        if self.checkpoint.is_ensemble_model is True:
+            return list(ensemble) if ensemble else [0]
+        return None
+
+    def from_input(self, input_source: str, date: datetime, lead_time: int, ensemble: list[int] | None = None, **k: Any) -> Action:
         input_configuration = self.checkpoint.get_input_configuration(input_source)
         action = self.inference(lead_time=lead_time, extra_environment=get_input_source_extras(input_source)).from_input(
             input=input_configuration,
             date=strip_timezone(date),
             lead_time=lead_time,
-            ensemble_members=ensemble,
+            ensemble_members=self._ensemble_members(ensemble),
             artifacts=Artifacts(artifact_urls={CompositeArtifactId.to_str(self.artifact_id): self.checkpoint.get_url()}),
             **k,
         )
@@ -130,7 +152,7 @@ class AnemoiBuilder:
         )
         return self._add_extra_output_keys(action)
 
-    def get_initial_conditions(self, input_source: str, date: datetime, ensemble: int = 1, **k: Any) -> Action:
+    def get_initial_conditions(self, input_source: str, date: datetime, ensemble: list[int] | None = None, **k: Any) -> Action:
         env = self.checkpoint.get_environment()
         env.extend(get_input_source_extras(input_source))
 
@@ -139,7 +161,7 @@ class AnemoiBuilder:
             input=self.checkpoint.get_input_configuration(input_source),
             date=strip_timezone(date),
             environment=env,
-            ensemble_members=ensemble,
+            ensemble_members=self._ensemble_members(ensemble),
             artifacts=Artifacts(artifact_urls={CompositeArtifactId.to_str(self.artifact_id): self.checkpoint.get_url()}),
             **k,
             **self.checkpoint.get_additional_kwargs(),
@@ -155,32 +177,70 @@ class AnemoiBaseBlock:
         if validation_error is not None:
             raise ValueError(validation_error)
 
-    def validate_ensemble(self, checkpoint: CheckpointArtifact, ensemble_members: int | set) -> None:
-        """Validate the ensemble configuration option against the checkpoint properties"""
-        if checkpoint.is_ensemble_model is None:  # Cannot know if the model is an ensemble or not, so cannot validate
+    def get_ensemble_members(self, block: BlockInstanceRich) -> list[int]:
+        """The ensemble members requested in the block configuration, empty for "none" (or if the option is absent)
+
+        The option is a union of the "none" sentinel and a list of ints, which has no typed accessor, so the converted
+        value is read directly. An empty list is also read as no members.
+        """
+        value = block.block.configuration_values.get(ENSEMBLE, NO_ENSEMBLE_MEMBERS)
+        if value == NO_ENSEMBLE_MEMBERS:
+            return []
+        if isinstance(value, list) and all(type(member) is int for member in value):
+            return list(value)
+        raise BlockInstanceConfigurationError(
+            f"Configuration option {ENSEMBLE!r} expected {NO_ENSEMBLE_MEMBERS!r} or list[int], got {value!r}"
+        )
+
+    def validate_ensemble(self, checkpoint: CheckpointArtifact, ensemble_members: list[int]) -> None:
+        """Validate the ensemble configuration option against the checkpoint properties
+
+        Ensemble models accept any member ids, or "none" to run the control member. Non-ensemble and unknown models run
+        deterministically, so cannot be given members.
+        """
+        if checkpoint.is_ensemble_model is True or not ensemble_members:
             return
-        if (
-            (isinstance(ensemble_members, int) and ensemble_members > 1)
-            or (isinstance(ensemble_members, set) and ensemble_members)
-            and not checkpoint.is_ensemble_model
-        ):
-            raise ValueError(
-                f"Checkpoint {checkpoint.artifact} is not an ensemble model, but ensemble members requested: {ensemble_members}"
-            )
+        reason = "not an ensemble model" if checkpoint.is_ensemble_model is False else "not known to be an ensemble model"
+        raise ValueError(
+            f"Checkpoint {checkpoint.artifact} is {reason}, so ensemble members cannot be set, but {ensemble_members} were requested. "
+            f'Set the ensemble members to "{NO_ENSEMBLE_MEMBERS}".'
+        )
+
+    def resolve_ensemble(self, checkpoint: CheckpointArtifact, ensemble_members: list[int]) -> list[int]:
+        """The members that are actually run: ensemble models run the control member 0 if none are requested"""
+        if checkpoint.is_ensemble_model is True and not ensemble_members:
+            return [0]
+        return ensemble_members
+
+    def add_ensemble_restriction(self, checkpoint: CheckpointArtifact, restrictions: ConfigurationOptionRestriction) -> None:
+        """Restrict the ensemble members option to "none" for models that are not known ensembles
+
+        Ensemble models are given the full option type rather than no restriction, to replace any restriction the
+        frontend still holds from a previously selected checkpoint.
+        """
+        restrictions[ENSEMBLE] = ENSEMBLE_MEMBERS_TYPE if checkpoint.is_ensemble_model is True else ClosedEnumType([NO_ENSEMBLE_MEMBERS])
 
     def add_restrictions(self, checkpoint: CheckpointArtifact, restrictions: ConfigurationOptionRestriction) -> None:
         """Add restrictions to the block configuration options based on the checkpoint properties"""
-        if not checkpoint.is_ensemble_model and checkpoint.is_ensemble_model is not None:
-            restrictions[ENSEMBLE] = ClosedEnumType([1])  # Only allow single member for non-ensemble models
         restrictions[LEAD_TIME] = IntType(traits=DivisibleBy(checkpoint.model_step))
 
+    def _expand_ensemble(
+        self, checkpoint: CheckpointArtifact, qube: Qube, ensemble_members: list[int] | None, preserve_members: bool = False
+    ) -> Qube:
+        """Add the `number` axis for the given members, if any
+
+        By default only ensemble models get the axis. With `preserve_members` the members are added whatever the model
+        type, for blocks that keep the members of their initial conditions.
+        """
+        if (preserve_members or checkpoint.is_ensemble_model is True) and ensemble_members:
+            return expand(qube, {ENSEMBLE: sorted(ensemble_members)})
+        return qube
+
     def get_input_qube(
-        self, checkpoint: CheckpointArtifact, ensemble_members: int | set = 0, base_time: datetime | None = None
+        self, checkpoint: CheckpointArtifact, ensemble_members: list[int] | None = None, base_time: datetime | None = None
     ) -> QubedOutput:
         """Get the input qube for the given checkpoint and ensemble members"""
         qubed_input = checkpoint.combine_if_nested_qube(checkpoint.get_model_input())
-        if checkpoint.is_ensemble_model is False:
-            return QubedOutput(dataqube=qubed_input)
 
         if base_time is not None:
             datetime = strip_timezone(base_time)
@@ -192,23 +252,21 @@ class AnemoiBaseBlock:
                 },
             )
 
-        if isinstance(ensemble_members, int) and ensemble_members > 1:
-            qubed_input = expand(qubed_input, {ENSEMBLE: [ensemble_members]})
-        elif isinstance(ensemble_members, set) and ensemble_members:
-            qubed_input = expand(qubed_input, {ENSEMBLE: sorted(ensemble_members)})
-        return QubedOutput(dataqube=qubed_input)
+        return QubedOutput(dataqube=self._expand_ensemble(checkpoint, qubed_input, ensemble_members))
 
     def get_output_qube(
-        self, checkpoint: CheckpointArtifact, lead_time: int, ensemble_members: int | set = 0, base_time: datetime | None = None
+        self,
+        checkpoint: CheckpointArtifact,
+        lead_time: int,
+        ensemble_members: list[int] | None = None,
+        base_time: datetime | None = None,
+        preserve_members: bool = False,
     ) -> QubedOutput:
         """Get the output qube for the given checkpoint, lead time, and ensemble members"""
         qubed_output = checkpoint.combine_if_nested_qube(checkpoint.get_model_output(lead_time))
 
         # Ensure alignment in output qube and action metadata
         qubed_output = expand(qubed_output, {key: [value] for key, value in checkpoint.extra_output_keys.items()})
-
-        if checkpoint.is_ensemble_model is False:
-            return QubedOutput(dataqube=qubed_output)
 
         if base_time is not None:
             datetime = strip_timezone(base_time)
@@ -220,12 +278,7 @@ class AnemoiBaseBlock:
                 },
             )
 
-        if isinstance(ensemble_members, int) and ensemble_members > 1:
-            qubed_output = expand(qubed_output, {ENSEMBLE: [ensemble_members]})
-        elif isinstance(ensemble_members, set) and ensemble_members:
-            qubed_output = expand(qubed_output, {ENSEMBLE: sorted(ensemble_members)})
-
-        return QubedOutput(dataqube=qubed_output)
+        return QubedOutput(dataqube=self._expand_ensemble(checkpoint, qubed_output, ensemble_members, preserve_members))
 
 
 class AnemoiSource(Source, AnemoiBaseBlock):
@@ -256,26 +309,28 @@ class AnemoiSource(Source, AnemoiBaseBlock):
             value_type=DatetimeType(),
         ),
         ENSEMBLE: BlockConfigurationOption(
-            title="Ensemble Member",
-            description="ID of ensemble member.",
-            value_type=IntType(traits=Positive()),
-            default_value="1",
+            title="Ensemble members",
+            description=ENSEMBLE_MEMBERS_DESCRIPTION,
+            value_type=ENSEMBLE_MEMBERS_TYPE,
+            default_value=NO_ENSEMBLE_MEMBERS,
         ),
     }
 
     def validate(
         self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
     ) -> BlockInstanceOutput:
-        ensemble_members = block.config_as_int(ENSEMBLE)
+        ensemble_members = self.get_ensemble_members(block)
         checkpoint = CheckpointArtifact(block.config_as_artifactid(CHECKPOINT))
         lead_time = block.config_as_int(LEAD_TIME)
         base_time = block.config_as_datetime(BASE_TIME)
 
+        # Restrictions are added before validating, so they are reported with any validation error
+        self.add_restrictions(checkpoint, restrictions)
+        self.add_ensemble_restriction(checkpoint, restrictions)
         self.validate_lead_time(checkpoint, lead_time)
         self.validate_ensemble(checkpoint, ensemble_members)
-        self.add_restrictions(checkpoint, restrictions)
 
-        return self.get_output_qube(checkpoint, lead_time, ensemble_members, base_time=base_time)
+        return self.get_output_qube(checkpoint, lead_time, self.resolve_ensemble(checkpoint, ensemble_members), base_time=base_time)
 
     def compile(  # type:ignore[invalid-argument] # semigroup
         self,
@@ -291,7 +346,7 @@ class AnemoiSource(Source, AnemoiBaseBlock):
             input_source=input_source,
             lead_time=block.config_as_int(LEAD_TIME),
             date=datetime,
-            ensemble=block.config_as_int(ENSEMBLE),
+            ensemble=self.get_ensemble_members(block),
         )
         action.set_scalar_coords(
             {
@@ -326,10 +381,10 @@ class AnemoiInputSource(Source, AnemoiBaseBlock):
             value_type=DatetimeType(),
         ),
         ENSEMBLE: BlockConfigurationOption(
-            title="Ensemble Member",
-            description="ID of ensemble member.",
-            value_type=IntType(traits=Positive()),
-            default_value="1",
+            title="Ensemble members",
+            description=ENSEMBLE_MEMBERS_DESCRIPTION,
+            value_type=ENSEMBLE_MEMBERS_TYPE,
+            default_value=NO_ENSEMBLE_MEMBERS,
         ),
     }
 
@@ -337,11 +392,13 @@ class AnemoiInputSource(Source, AnemoiBaseBlock):
         self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
     ) -> BlockInstanceOutput:
         checkpoint = CheckpointArtifact(block.config_as_artifactid(CHECKPOINT))
-        ensemble_members = block.config_as_int(ENSEMBLE)
+        ensemble_members = self.get_ensemble_members(block)
         base_time = block.config_as_datetime(BASE_TIME)
 
+        # Restrictions are added before validating, so they are reported with any validation error
+        self.add_ensemble_restriction(checkpoint, restrictions)
         self.validate_ensemble(checkpoint, ensemble_members)
-        return self.get_input_qube(checkpoint, ensemble_members, base_time=base_time)
+        return self.get_input_qube(checkpoint, self.resolve_ensemble(checkpoint, ensemble_members), base_time=base_time)
 
     def compile(  # type:ignore[invalid-argument] # semigroup
         self,
@@ -355,7 +412,7 @@ class AnemoiInputSource(Source, AnemoiBaseBlock):
         action = builder.get_initial_conditions(
             input_source=block.config_as_str(INPUT_SOURCE),
             date=base_time,
-            ensemble=block.config_as_int(ENSEMBLE),
+            ensemble=self.get_ensemble_members(block),
         )
         action.set_scalar_coords(
             {
@@ -400,16 +457,17 @@ class AnemoiTransform(Transform, AnemoiBaseBlock):
             raise ValueError(f"Input dataset is not compatible with the model checkpoint. Difference in qubes: {difference_qube}")
 
         input_dataset = inputs["initial conditions"]
-        ensemble_members = axes(input_dataset).get(ENSEMBLE, 0)
-        date = list(axes(input_dataset).get(DATE, set()))[0]
-        time = list(axes(input_dataset).get(TIME, set()))[0]
-        base_time = datetime.strptime(f"{date}{time}", "%Y%m%d%H%M")
+        ensemble_members = sorted(int(x) for x in axes(input_dataset).get(ENSEMBLE, set()))
+        dates = sorted(axes(input_dataset).get(DATE, set()))
+        times = sorted(axes(input_dataset).get(TIME, set()))
+        base_time = datetime.strptime(f"{dates[0]}{times[0]}", "%Y%m%d%H%M") if dates and times else None
 
         self.validate_lead_time(checkpoint, lead_time)
-        self.validate_ensemble(checkpoint, ensemble_members)
-        self.add_restrictions(checkpoint, restrictions)
+        # The members are those of the initial conditions, which the model runs on whatever its type, so they are not
+        # validated against the model type and the output keeps exactly the upstream `number` axis (if any)
+        restrictions[LEAD_TIME] = IntType(traits=DivisibleBy(checkpoint.model_step))
 
-        return self.get_output_qube(checkpoint, lead_time, ensemble_members, base_time=base_time)
+        return self.get_output_qube(checkpoint, lead_time, ensemble_members, base_time=base_time, preserve_members=True)
 
     def compile(  # type:ignore[invalid-argument] # semigroup
         self,

@@ -8,7 +8,7 @@
           "input_source": "opendata",
           "lead_time": "72",
           "base_time": "2026-01-01T00:00:00",
-          "number": "1"
+          "number": "none"
         },
         "input_ids": {}
       }

@@ -54,7 +54,7 @@ from fiab_plugin_ecmwf.products.blocks import (
     ThermalIndices,
     WindSpeed,
 )
-from fiab_plugin_ecmwf.qubed_utils import axes, collapse, contains, coxpand, datacubes, select
+from fiab_plugin_ecmwf.qubed_utils import axes, collapse, contains, datacubes, select
 
 PRODUCT_BLOCKS = [
     BlockFactoryId("ensembleStatistics"),
@@ -487,17 +487,17 @@ class TestThermalIndices:
     @pytest.mark.parametrize(
         "ensemble, expected",
         [
-            [1, 1],
+            [[1], 1],
             # [[1, 2, 3], 2],
         ],
         ids=["single"],
     )
     def test_anemoi_source_compile(
         self,
+        ensemble_model: None,
         dummy_checkpoint: CompositeArtifactId,
-        anemoi_source_ensemble_output: QubedOutput,
         thermal_indices_configuration: BlockInstance,
-        ensemble: int,
+        ensemble: list[int],
         expected: int,
     ) -> None:
         block_instance = BlockInstance.from_block(
@@ -515,11 +515,10 @@ class TestThermalIndices:
             AnemoiSource.configuration_options,
         )
         source_action = AnemoiSource().compile(inputs={}, block=block_instance).get_or_raise()
-        if ensemble == 1:
-            anemoi_source_ensemble_output = coxpand(anemoi_source_ensemble_output, ENSEMBLE, {ENSEMBLE: [1]})
+        source_output = AnemoiSource().validate(block=block_instance, inputs={}, restrictions={})
 
         block = ThermalIndices()
-        output = block.validate(block=thermal_indices_configuration, inputs={"dataset": anemoi_source_ensemble_output}, restrictions={})  # type: ignore[dict-item]
+        output = block.validate(block=thermal_indices_configuration, inputs={"dataset": source_output}, restrictions={})  # type: ignore[dict-item]
 
         action = block.compile(
             inputs={BlockInstanceId("source_output"): source_action},
@@ -714,17 +713,17 @@ class TestWindSpeed:
     @pytest.mark.parametrize(
         "ensemble, expected",
         [
-            [1, 1],
+            [[1], 1],
             # [[1, 2, 3], 2],
         ],
         ids=["single"],
     )
     def test_anemoi_source_compile(
         self,
+        ensemble_model: None,
         dummy_checkpoint: CompositeArtifactId,
-        anemoi_source_ensemble_output: QubedOutput,
         wind_speed_configuration: BlockInstance,
-        ensemble: int,
+        ensemble: list[int],
         expected: int,
     ) -> None:
         block_instance = BlockInstance.from_block(
@@ -742,11 +741,10 @@ class TestWindSpeed:
             AnemoiSource.configuration_options,
         )
         source_action = AnemoiSource().compile(inputs={}, block=block_instance).get_or_raise()
-        if ensemble == 1:
-            anemoi_source_ensemble_output = coxpand(anemoi_source_ensemble_output, ENSEMBLE, {ENSEMBLE: [1]})
+        source_output = AnemoiSource().validate(block=block_instance, inputs={}, restrictions={})
 
         block = WindSpeed()
-        output = block.validate(block=wind_speed_configuration, inputs={"dataset": anemoi_source_ensemble_output}, restrictions={})  # type: ignore[dict-item]
+        output = block.validate(block=wind_speed_configuration, inputs={"dataset": source_output}, restrictions={})  # type: ignore[dict-item]
 
         action = block.compile(
             inputs={BlockInstanceId("source_output"): source_action},
