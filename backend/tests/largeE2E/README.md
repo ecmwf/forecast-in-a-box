@@ -44,6 +44,8 @@ Every `case_*.py` module in this directory is one scenario. Each one:
 - `case_checkpointMatrix.py` -- opt-in (see below): runs a list of checkpoints, each against its
   own list of input sources (eg opendata, polytope), through anemoiSource -> gribSink and
   anemoiSource -> mapPlotSink (2t, msl, tp), and checks the grib files and png plots.
+- `case_sourceMatrix.py` -- opt-in (see below): runs the demo checkpoints against every input source
+  the anemoiSource block offers, through anemoiSource -> gribSink, to find out which sources work.
 - `case_scheduledJob.py` -- placeholder for now (trivially succeeds); the real scenario (create a
   schedule, observe the background scheduler actually produce a run) still needs reworking against
   the current `/experiment/*` API and a dedicated test plugin -- see the draft kept in that file.
@@ -98,6 +100,25 @@ Every combination is attempted and the results are summarised at the end; the sc
 any combination failed. Each run logs, once over, the wall time of each run phase -- input data fetch, model run, grib
 output and plots, read from the cascade task tracing markers in the run logs (`GET /run/logs`) -- and
 the total run time, for failed runs too; the summary lists them for all runs.
+
+### Source matrix
+
+`case_sourceMatrix.py` does nothing unless `FIAB_E2E_SOURCES` is set, since several input sources
+need credentials (polytope, mars). It runs the `demo` checkpoints against `all` the input sources
+listed in the anemoiSource block's `input_source` option, or against a `,`-separated list of them,
+and summarises the results with the same timings as the checkpoint matrix. A run is stopped after 20
+minutes, as some sources hang rather than fail (eg `mars` without a MARS client):
+
+```bash
+FIAB_E2E_SOURCES="all" just run sourceMatrix
+FIAB_E2E_SOURCES="dummy,opendata:aws:lowres" just run sourceMatrix
+```
+
+Run it against a backend that caches input data (`EARTHKIT_DATA_CACHE_POLICY=user` in its
+environment): all runs use the same base time and are ordered by source, so repeated requests are
+served from the earthkit-data cache. The scenario logs how much the cache directory
+(`FIAB_E2E_EARTHKIT_CACHE_DIR`, by default `/tmp/earthkit-data-$USER`) grew per run, and warns when
+it never grows.
 
 ### Fully self-contained (CI-style)
 
