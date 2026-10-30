@@ -24,10 +24,14 @@ logger = logging.getLogger(__name__)
 
 WIND_SHORTNAMES = ["u", "v", "10u", "10v", "100u", "100v"]
 
-# TODO remove REDUCED_GG_PATTERN, LATLON_METADATA_KEYS, _is_subarea_reduced_gg, _to_latlon_field and _prepare_fields
-# once we switch to earthkit-plots 1.0, where a fix is probably available. earthkit-plots<1.0 drops the area from the
-# gridspec of reduced Gaussian GRIB fields, so sub-area fields (e.g. limited-area model output) are regridded with the
-# global matrix and fail with a dimension mismatch. As a workaround such fields are plotted as scattered lat/lon points.
+# TODO remove REDUCED_GG_PATTERN, LATLON_METADATA_KEYS, _is_subarea_reduced_gg, _is_lambert, _needs_latlon,
+# _to_latlon_field and _prepare_fields once the plotting stack handles these grids. As a workaround, the fields below are
+# plotted as scattered lat/lon points:
+#  - reduced Gaussian sub-areas (e.g. limited-area model output): earthkit-plots<1.0 drops the area from their gridspec,
+#    so they are regridded with the global matrix and fail with a dimension mismatch, probably fixed in earthkit-plots 1.0,
+#  - Lambert conformal grids (e.g. MEPS-based model output): earthkit-data does not implement to_points() for them, which
+#    earthkit-plots calls for the coordinates in the projection, and its fallback to to_latlon() does not handle the
+#    resulting ValueError.
 REDUCED_GG_PATTERN = re.compile(r"^[OoNn]\d+$")
 
 LATLON_METADATA_KEYS = ["shortName", "paramId", "name", "units", "levtype", "level", "step", "number", "date", "time"]
@@ -108,44 +112,17 @@ def _is_subarea_reduced_gg(field: Any) -> bool:
     return (north - south) < 170 or (east - west) % 360 < 350
 
 
-def _to_latlon_field(field: Any) -> ekd.ArrayField:
-    """Rewrap *field* as an ArrayField carrying explicit latitudes and longitudes and no grid definition."""
-    latlon = field.to_latlon(flatten=True)
-    lons = latlon["lon"]
-    datetimes = field.datetime()
-    metadata = {key: value for key in LATLON_METADATA_KEYS if (value := field.metadata(key, default=None)) is not None}
-    metadata.update(
-        param=metadata.get("shortName"),
-        base_datetime=datetimes["base_time"],
-        valid_datetime=datetimes["valid_time"],
-        latitudes=latlon["lat"],
-        longitudes=np.where(lons > 180, lons - 360, lons),
-    )
-    return ekd.ArrayField(field.to_numpy(flatten=True), metadata)
-
-
-def _prepare_fields(fields: ekd.FieldList) -> ekd.FieldList:
-    """Rewrap sub-area reduced Gaussian fields as lat/lon fields; other fields are returned unchanged."""
-    if not any(_is_subarea_reduced_gg(field) for field in fields):  # type: ignore[reportGeneralTypeIssues]
-        return fields
-    return ekd.FieldList.from_fields(
-        [_to_latlon_field(field) if _is_subarea_reduced_gg(field) else field for field in fields]  # type: ignore[reportGeneralTypeIssues]
-    )
-
-
-def _is_subarea_reduced_gg(field: Any) -> bool:
-    """Return True if *field* is on a reduced Gaussian grid restricted to a non-global area."""
+def _is_lambert(field: Any) -> bool:
+    """Return True if *field* is on a Lambert conformal grid."""
     try:
-        gridspec = field.metadata().geography.gridspec()
+        return field.metadata("gridType", default=None) == "lambert"
     except Exception:
         return False
-    if gridspec is None:
-        return False
-    grid, area = gridspec.get("grid"), gridspec.get("area")
-    if not (isinstance(grid, str) and REDUCED_GG_PATTERN.match(grid)) or not area:
-        return False
-    north, west, south, east = area
-    return (north - south) < 170 or (east - west) % 360 < 350
+
+
+def _needs_latlon(field: Any) -> bool:
+    """Return True if *field* must be plotted as scattered lat/lon points, see REDUCED_GG_PATTERN."""
+    return _is_subarea_reduced_gg(field) or _is_lambert(field)
 
 
 def _to_latlon_field(field: Any) -> ekd.ArrayField:
@@ -165,11 +142,11 @@ def _to_latlon_field(field: Any) -> ekd.ArrayField:
 
 
 def _prepare_fields(fields: ekd.FieldList) -> ekd.FieldList:
-    """Rewrap sub-area reduced Gaussian fields as lat/lon fields; other fields are returned unchanged."""
-    if not any(_is_subarea_reduced_gg(field) for field in fields):  # type: ignore[reportGeneralTypeIssues]
+    """Rewrap sub-area reduced Gaussian and Lambert fields as lat/lon fields; other fields are returned unchanged."""
+    if not any(_needs_latlon(field) for field in fields):  # type: ignore[reportGeneralTypeIssues]
         return fields
     return ekd.FieldList.from_fields(
-        [_to_latlon_field(field) if _is_subarea_reduced_gg(field) else field for field in fields]  # type: ignore[reportGeneralTypeIssues]
+        [_to_latlon_field(field) if _needs_latlon(field) else field for field in fields]  # type: ignore[reportGeneralTypeIssues]
     )
 
 
