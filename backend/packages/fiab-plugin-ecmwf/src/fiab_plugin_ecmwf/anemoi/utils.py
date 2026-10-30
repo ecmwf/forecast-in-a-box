@@ -47,7 +47,7 @@ INPUT_SOURCE_DEFAULTS: dict[str, dict[str, Any]] = {
 
 INPUT_SOURCE_EXTRAS = {
     "opendata": [*opendata_dependencies, "anemoi-plugins-ecmwf-inference[opendata]>=0.7.0"],
-    "polytope": [*polytope_dependencies, "anemoi-plugins-ecmwf-inference[polytope]>=0.7.0"],
+    "polytope": [*polytope_dependencies, "anemoi-plugins-ecmwf-inference[polytope,mir]>=0.7.0"],
     "mars": mars_dependencies,
     "dummy": [],
 }
