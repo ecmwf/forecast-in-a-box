@@ -290,7 +290,8 @@ def stop_run_if_active(client: httpx.Client, run_id: str, attempt_count: int, *,
     """Stop a run that is still submitted, preparing or running, eg after waiting for it timed out, and wait until it is over.
 
     Cascade tears the job down in the background, and a run submitted meanwhile fails with an infrastructure error, so this
-    returns only once the run is no longer active (or raises after `attempts` polls).
+    returns only once the run is no longer active (or raises after `attempts` polls). The status is `unknown` while the
+    backend cannot reach the cascade gateway, as can happen during the teardown, so it counts as still active.
     """
 
     def status() -> str:
@@ -306,7 +307,7 @@ def stop_run_if_active(client: httpx.Client, run_id: str, attempt_count: int, *,
         client.post("/run/stop", json={"run_id": run_id, "attempt_count": attempt_count}, timeout=30).raise_for_status()
     retry_until(
         status,
-        lambda s: s if s not in {"submitted", "preparing", "running", "stopping"} else None,
+        lambda s: s if s not in {"submitted", "preparing", "running", "stopping", "unknown"} else None,
         attempts=attempts,
         sleep=sleep,
         error_msg=f"run {run_id} did not stop in time",
