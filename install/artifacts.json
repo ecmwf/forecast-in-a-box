@@ -21,7 +21,7 @@
         "pip_package_constraints": [
           "anemoi-models==0.5.0",
           "anemoi-inference",
-          "torch==2.6.0",
+          "torch==2.8.0",
           "torch_geometric==2.4.0"
         ],
         "input_characteristics": [
@@ -3263,7 +3263,7 @@
         "minimum_gpu_memory_mib": 2000,
         "pip_package_constraints": [
           "anemoi-models==0.9.5",
-          "anemoi-graphs==0.6.6",
+          "anemoi-graphs==0.8.3",
           "anemoi-inference",
           "anemoi-plugins-ecmwf-inference[regrid]>=0.3.0",
           "torch==2.8",
