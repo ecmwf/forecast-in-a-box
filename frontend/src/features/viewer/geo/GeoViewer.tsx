@@ -761,6 +761,7 @@ export function GeoViewer({
     setAnnotationHighlightId,
   } = useViewerAnnotations({
     viewRef,
+    centerGlobe: globe.centerOn,
     onToggle: () => setMeasureMode('none'),
   })
   const setMeasureModeExclusive = useCallback(
@@ -1324,6 +1325,11 @@ export function GeoViewer({
               onRegisterFitBbox={onRegisterFitBbox}
               onZoom={zoomGlobe}
               onRegisterCapture={onRegisterCapture}
+              overlays={overlays}
+              measurements={measurements}
+              annotations={annotations}
+              annotationHighlightId={annotationHighlightId}
+              onAnnotationEdit={onAnnotationEdit}
             />
           )}
           {globe.phase === 'globe' ? null : focusSlot === null &&

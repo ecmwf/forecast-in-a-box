@@ -22,6 +22,7 @@ import { globeMinZoom, zoomFromGroundMpp } from './globe-camera'
 import { easeInOutCubic, tween } from './animation'
 import { createGlobeContent } from './globe-content'
 import { applyFlatUniforms } from './globe-render'
+import { VECTOR_OPACITY, createGlobeVectors } from './globe-vectors'
 import { EARTH_RADIUS_M } from './sphere-math'
 import { invertMat4 } from './webgl/gl'
 import type { CustomLayerInterface } from 'maplibre-gl'
@@ -179,6 +180,7 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
   /** Camera and size, measured once per move or resize (two project() calls and a layout read). */
   let viewCache: ViewState | null = null
   let restoreTimer = 0
+  const vectors = createGlobeVectors()
   const detach: Array<() => void> = []
   const inverse = new Float64Array(16)
 
@@ -271,6 +273,7 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
       state: {
         ...next.state,
         [BASEMAP_OPACITY]: { default: (basemap?.opacity ?? 1) * cartoShown },
+        [VECTOR_OPACITY]: { default: cartoShown },
       },
       layers: next.layers.map(withBasemapOpacity),
     })
@@ -306,6 +309,8 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
   /** Carto at the chosen opacity when settled; while it sits out a bend, our outline stands in. */
   function applyBasemapOpacity() {
     if (!map || !content || !basemap) return
+    // Vectors fade with Carto during bends; the seed shows them.
+    if (styleReady) map.setGlobalStateProperty(VECTOR_OPACITY, cartoShown)
     const vector = styleUrl !== null
     if (vector && styleReady) {
       map.setGlobalStateProperty(BASEMAP_OPACITY, basemap.opacity * cartoShown)
@@ -447,6 +452,7 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
     while (band > 0 && layers[band - 1].type === 'symbol') band--
     if (!m.getLayer(layer.id)) m.addLayer(layer, layers[band]?.id)
     if (!m.getLayer(seedLayer.id)) m.addLayer(seedLayer)
+    vectors.install(m, seedLayer.id)
   }
 
   /** Hold the seed until the live layers and tiles are in, then fade it. */
@@ -525,6 +531,16 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
         handlers.onCameraChange({ lon, lat, zoom })
         content?.scheduleUpgrade()
       })
+      // Pins open their note on the settled globe only.
+      const pinAt = (point: { x: number; y: number }) =>
+        styleReady && content?.uniforms.t === 1 ? vectors.pinAt(m, point) : null
+      m.on('click', (e) => {
+        const id = pinAt(e.point)
+        if (id) handlers.onPinClick?.(id)
+      })
+      m.on('mousemove', (e) => {
+        canvas.style.cursor = pinAt(e.point) ? 'pointer' : ''
+      })
       m.on('webglcontextlost', () => {
         styleReady = false
         window.clearTimeout(restoreTimer)
@@ -569,6 +585,8 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
       basemap = spec
       syncBasemap()
     },
+
+    setVectors: (spec) => vectors.set(styleReady ? map : null, spec),
 
     setLive: (on) => {
       content?.setLive(on)

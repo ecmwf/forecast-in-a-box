@@ -35,6 +35,9 @@ import type {
   FitBboxAction,
 } from '../geo/types'
 import type { GlobeBasemapSpec, GlobeEngine } from './engine'
+import type { MapAnnotation } from '../geo/annotations'
+import type { ContextOverlay } from '../geo/overlays'
+import type { Measurement } from '../hooks/useMeasure'
 import type { SharedGlobeCamera } from './globe-camera'
 import type { CrossPosition, GlobeLoupe } from './GlobePanel'
 import { cn } from '@/lib/utils'
@@ -66,6 +69,13 @@ export interface GlobeViewProps {
   onRegisterCapture: (
     capture: (() => Promise<Array<CaptureResult>>) | null,
   ) => void
+  /** User vectors (WGS84), filtered per panel source. */
+  overlays: ReadonlyArray<ContextOverlay>
+  measurements: ReadonlyArray<Measurement>
+  annotations: ReadonlyArray<MapAnnotation>
+  annotationHighlightId: string | null
+  /** A pin was clicked. */
+  onAnnotationEdit: (id: string) => void
 }
 
 export function GlobeView({
@@ -87,6 +97,11 @@ export function GlobeView({
   onRegisterFitBbox,
   onZoom,
   onRegisterCapture,
+  overlays,
+  measurements,
+  annotations,
+  annotationHighlightId,
+  onAnnotationEdit,
 }: GlobeViewProps) {
   const enginesRef = useRef(new Map<string, GlobeEngine>())
   // Pointer moves write here, not React state: only the crosshairs re-render.
@@ -181,6 +196,11 @@ export function GlobeView({
       mirrorLoupe={side && loupe.mirror}
       onZoom={onZoom}
       onPan={panBy}
+      overlays={overlays}
+      measurements={measurements}
+      annotations={annotations}
+      annotationHighlightId={annotationHighlightId}
+      onAnnotationEdit={onAnnotationEdit}
     />
   ))
 

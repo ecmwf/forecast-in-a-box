@@ -19,12 +19,14 @@ import type {
   GlobeEngine,
   GlobeEngineEvents,
   GlobeLayerSpec,
+  GlobeVectorSpec,
 } from '@/features/viewer/globe/engine'
 
 /** What reached the engine; one module instance per test file. */
 export const engineCalls = {
   layers: [] as Array<ReadonlyArray<GlobeLayerSpec>>,
   basemaps: [] as Array<GlobeBasemapSpec>,
+  vectors: [] as Array<GlobeVectorSpec>,
   seeds: [] as Array<boolean>,
   live: [] as Array<boolean>,
   mounted: 0,
@@ -50,6 +52,7 @@ function fakeEngine(): GlobeEngine {
     },
     setLayers: (specs) => engineCalls.layers.push(specs),
     setBasemap: (spec) => engineCalls.basemaps.push(spec),
+    setVectors: (spec) => engineCalls.vectors.push(spec),
     setLive: (live) => engineCalls.live.push(live),
     setCamera: (next) => {
       camera = next

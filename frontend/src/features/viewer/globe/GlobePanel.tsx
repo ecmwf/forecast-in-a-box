@@ -22,11 +22,15 @@ import { NAV_CLEARANCE } from '../geo/map-nav'
 import { PanelCorner, SlotStatusBadges } from '../geo/SlotStatusBadges'
 import { GLOBE_ENGINE } from './engine-entry'
 import { globeDecorationSpecs, globeLayerSpecs } from './globe-layer-specs'
+import { globeVectorSpec } from './globe-vector-specs'
 import { createValueStore, useValue } from './value-store'
 import type { ComponentProps } from 'react'
 import type { PinnedLegendItem } from '../components/PinnedLegendsBar'
 import type { PointerReadout } from '../hooks/usePointerReadout'
 import type { CompareMapSource } from '../geo/types'
+import type { MapAnnotation } from '../geo/annotations'
+import type { ContextOverlay } from '../geo/overlays'
+import type { Measurement } from '../hooks/useMeasure'
 import type { GlobeBasemapSpec, GlobeEngine, ViewportDraw } from './engine'
 import type { SharedGlobeCamera } from './globe-camera'
 import type { ValueStore } from './value-store'
@@ -61,6 +65,11 @@ export function GlobePanel({
   mirrorLoupe,
   onZoom,
   onPan,
+  overlays,
+  measurements,
+  annotations,
+  annotationHighlightId,
+  onAnnotationEdit,
 }: {
   source: CompareMapSource
   camera: SharedGlobeCamera
@@ -79,6 +88,11 @@ export function GlobePanel({
   mirrorLoupe: boolean
   onZoom: (delta: number) => void
   onPan: (dx: number, dy: number) => void
+  overlays: ReadonlyArray<ContextOverlay>
+  measurements: ReadonlyArray<Measurement>
+  annotations: ReadonlyArray<MapAnnotation>
+  annotationHighlightId: string | null
+  onAnnotationEdit: (id: string) => void
 }) {
   const { t } = useTranslation('visualise')
   const containerRef = useRef<HTMLDivElement>(null)
@@ -113,6 +127,7 @@ export function GlobePanel({
     onFailure,
     onContextLost,
     onBasemapFailed,
+    onAnnotationEdit,
   })
   useLayoutEffect(() => {
     latest.current = {
@@ -122,6 +137,7 @@ export function GlobePanel({
       onFailure,
       onContextLost,
       onBasemapFailed,
+      onAnnotationEdit,
     }
   })
   const zBase = slot === 'a' ? 100 : 200
@@ -153,6 +169,7 @@ export function GlobePanel({
           onLoadingChange: setInFlight,
           onContextLost: () => latest.current.onContextLost(),
           onBasemapFailed: () => latest.current.onBasemapFailed(),
+          onPinClick: (id) => latest.current.onAnnotationEdit(id),
         })
         if (isCancelled()) return
         mounted.setCamera(camera.get())
@@ -195,6 +212,23 @@ export function GlobePanel({
   useEffect(() => {
     engine?.setLive(live)
   }, [engine, live])
+
+  // Each panel shows only its own source.
+  const sourceId = source.id
+  const vectors = useMemo(
+    () =>
+      globeVectorSpec({
+        overlays,
+        measurements,
+        annotations,
+        highlightId: annotationHighlightId,
+        shownIds: [sourceId],
+      }),
+    [overlays, measurements, annotations, annotationHighlightId, sourceId],
+  )
+  useEffect(() => {
+    engine?.setVectors(vectors)
+  }, [engine, vectors])
 
   const drawLoupe = useMemo(
     () =>
