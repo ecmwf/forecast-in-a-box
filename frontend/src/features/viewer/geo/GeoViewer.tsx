@@ -38,6 +38,7 @@ import { RefreshCw } from 'lucide-react'
 import { fromLonLat } from 'ol/proj'
 import { useLensSource } from '../hooks/useLensSource'
 import { AUTOFIT_KEY, createViewerView } from '../hooks/useOlMapBase'
+import { nextMeasurementId } from '../hooks/useMeasure'
 import { formatStep } from '../format'
 import {
   BASEMAPS,
@@ -107,7 +108,8 @@ import type {
   CompareModeOptions,
   FitBboxAction,
 } from './types'
-import type { MeasureMode } from '../hooks/useMeasure'
+import type { MeasureMode, Measurement } from '../hooks/useMeasure'
+import type Geometry from 'ol/geom/Geometry'
 import type { ViewerUrlState } from './view-url-state'
 import { CollapsedSidebarHandle } from '@/components/common/CollapsedSidebarHandle'
 import { TOUR, tourAttr } from '@/features/tutorials/anchors'
@@ -349,9 +351,21 @@ export function GeoViewer({
     [],
   )
 
-  // Measure tools (mode-independent): current tool + clear signal.
+  // Measure tools (mode-independent): current tool + measurements (WGS84).
   const [measureMode, setMeasureMode] = useState<MeasureMode>('none')
-  const [measureClearNonce, setMeasureClearNonce] = useState(0)
+  const [measurements, setMeasurements] = useState<Array<Measurement>>([])
+  const onMeasurementAdd = useCallback(
+    (geometry: Geometry, label: string, sourceId: string | null) =>
+      setMeasurements((prev) => [
+        ...prev,
+        { id: nextMeasurementId(), geometry, label, sourceId },
+      ]),
+    [],
+  )
+  const onMeasurementRemove = useCallback(
+    (id: string) => setMeasurements((prev) => prev.filter((m) => m.id !== id)),
+    [],
+  )
 
   // Per-mode tuning surfaced in the toolbar's action row.
   const [modeOptions, setModeOptions] = useState<CompareModeOptions>({
@@ -1115,7 +1129,7 @@ export function GeoViewer({
         }
         measureMode={measureMode}
         onMeasureMode={setMeasureModeExclusive}
-        onMeasureClear={() => setMeasureClearNonce((n) => n + 1)}
+        onMeasureClear={() => setMeasurements([])}
         annotateArmed={annotateArmed}
         onAnnotateToggle={toggleAnnotate}
         annotations={annotations}
@@ -1327,7 +1341,9 @@ export function GeoViewer({
               pinnedLegends={pinnedLegendItems}
               onUnpinLegend={unpinLegend}
               measureMode={measureMode}
-              measureClearNonce={measureClearNonce}
+              measurements={measurements}
+              onMeasurementAdd={onMeasurementAdd}
+              onMeasurementRemove={onMeasurementRemove}
               overlays={overlays}
               annotations={annotations}
               annotateArmed={annotateArmed}
@@ -1356,7 +1372,9 @@ export function GeoViewer({
               }
               options={modeOptions}
               measureMode={measureMode}
-              measureClearNonce={measureClearNonce}
+              measurements={measurements}
+              onMeasurementAdd={onMeasurementAdd}
+              onMeasurementRemove={onMeasurementRemove}
               overlays={overlays}
               annotations={annotations}
               annotateArmed={annotateArmed}
