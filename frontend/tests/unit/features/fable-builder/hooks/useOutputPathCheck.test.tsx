@@ -64,6 +64,14 @@ describe('useOutputPathCheck', () => {
     })
   })
 
+  it('trusts a literal runId glyph over a preview with another run ID', () => {
+    const { result } = renderCheck({
+      block: block('gribSink', '${outputRoot}/${runId}/[shortName].grib'),
+      resolved: { path: '/tmp/outputRoot/9f0e7c1a/[shortName].grib' },
+    })
+    expect(result.current).toBeNull()
+  })
+
   it('accepts a glyph path whose resolved folder carries the run ID', () => {
     const { result } = renderCheck({
       block: block('gribSink', '${outputRoot}/${runId}/[shortName].grib'),

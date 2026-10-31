@@ -35,17 +35,16 @@ export function useOutputPathCheck(
   const path = block ? runScopedPath(block.factory_id) : null
   const configKey = path?.configKey ?? null
   const value = (configKey && block?.configuration_values[configKey]) || ''
-  if (blockId && path && runId && value) {
+  if (blockId && path && value) {
     const resolved = containsGlyphs(value)
       ? (resolvedConfig?.[path.configKey] ?? null)
       : value
-    // Without a preview, only a literal runId glyph settles it.
-    const verdict =
-      resolved !== null
+    // A literal runId glyph wins: the preview's run ID changes on restart.
+    const verdict = namesRunId(value, path.scope)
+      ? false
+      : resolved !== null && runId
         ? isSharedAcrossRuns(resolved, runId, path.scope)
-        : namesRunId(value, path.scope)
-          ? false
-          : null
+        : null
     if (verdict !== null) lastShared.current[blockId] = verdict
   }
   const shared = !!blockId && !!value && lastShared.current[blockId] === true
