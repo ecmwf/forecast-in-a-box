@@ -24,6 +24,13 @@ export interface RunScopedPath {
   scope: RunScope
 }
 
+/** A sink path shared across runs. */
+export interface SharedOutputPath {
+  scope: RunScope
+  /** One-click fix; null when none applies. */
+  fix: string | null
+}
+
 /** ecmwf plugin sinks that write to disk, by factory name. */
 const RUN_SCOPED_PATHS: Record<string, RunScopedPath | undefined> = {
   gribSink: { configKey: 'path', scope: 'folder' },

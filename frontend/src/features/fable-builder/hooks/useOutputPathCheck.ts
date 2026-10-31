@@ -10,6 +10,7 @@
 
 import { useMemo, useRef } from 'react'
 import type { BlockInstance } from '@/api/types/fable.types'
+import type { SharedOutputPath } from '@/features/fable-builder/utils/run-folder-nudge'
 import { useGlyphContext } from '@/features/fable-builder/context/GlyphContext'
 import { containsGlyphs } from '@/features/fable-builder/utils/glyph-display'
 import {
@@ -19,12 +20,12 @@ import {
   withRunFolder,
 } from '@/features/fable-builder/utils/run-folder-nudge'
 
-/** The block's output path shared across runs: config key -> one-click fix (null: none). */
+/** The block's output path shared across runs, by config key. */
 export function useOutputPathCheck(
   blockId: string | null,
   block: BlockInstance | null,
   resolvedConfig: Record<string, string | null> | null,
-): Record<string, string | null> | null {
+): Record<string, SharedOutputPath> | null {
   // The preview resolves runId to this example value.
   const runId = useGlyphContext().find(
     (g) => g.type === 'intrinsic' && g.name === 'runId',
@@ -49,9 +50,11 @@ export function useOutputPathCheck(
   }
   const shared = !!blockId && !!value && lastShared.current[blockId] === true
   const fix = shared ? withRunFolder(value) : null
+  const scope = path?.scope ?? null
 
   return useMemo(
-    () => (shared && configKey ? { [configKey]: fix } : null),
-    [shared, configKey, fix],
+    () =>
+      shared && configKey && scope ? { [configKey]: { scope, fix } } : null,
+    [shared, configKey, scope, fix],
   )
 }

@@ -119,6 +119,7 @@
     },
     "runFolder": {
       "shared": "Not a per-run folder",
+      "gribFolder": "This folder has no run ID, and viewing or downloading loads the whole folder, so files from other runs can mix in.",
       "details": "Later runs overwrite files with the same name, so an earlier run can silently show newer data. A shared folder also slows down the map viewer as it fills.",
       "action": "Use run folder",
       "actionTooltip": "Writes each run and attempt to its own folder:"

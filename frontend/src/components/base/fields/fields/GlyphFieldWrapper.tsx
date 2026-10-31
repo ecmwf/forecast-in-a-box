@@ -238,9 +238,10 @@ export function GlyphFieldWrapper({
     !hasFieldError &&
     sharedOutputPaths !== null &&
     configKey in sharedOutputPaths
-  const runFolderFix = runFolderNudgeVisible
-    ? sharedOutputPaths[configKey]
-    : null
+  const runFolder = runFolderNudgeVisible ? sharedOutputPaths[configKey] : null
+  const runFolderFix = runFolder?.fix ?? null
+  // GRIB output is the file's folder, not the file.
+  const runFolderIsGrib = runFolder?.scope === 'folder'
 
   function handleApplyFloorDay() {
     const next = applyFloorDay(value)
@@ -347,7 +348,10 @@ export function GlyphFieldWrapper({
       )}
 
       {runFolderNudgeVisible && (
-        <div className={NUDGE_CLASS} data-testid="run-folder-nudge">
+        <div
+          className={cn(NUDGE_CLASS, 'flex-wrap gap-y-0.5')}
+          data-testid="run-folder-nudge"
+        >
           <AlertCircle className="h-3.5 w-3.5 shrink-0" />
           <Tooltip>
             <TooltipTrigger
@@ -394,6 +398,12 @@ export function GlyphFieldWrapper({
                 </span>
               </TooltipContent>
             </Tooltip>
+          )}
+          {/* Own row, aligned with the label. */}
+          {runFolderIsGrib && (
+            <p className="basis-full pl-5.5">
+              {t('field.runFolder.gribFolder')}
+            </p>
           )}
         </div>
       )}

@@ -60,8 +60,30 @@ describe('useOutputPathCheck', () => {
       resolved: null,
     })
     expect(result.current).toEqual({
-      path: '/tmp/out/${runId}__${attemptCount}/[shortName].grib',
+      path: {
+        scope: 'folder',
+        fix: '/tmp/out/${runId}__${attemptCount}/[shortName].grib',
+      },
     })
+  })
+
+  it('flags a per-run GRIB file name in a shared folder', () => {
+    const value = '/tmp/myFunBlock-${runId}__${attemptCount}'
+    const { result } = renderCheck({
+      block: block('gribSink', value),
+      resolved: { path: `/tmp/myFunBlock-${RUN}__1` },
+    })
+    expect(result.current).toEqual({
+      path: {
+        scope: 'folder',
+        fix: '/tmp/${runId}__${attemptCount}/myFunBlock-${runId}__${attemptCount}',
+      },
+    })
+    const zarr = renderCheck({
+      block: block('zarrSink', value),
+      resolved: { path: `/tmp/myFunBlock-${RUN}__1` },
+    })
+    expect(zarr.result.current).toBeNull()
   })
 
   it('trusts a literal runId glyph over a preview with another run ID', () => {

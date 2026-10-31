@@ -20,6 +20,7 @@ import { userEvent } from 'vitest/browser'
 import { describe, expect, it } from 'vitest'
 import { renderWithProviders } from '@tests/utils/render'
 import type { GlyphInfo } from '@/features/fable-builder/hooks/useAllGlyphs'
+import type { SharedOutputPath } from '@/features/fable-builder/utils/run-folder-nudge'
 import { GlyphFieldWrapper } from '@/components/base/fields/fields/GlyphFieldWrapper'
 import { InputGroupInput } from '@/components/ui/input-group'
 import {
@@ -72,7 +73,7 @@ function WithGlyphs({
   glyphs?: Array<GlyphInfo>
   resolvedConfig?: Record<string, string> | null
   fieldErrors?: Record<string, Array<string>> | null
-  sharedOutputPaths?: Record<string, string | null> | null
+  sharedOutputPaths?: Record<string, SharedOutputPath> | null
 }) {
   return (
     <GlyphContext.Provider value={glyphs}>
@@ -91,7 +92,7 @@ function ControlledStringField(props: {
   initialValue?: string
   resolvedConfig?: Record<string, string> | null
   fieldErrors?: Record<string, Array<string>> | null
-  sharedOutputPaths?: Record<string, string | null> | null
+  sharedOutputPaths?: Record<string, SharedOutputPath> | null
 }) {
   const [value, setValue] = useState(props.initialValue ?? '')
   return (
@@ -474,11 +475,14 @@ describe('GlyphFieldWrapper Integration', () => {
       const screen = await renderWithProviders(
         <ControlledStringField
           initialValue="/tmp/out/[shortName].grib"
-          sharedOutputPaths={{ value: fix }}
+          sharedOutputPaths={{ value: { scope: 'folder', fix } }}
         />,
       )
       await expect
         .element(screen.getByText('Not a per-run folder'))
+        .toBeVisible()
+      await expect
+        .element(screen.getByText(/^This folder has no run ID/))
         .toBeVisible()
       await screen.getByRole('button', { name: 'Use run folder' }).click()
       await expect
@@ -490,12 +494,16 @@ describe('GlyphFieldWrapper Integration', () => {
       const screen = await renderWithProviders(
         <ControlledStringField
           initialValue="${outputRoot}"
-          sharedOutputPaths={{ value: null }}
+          sharedOutputPaths={{ value: { scope: 'path', fix: null } }}
         />,
       )
       await expect.element(screen.getByTestId('run-folder-nudge')).toBeVisible()
       await expect
         .element(screen.getByRole('button', { name: 'Use run folder' }))
+        .not.toBeInTheDocument()
+      // A Zarr store is the path itself: no folder note.
+      await expect
+        .element(screen.getByText(/^This folder has no run ID/))
         .not.toBeInTheDocument()
     })
 
@@ -503,7 +511,7 @@ describe('GlyphFieldWrapper Integration', () => {
       const screen = await renderWithProviders(
         <ControlledStringField
           initialValue="/tmp/out/[shortName].grib"
-          sharedOutputPaths={{ other_key: null }}
+          sharedOutputPaths={{ other_key: { scope: 'folder', fix: null } }}
         />,
       )
       await expect
