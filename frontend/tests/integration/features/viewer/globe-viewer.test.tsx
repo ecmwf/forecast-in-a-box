@@ -43,12 +43,26 @@ const PINS = JSON.stringify({
   ],
 })
 
+const QUAKES = JSON.stringify({
+  type: 'FeatureCollection',
+  features: [
+    {
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [140, 36] },
+      properties: { mag: 4.6, place: 'Honshu', felt: null },
+    },
+  ],
+})
+
 describe('GeoViewer 3D globe', () => {
   let removeSizing = () => {}
   beforeEach(() => {
     removeSizing = injectMapSizing()
   })
-  afterEach(() => removeSizing())
+  afterEach(() => {
+    removeSizing()
+    engineCalls.overlayAt = () => null
+  })
 
   it('bends into the globe with the active stack and flattens back', async () => {
     const portA = registerServer()
@@ -308,6 +322,50 @@ describe('GeoViewer 3D globe', () => {
     await expect
       .poll(() => engineCalls.camera())
       .toMatchObject({ lon: -20, lat: 55 })
+  })
+
+  it('shows a hovered GeoJSON feature its properties on the globe', async () => {
+    const screen = await render(
+      <Harness
+        portA={registerServer()}
+        initialViewState={{
+          projection: 'globe',
+          camera: { lon: 140, lat: 36, zoom: 2 },
+        }}
+      />,
+    )
+    await expect.element(screen.getByTestId('globe-canvas')).toBeInTheDocument()
+    const input = document.querySelector<HTMLInputElement>(
+      'input[aria-label="Add GeoJSON"]',
+    )
+    await userEvent.upload(
+      input!,
+      new File([QUAKES], 'quakes.geojson', { type: 'application/geo+json' }),
+    )
+    await expect
+      .poll(() =>
+        engineCalls.vectors
+          .at(-1)
+          ?.overlays.features.map((f) => f.properties?.index),
+      )
+      .toEqual([0])
+
+    const panel = document.querySelector('[data-globe-panel="a"]')!
+    const move = () =>
+      panel.dispatchEvent(
+        new PointerEvent('pointermove', { bubbles: true, clientX: 50 }),
+      )
+    engineCalls.overlayAt = () => 0
+    move()
+    const cells = () =>
+      Array.from(panel.querySelectorAll('td'), (td) => td.textContent)
+    await expect
+      .poll(cells)
+      .toEqual(['mag', '4.6', 'place', 'Honshu', 'felt', '—'])
+
+    engineCalls.overlayAt = () => null
+    move()
+    await expect.poll(cells).toEqual([])
   })
 
   it('restores straight onto the globe and reports its camera', async () => {

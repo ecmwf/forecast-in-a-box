@@ -184,6 +184,9 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
   const detach: Array<() => void> = []
   const inverse = new Float64Array(16)
 
+  /** Style loaded and no bend running. */
+  const settled = () => styleReady && content?.uniforms.t === 1
+
   const size = (): [number, number] => [
     Math.max(1, container?.clientWidth ?? 1),
     Math.max(1, container?.clientHeight ?? 1),
@@ -533,7 +536,7 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
       })
       // Pins open their note on the settled globe only.
       const pinAt = (point: { x: number; y: number }) =>
-        styleReady && content?.uniforms.t === 1 ? vectors.pinAt(m, point) : null
+        settled() ? vectors.pinAt(m, point) : null
       m.on('click', (e) => {
         const id = pinAt(e.point)
         if (id) handlers.onPinClick?.(id)
@@ -657,6 +660,9 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
         ? { lon: ll.lng, lat: ll.lat }
         : null
     },
+
+    overlayAt: (px) =>
+      map && settled() ? vectors.overlayAt(map, { x: px[0], y: px[1] }) : null,
 
     capture: () => {
       const out = document.createElement('canvas')

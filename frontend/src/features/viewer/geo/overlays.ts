@@ -176,6 +176,25 @@ export interface OverlayHover {
 
 const HOVER_MAX_ROWS = 8
 
+/** The hover card for `feature` with the cursor at (`x`, `y`). */
+export function overlayHoverAt(
+  feature: FeatureLike,
+  x: number,
+  y: number,
+): OverlayHover {
+  const entries = Object.entries(feature.getProperties()).filter(
+    ([key]) => key !== 'geometry',
+  )
+  return {
+    x,
+    y,
+    rows: entries
+      .slice(0, HOVER_MAX_ROWS)
+      .map(([k, v]) => [k, v === null ? '—' : String(v)]),
+    more: Math.max(0, entries.length - HOVER_MAX_ROWS),
+  }
+}
+
 export function useOverlayHover(
   mapRef: RefObject<OlMap | null>,
   overlays: ReadonlyArray<ContextOverlay>,
@@ -198,17 +217,7 @@ export function useOverlayHover(
         setHover((prev) => (prev === null ? prev : null))
         return
       }
-      const entries = Object.entries(feature.getProperties()).filter(
-        ([key]) => key !== 'geometry',
-      )
-      setHover({
-        x: evt.pixel[0],
-        y: evt.pixel[1],
-        rows: entries
-          .slice(0, HOVER_MAX_ROWS)
-          .map(([k, v]) => [k, v === null ? '—' : String(v)]),
-        more: Math.max(0, entries.length - HOVER_MAX_ROWS),
-      })
+      setHover(overlayHoverAt(feature, evt.pixel[0], evt.pixel[1]))
     }
     map.on('pointermove', onMove)
     return () => {

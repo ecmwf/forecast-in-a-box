@@ -18,6 +18,7 @@ import type { Measurement } from '@/features/viewer/hooks/useMeasure'
 import {
   globeVectorSpec,
   labelAnchors,
+  shownOverlayFeatures,
 } from '@/features/viewer/globe/globe-vector-specs'
 import { parseGeojsonOverlay } from '@/features/viewer/geo/overlays'
 
@@ -160,6 +161,19 @@ describe('globeVectorSpec', () => {
     expect(result.overlayLabels[0]).toMatchObject({ text: 'Box' })
     expect(result.overlayLabels[0].lon).toBeCloseTo(5)
     expect(result.overlayLabels[0].lat).toBeCloseTo(50)
+  })
+
+  it('indexes overlay features into the visible overlays', () => {
+    const hidden = { ...parseGeojsonOverlay('a.geojson', OVERLAY) }
+    const shown = { ...parseGeojsonOverlay('b.geojson', OVERLAY) }
+    hidden.visible = false
+    const overlays = [hidden, shown]
+    const features = shownOverlayFeatures(overlays)
+    const indices = spec({ overlays }).overlays.features.map(
+      (f) => f.properties?.index as number,
+    )
+    expect(indices).toEqual([0, 1])
+    expect(indices.map((i) => features[i])).toEqual(shown.features)
   })
 
   it('places measurement results at the top centre, by source binding', () => {

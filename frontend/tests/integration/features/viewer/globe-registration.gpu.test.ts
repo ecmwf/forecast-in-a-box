@@ -1098,6 +1098,51 @@ describe('globe registration', () => {
     await expect.poll(() => frame(engine).centroid(pin.rgb, 12)).toBeNull()
   })
 
+  it('finds the topmost overlay feature under the pointer, front side only', async () => {
+    const { lon, lat } = CAMERA
+    const empty: FeatureCollection = { type: 'FeatureCollection', features: [] }
+    engine.setVectors({
+      overlays: {
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            geometry: {
+              type: 'Polygon',
+              coordinates: [
+                [
+                  [lon - 20, lat - 15],
+                  [lon + 20, lat - 15],
+                  [lon + 20, lat + 15],
+                  [lon - 20, lat + 15],
+                  [lon - 20, lat - 15],
+                ],
+              ],
+            },
+            properties: { index: 0 },
+          },
+          {
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: [lon, lat] },
+            properties: { index: 1 },
+          },
+        ],
+      },
+      overlayLabels: [],
+      measurements: empty,
+      measurementLabels: [],
+      pins: [],
+    })
+    const centre = [WIDTH / 2, HEIGHT / 2] as const
+    await expect.poll(() => engine.overlayAt(centre)).toBe(1)
+    // ~10 degrees east: inside the box, off the point.
+    expect(engine.overlayAt([centre[0] + 40, centre[1]])).toBe(0)
+    expect(engine.overlayAt([5, 5])).toBeNull()
+
+    engine.setCamera({ ...CAMERA, lon: lon + 180, lat: -lat })
+    await expect.poll(() => engine.overlayAt(centre)).toBeNull()
+  })
+
   it('fetches nothing while hidden and loads once live', async () => {
     engine.setLive(false)
     engine.setLayers([spec('world', 1)])

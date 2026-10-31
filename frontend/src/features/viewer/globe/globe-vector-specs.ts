@@ -22,6 +22,7 @@ import { ANNOTATION_COLORS, annotationVisibleOn } from '../geo/annotations'
 import { overlayLabelText } from '../geo/overlays'
 import { pinLabelText } from '../vector-styles'
 import type { FeatureCollection } from 'geojson'
+import type Feature from 'ol/Feature'
 import type Geometry from 'ol/geom/Geometry'
 import type { MapAnnotation } from '../geo/annotations'
 import type { ContextOverlay } from '../geo/overlays'
@@ -54,14 +55,29 @@ export function labelAnchors(geometry: Geometry): Array<[number, number]> {
   return []
 }
 
-function collection(geometries: ReadonlyArray<Geometry>): FeatureCollection {
+/** Visible overlay features, addressed by the globe's `index`. */
+export function shownOverlayFeatures(
+  overlays: ReadonlyArray<ContextOverlay>,
+): Array<Feature> {
+  return overlays.filter((o) => o.visible).flatMap((o) => o.features)
+}
+
+function collection(
+  geometries: ReadonlyArray<Geometry | undefined>,
+): FeatureCollection {
   return {
     type: 'FeatureCollection',
-    features: geometries.map((geometry) => ({
-      type: 'Feature',
-      geometry: format.writeGeometryObject(geometry),
-      properties: {},
-    })),
+    features: geometries.flatMap((geometry, index) =>
+      geometry
+        ? [
+            {
+              type: 'Feature' as const,
+              geometry: format.writeGeometryObject(geometry),
+              properties: { index },
+            },
+          ]
+        : [],
+    ),
   }
 }
 
@@ -80,7 +96,6 @@ export function globeVectorSpec({
   shownIds: ReadonlyArray<string>
 }): GlobeVectorSpec {
   const shownOverlays = overlays.filter((o) => o.visible)
-  const overlayFeatures = shownOverlays.flatMap((o) => o.features)
   const overlayLabels = shownOverlays.flatMap((o) =>
     o.features.flatMap((feature): Array<GlobeLabel> => {
       const text = overlayLabelText(feature, o.labelProperty)
@@ -93,7 +108,9 @@ export function globeVectorSpec({
     annotationVisibleOn(m, shownIds),
   )
   return {
-    overlays: collection(overlayFeatures.flatMap((f) => f.getGeometry() ?? [])),
+    overlays: collection(
+      shownOverlayFeatures(overlays).map((f) => f.getGeometry()),
+    ),
     overlayLabels,
     measurements: collection(shownMeasurements.map((m) => m.geometry)),
     // Top centre of the extent, as on the flat map.

@@ -48,8 +48,15 @@ const SOURCES = {
   pins: 'fiab-pins',
 } as const
 const PIN_LAYER = 'fiab-pins'
+const OVERLAY_LAYERS = [
+  'fiab-overlay-fill',
+  'fiab-overlay-line',
+  'fiab-overlay-point',
+]
 /** Pin click slop (px), as on the flat map. */
 const HIT_TOLERANCE = 8
+/** Overlay hover slop (px), as on the flat map. */
+const HOVER_TOLERANCE = 5
 
 const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] }
 const POLYGON = [
@@ -80,14 +87,14 @@ function labelLayer(id: string, source: string, overlap: boolean) {
 /** Bottom to top: overlays, measurements, pins. */
 const LAYERS = [
   {
-    id: 'fiab-overlay-fill',
+    id: OVERLAY_LAYERS[0],
     type: 'fill',
     source: SOURCES.overlays,
     filter: POLYGON,
     paint: { 'fill-color': OVERLAY_COLORS.fill, 'fill-opacity': OPACITY },
   },
   {
-    id: 'fiab-overlay-line',
+    id: OVERLAY_LAYERS[1],
     type: 'line',
     source: SOURCES.overlays,
     filter: ['!', POINT],
@@ -98,7 +105,7 @@ const LAYERS = [
     },
   },
   {
-    id: 'fiab-overlay-point',
+    id: OVERLAY_LAYERS[2],
     type: 'circle',
     source: SOURCES.overlays,
     filter: POINT,
@@ -282,6 +289,18 @@ export interface GlobeVectors {
   set: (m: MapLibreMap | null, spec: GlobeVectorSpec) => void
   /** The annotation id of the pin at a canvas point, if any. */
   pinAt: (m: MapLibreMap, point: { x: number; y: number }) => string | null
+  /** The `index` of the topmost overlay feature at a canvas point, if any. */
+  overlayAt: (m: MapLibreMap, point: { x: number; y: number }) => number | null
+}
+
+function hitBox(
+  { x, y }: { x: number; y: number },
+  slop: number,
+): [PointLike, PointLike] {
+  return [
+    [x - slop, y - slop],
+    [x + slop, y + slop],
+  ]
 }
 
 export function createGlobeVectors(): GlobeVectors {
@@ -366,15 +385,25 @@ export function createGlobeVectors(): GlobeVectors {
       spec = next
       if (m && m === installed) apply(m)
     },
-    pinAt: (m, { x, y }) => {
+    pinAt: (m, point) => {
       if (installed !== m || spec.pins.length === 0) return null
-      const box: [PointLike, PointLike] = [
-        [x - HIT_TOLERANCE, y - HIT_TOLERANCE],
-        [x + HIT_TOLERANCE, y + HIT_TOLERANCE],
-      ]
-      const hit = m.queryRenderedFeatures(box, { layers: [PIN_LAYER] }).at(0)
+      const hit = m
+        .queryRenderedFeatures(hitBox(point, HIT_TOLERANCE), {
+          layers: [PIN_LAYER],
+        })
+        .at(0)
       const id: unknown = hit?.properties.id
       return typeof id === 'string' ? id : null
+    },
+    overlayAt: (m, point) => {
+      if (installed !== m || spec.overlays.features.length === 0) return null
+      const hit = m
+        .queryRenderedFeatures(hitBox(point, HOVER_TOLERANCE), {
+          layers: OVERLAY_LAYERS,
+        })
+        .at(0)
+      const index: unknown = hit?.properties.index
+      return typeof index === 'number' ? index : null
     },
   }
 }

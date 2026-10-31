@@ -18,18 +18,20 @@ import { PointerReadoutBadge } from '../components/PointerReadoutBadge'
 import { CompareSlotTag } from '../geo/CompareSlotTag'
 import { LoupeOverlay } from '../geo/LoupeOverlay'
 import { MapNavControls } from '../geo/MapNavControls'
+import { OverlayHoverCard } from '../geo/OverlayHoverCard'
+import { overlayHoverAt } from '../geo/overlays'
 import { NAV_CLEARANCE } from '../geo/map-nav'
 import { PanelCorner, SlotStatusBadges } from '../geo/SlotStatusBadges'
 import { GLOBE_ENGINE } from './engine-entry'
 import { globeDecorationSpecs, globeLayerSpecs } from './globe-layer-specs'
-import { globeVectorSpec } from './globe-vector-specs'
+import { globeVectorSpec, shownOverlayFeatures } from './globe-vector-specs'
 import { createValueStore, useValue } from './value-store'
 import type { ComponentProps } from 'react'
 import type { PinnedLegendItem } from '../components/PinnedLegendsBar'
 import type { PointerReadout } from '../hooks/usePointerReadout'
 import type { CompareMapSource } from '../geo/types'
 import type { MapAnnotation } from '../geo/annotations'
-import type { ContextOverlay } from '../geo/overlays'
+import type { ContextOverlay, OverlayHover } from '../geo/overlays'
 import type { Measurement } from '../hooks/useMeasure'
 import type { GlobeBasemapSpec, GlobeEngine, ViewportDraw } from './engine'
 import type { SharedGlobeCamera } from './globe-camera'
@@ -101,6 +103,9 @@ export function GlobePanel({
   const [errored, setErrored] = useState<ReadonlySet<string>>(() => new Set())
   const [pointer] = useState(() =>
     createValueStore<PointerReadout | null>(null),
+  )
+  const [overlayHover] = useState(() =>
+    createValueStore<OverlayHover | null>(null),
   )
   const slot = source.slot
 
@@ -226,9 +231,14 @@ export function GlobePanel({
       }),
     [overlays, measurements, annotations, annotationHighlightId, sourceId],
   )
+  const overlayFeatures = useMemo(
+    () => shownOverlayFeatures(overlays),
+    [overlays],
+  )
   useEffect(() => {
     engine?.setVectors(vectors)
-  }, [engine, vectors])
+    overlayHover.set(null)
+  }, [engine, vectors, overlayHover])
 
   const drawLoupe = useMemo(
     () =>
@@ -251,10 +261,14 @@ export function GlobePanel({
     const hit = engine?.pick(px) ?? null
     pointer.set(hit && { ...hit, x: hit.lon, y: hit.lat })
     cross?.set({ x: px[0] / rect.width, y: px[1] / rect.height })
+    const index = engine?.overlayAt(px) ?? null
+    const feature = index === null ? undefined : overlayFeatures.at(index)
+    overlayHover.set(feature ? overlayHoverAt(feature, px[0], px[1]) : null)
   }
   const onPointerLeave = () => {
     pointer.set(null)
     cross?.set(null)
+    overlayHover.set(null)
   }
   return (
     // Pointer tracking on the root: the loupe shield sits above the canvas.
@@ -307,6 +321,7 @@ export function GlobePanel({
             crs={t('projections.globeCode')}
           />
           {cross && <Crosshair store={cross} />}
+          <GlobeOverlayHover store={overlayHover} />
         </>
       )}
     </div>
@@ -331,6 +346,14 @@ function GlobeReadout({
       metres={false}
     />
   ) : null
+}
+
+function GlobeOverlayHover({
+  store,
+}: {
+  store: ValueStore<OverlayHover | null>
+}) {
+  return <OverlayHoverCard hover={useValue(store)} />
 }
 
 function Crosshair({ store }: { store: ValueStore<CrossPosition> }) {

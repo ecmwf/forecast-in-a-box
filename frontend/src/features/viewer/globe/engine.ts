@@ -92,6 +92,7 @@ export interface GlobePin {
 
 /** The user's vectors above the data, in WGS84; pins draw on top. */
 export interface GlobeVectorSpec {
+  /** Features carry an `index` property, returned by `overlayAt`. */
   overlays: FeatureCollection
   overlayLabels: ReadonlyArray<GlobeLabel>
   measurements: FeatureCollection
@@ -142,6 +143,8 @@ export interface GlobeEngine {
   bendOut: (to: FlatCamera, durationMs: number) => Promise<void>
   /** Screen px (container-relative) -> lon/lat, null off the globe. */
   pick: (px: readonly [number, number]) => { lon: number; lat: number } | null
+  /** Overlay feature `index` at a container px; null if none or mid-bend. */
+  overlayAt: (px: readonly [number, number]) => number | null
   /** Render now and copy the frame into a 2D canvas. */
   capture: () => HTMLCanvasElement
   /** Render now and draw the CSS-px region from `origin` at `scale` (loupe). */

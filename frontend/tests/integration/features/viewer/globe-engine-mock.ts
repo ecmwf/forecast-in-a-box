@@ -35,6 +35,8 @@ export const engineCalls = {
   loaded: Promise.resolve(),
   captures: 0,
   events: null as GlobeEngineEvents | null,
+  /** What `overlayAt` answers. */
+  overlayAt: (): number | null => null,
   commits: 0,
 }
 
@@ -66,6 +68,7 @@ function fakeEngine(): GlobeEngine {
     },
     bendOut: () => Promise.resolve(),
     pick: () => null,
+    overlayAt: () => engineCalls.overlayAt(),
     capture: () => {
       engineCalls.captures++
       return document.createElement('canvas')
