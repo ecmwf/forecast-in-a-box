@@ -27,6 +27,13 @@ import CircleStyle from 'ol/style/Circle'
 import Point from 'ol/geom/Point'
 import { getArea, getLength } from 'ol/sphere'
 import { unByKey } from 'ol/Observable'
+import {
+  CALLOUT_LABEL,
+  LABEL_OFFSET_Y,
+  MEASURE_COLORS,
+  MEASURE_DASH,
+  MEASURE_STROKE_WIDTH,
+} from '../vector-styles'
 import type { RefObject } from 'react'
 import type Feature from 'ol/Feature'
 import type OlMap from 'ol/Map'
@@ -60,15 +67,15 @@ export function formatArea(squareMeters: number): string {
 }
 
 const MEASURE_STYLE = new Style({
-  fill: new Fill({ color: 'rgba(30, 41, 59, 0.12)' }),
+  fill: new Fill({ color: MEASURE_COLORS.fill }),
   stroke: new Stroke({
-    color: 'rgba(15, 23, 42, 0.9)',
-    width: 2,
-    lineDash: [6, 6],
+    color: MEASURE_COLORS.stroke,
+    width: MEASURE_STROKE_WIDTH,
+    lineDash: [...MEASURE_DASH],
   }),
   image: new CircleStyle({
     radius: 4,
-    fill: new Fill({ color: 'rgba(15, 23, 42, 0.9)' }),
+    fill: new Fill({ color: MEASURE_COLORS.stroke }),
   }),
 })
 
@@ -92,12 +99,12 @@ function measureStyleWithLabel(
       geometry: anchor,
       text: new Text({
         text: label,
-        font: '12px system-ui, sans-serif',
-        offsetY: -12,
-        fill: new Fill({ color: 'rgba(15, 23, 42, 0.95)' }),
-        backgroundFill: new Fill({ color: 'rgba(255, 255, 255, 0.92)' }),
-        backgroundStroke: new Stroke({ color: 'rgba(0, 0, 0, 0.15)' }),
-        padding: [3, 5, 2, 5],
+        font: CALLOUT_LABEL.font,
+        offsetY: LABEL_OFFSET_Y,
+        fill: new Fill({ color: CALLOUT_LABEL.color }),
+        backgroundFill: new Fill({ color: CALLOUT_LABEL.background }),
+        backgroundStroke: new Stroke({ color: CALLOUT_LABEL.border }),
+        padding: [...CALLOUT_LABEL.padding],
       }),
     }),
   ]
