@@ -563,6 +563,28 @@ describe('GeoViewer', () => {
       .toHaveAttribute('aria-pressed', 'true')
   })
 
+  it('groups each split button so its chevron cannot take the button clicks', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+    // In a button group the 44 px hit halos grow vertically only.
+    for (const [main, chevron] of [
+      ['Measure area', 'Area shape options'],
+      [/^Annotate/, 'Annotation options'],
+      ['Copy map to clipboard', 'Copy options'],
+      ['Magnifier on', 'Magnifier options'],
+    ] as const) {
+      const group = screen
+        .getByRole('button', { name: chevron })
+        .element()
+        .closest('[data-slot="button-group"]')
+      expect(group, chevron).not.toBeNull()
+      expect(
+        group!.contains(screen.getByRole('button', { name: main }).element()),
+        String(main),
+      ).toBe(true)
+    }
+  })
+
   it('exposes export and overlay-upload entry points', async () => {
     const { portA, portB } = registerDefaultPair()
     const screen = await render(<Harness portA={portA} portB={portB} />)
