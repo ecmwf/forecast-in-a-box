@@ -71,6 +71,12 @@ class TestGeoDomainWrapperWithBbox:
         with pytest.raises(ValueError, match="permutation of 'wsen'"):
             w.with_bbox_ordering("wwww")
 
+    @pytest.mark.parametrize("fmt", ["wsenn", "wse", ""])
+    def test_with_bbox_ordering_wrong_length_raises(self, fmt: str) -> None:
+        w = self._wrap("-10,35,30,60")
+        with pytest.raises(ValueError, match="permutation of 'wsen'"):
+            w.with_bbox_ordering(fmt)
+
 
 class TestGeoDomainWrapperWithRegionNames:
     """GeoDomainWrapper: list[str] (region name list) is passed through unchanged."""

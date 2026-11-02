@@ -72,6 +72,13 @@ def test_traits() -> None:
     assert dump_ast("float{nonNegative, divisibleBy(0.5)}") == expected
 
 
+def test_finite_trait() -> None:
+    assert dump_ast("float{finite}") == {"name": "Float", "traits": [{"name": "Finite"}]}
+    expected = {"name": "Float", "traits": [{"name": "Finite"}, {"name": "NonNegative"}]}
+    assert dump_ast("float{finite, nonNegative}") == expected
+    assert dump_ast("list[float{finite}]") == {"name": "List", "item": {"name": "Float", "traits": [{"name": "Finite"}]}}
+
+
 def test_traits_on_nested_and_generic_types() -> None:
     expected = {
         "name": "List",

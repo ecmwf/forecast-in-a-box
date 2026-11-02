@@ -10,15 +10,18 @@
 """Definitions of all the types"""
 
 import logging
+import math
+import re
 from abc import ABC, abstractmethod
 from datetime import date, datetime, timedelta
+from decimal import Decimal
 from typing import Any, Iterable, Literal, get_args
 
 import fiab_core  # to satisfy the type checker for artifacts annotation
 from fiab_core.metkit import MetkitParamResolver
 from fiab_core.types.dt_util import parse_timedelta
 from fiab_core.types.exceptions import NotNoneInput, NotStringInput, WrongType
-from fiab_core.types.traits import FableTrait
+from fiab_core.types.traits import FableTrait, Finite
 
 logger = logging.getLogger(__name__)
 
@@ -131,7 +134,7 @@ class IntType(FableType):
 
 
 class FloatType(FableType):
-    """The float type. Converts string to float."""
+    """The float type. Converts string to float. NaN and infinity are accepted unless the Finite trait is attached."""
 
     def validate_convert_main(self, value: Any) -> float:
         if not isinstance(value, str):
@@ -236,6 +239,8 @@ def _serialize_enum_item(item: Any, subtype: FableType) -> str:
         return item.replace(microsecond=0).isoformat()
     if isinstance(subtype, StringType):
         return f"'{item}'"
+    if isinstance(subtype, GridType):
+        return GridType.value_to_str(item)
     return str(item)
 
 
@@ -355,9 +360,9 @@ class BoundingBoxWSENType(ListType):
     - west > east is allowed and means the box crosses the antimeridian."""
 
     def __init__(self, traits: _Traits = None) -> None:
-        super().__init__(IntType(), traits=traits)
+        super().__init__(FloatType(traits=Finite()), traits=traits)
 
-    def validate_convert_main(self, value: Any) -> list[int]:
+    def validate_convert_main(self, value: Any) -> list[float]:
         result = super().validate_convert_main(value)
         if len(result) != 4:
             raise WrongType(f"BoundingBoxWSEN must have exactly 4 elements, got {len(result)}")
@@ -403,6 +408,105 @@ class GeoDomainType(UnionType):
 
     def serialize_main(self) -> str:
         return "geodomain"
+
+
+# GRID TYPES
+
+GridValue = str | int | float | list[int | float]
+"""A converted grid: a Gaussian grid name, a single resolution in degrees, or a [west_east, south_north] pair of resolutions."""
+
+
+MIN_GRID_RESOLUTION = 0.01
+"""The finest lat/lon increment in degrees, inclusive."""
+
+MIN_GAUSSIAN_NUMBER = 1
+MAX_GAUSSIAN_NUMBER = 8000
+"""The inclusive range of the number of a Gaussian grid name, such as 320 in 'N320'."""
+
+_GAUSSIAN_NAME = re.compile(r"([NnOo])([0-9]+)")
+
+
+def _is_number(value: object) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _check_resolution(resolution: Any, value: Any) -> None:
+    """Raise unless the resolution in degrees is a finite number of at least the minimum, with value being the whole input."""
+    if not _is_number(resolution) or not math.isfinite(resolution) or resolution <= 0:
+        raise WrongType(f"Resolution {resolution!r} in {value!r} must be a positive finite number of degrees.")
+    if resolution < MIN_GRID_RESOLUTION:
+        raise WrongType(f"Resolution {resolution!r} in {value!r} is finer than the minimum of {MIN_GRID_RESOLUTION} degrees.")
+
+
+class GridType(FableType):
+    """Grid type. A union of a named Gaussian grid ('N320' or 'O96', in any case, with a number from 1 to 8000), a single resolution
+    in degrees, and a pair of resolutions in degrees written 'west_east/south_north', the order used by MARS and MIR. A resolution
+    is at least 0.01 degrees. The string 'auto' converts to None, and a Gaussian grid name converts to its upper case form."""
+
+    def _validate_gaussian_grid(self, value: str, match: re.Match[str]) -> str:
+        digits = match.group(2)
+        number = int(digits)
+        if not MIN_GAUSSIAN_NUMBER <= number <= MAX_GAUSSIAN_NUMBER:
+            raise WrongType(f"Gaussian grid number {number} in {value!r} must be from {MIN_GAUSSIAN_NUMBER} to {MAX_GAUSSIAN_NUMBER}.")
+        if digits != str(number):
+            raise WrongType(f"Gaussian grid number {digits!r} in {value!r} must not have leading zeros.")
+        return f"{match.group(1).upper()}{number}"
+
+    def _validate_string_resolution(self, value: str) -> float | list[float]:
+        parts = value.split("/")
+        if len(parts) > 2:
+            raise WrongType(f"String value {value!r} has more than two resolutions.")
+        try:
+            resolutions = [float(part) for part in parts]
+        except ValueError:
+            raise WrongType(
+                f"String value {value!r} is neither a valid Gaussian grid, a valid resolution, a pair of resolutions, or 'auto'."
+            ) from None
+        for resolution in resolutions:
+            _check_resolution(resolution, value)
+        return resolutions if len(resolutions) == 2 else resolutions[0]
+
+    def _validate_list_resolution(self, value: list) -> list[int | float]:
+        if len(value) != 2:
+            raise WrongType(f"List value {value!r} must hold two resolutions.")
+        for resolution in value:
+            _check_resolution(resolution, value)
+        return value
+
+    def validate_convert_main(self, value: Any) -> GridValue | None:
+        if isinstance(value, str):
+            if value == "auto":
+                return None
+            if match := _GAUSSIAN_NAME.fullmatch(value):
+                return self._validate_gaussian_grid(value, match)
+            return self._validate_string_resolution(value)
+
+        if isinstance(value, list):
+            return self._validate_list_resolution(value)
+
+        if isinstance(value, (int, float)):
+            _check_resolution(value, value)
+            return value
+
+        raise WrongType(f"Value {value!r} is not a valid grid type")
+
+    @staticmethod
+    def value_to_str(value: GridValue | None) -> str:
+        """Return the canonical string of a converted grid, which converts back to the same grid.
+
+        None is 'auto', a Gaussian grid name is as converted, a resolution is its shortest decimal without a trailing '.0' (for
+        example '0.25' or '1'), and a pair is the two such strings joined by a slash in west-east, south-north order.
+        """
+        if value is None:
+            return "auto"
+        if isinstance(value, str):
+            return value
+        if isinstance(value, list):
+            return "/".join(GridType.value_to_str(resolution) for resolution in value)
+        return format(Decimal(repr(float(value))).normalize(), "f")
+
+    def serialize_main(self) -> str:
+        return "grid"
 
 
 class ArtifactType(FableType):

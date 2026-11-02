@@ -9,6 +9,7 @@
 
 """Unit tests for FableTrait and its subclasses, and their integration with FableType."""
 
+import math
 from datetime import timedelta
 
 import pytest
@@ -16,7 +17,7 @@ import pytest
 from fiab_core.types.definitions import FloatType, IntType, TimeDeltaType, UnionType
 from fiab_core.types.exceptions import NotFableType, WrongType
 from fiab_core.types.parser import parse
-from fiab_core.types.traits import DivisibleBy, NonNegative, Positive
+from fiab_core.types.traits import DivisibleBy, Finite, NonNegative, Positive
 
 
 class TestPositive:
@@ -55,6 +56,29 @@ class TestNonNegative:
 
     def test_serialize(self) -> None:
         assert NonNegative().serialize() == "nonNegative"
+
+
+class TestFinite:
+    """Tests for the Finite trait"""
+
+    def test_validate_numbers(self) -> None:
+        t = Finite()
+        assert t.validate(1).e is None
+        assert t.validate(0).e is None
+        assert t.validate(-1.5).e is None
+        assert t.validate(10**400).e is None
+
+    @pytest.mark.parametrize("value", [math.nan, math.inf, -math.inf])
+    def test_validate_rejects_non_finite(self, value: float) -> None:
+        assert Finite().validate(value).e is not None
+
+    def test_validate_non_numbers_fail_gracefully(self) -> None:
+        t = Finite()
+        assert t.validate("1.0").e is not None
+        assert t.validate(timedelta(days=1)).e is not None
+
+    def test_serialize(self) -> None:
+        assert Finite().serialize() == "finite"
 
 
 class TestDivisibleBy:
@@ -138,6 +162,31 @@ class TestTraitsOnFableType:
         assert t.validate_convert("0") == 0.0
         with pytest.raises(WrongType):
             t.validate_convert("-0.5")
+
+    def test_float_with_finite(self) -> None:
+        t = parse("float{finite}")
+        assert isinstance(t, FloatType)
+        assert t.serialize() == "float{finite}"
+        assert t.validate_convert("1.5") == 1.5
+        for bad in ("nan", "inf", "-inf"):
+            with pytest.raises(WrongType, match="is not finite"):
+                t.validate_convert(bad)
+
+    def test_float_with_finite_and_non_negative(self) -> None:
+        t = parse("float{finite, nonNegative}")
+        assert t.serialize() == "float{finite,nonNegative}"
+        assert t.validate_convert("0") == 0.0
+        with pytest.raises(WrongType):
+            t.validate_convert("-inf")
+        with pytest.raises(WrongType):
+            t.validate_convert("-1")
+
+    def test_list_of_finite_floats(self) -> None:
+        t = parse("list[float{finite}]")
+        assert t.serialize() == "list[float{finite}]"
+        assert t.validate_convert("1,2.5") == [1.0, 2.5]
+        with pytest.raises(WrongType):
+            t.validate_convert("1,nan")
 
     def test_int_with_multiple_traits(self) -> None:
         t = parse("int{positive, divisibleBy(3)}")

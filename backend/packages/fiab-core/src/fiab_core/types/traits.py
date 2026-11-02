@@ -14,6 +14,7 @@ of operators like ``>`` or ``%``) rather than special-casing the handful of base
 expected to be used with (Int, Float, TimeDelta).
 """
 
+import math
 from abc import ABC, abstractmethod
 from datetime import timedelta
 from typing import Any
@@ -76,6 +77,28 @@ class NonNegative(FableTrait):
         if value >= _zero_like(value):
             return Either.ok(None)
         return Either.error(f"{value!r} is not non-negative")
+
+
+class Finite(FableTrait):
+    """Requires the value to be a finite number, ie not NaN and not positive or negative infinity.
+
+    Values which are not numbers are reported as failing the trait.
+    """
+
+    def serialize_main(self) -> str:
+        return "finite"
+
+    def validate(self, value: Any) -> Either[None, str]:  # ty:ignore[invalid-type-arguments] # semigroup
+        try:
+            finite = math.isfinite(value)
+        except OverflowError:
+            # an int too large to be a float is still a finite number
+            finite = True
+        except TypeError:
+            return Either.error(f"{value!r} cannot be checked against finite")
+        if finite:
+            return Either.ok(None)
+        return Either.error(f"{value!r} is not finite")
 
 
 class DivisibleBy(FableTrait):

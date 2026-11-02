@@ -31,6 +31,7 @@ from fiab_core.types.definitions import (
     FloatType,
     GeoDomainSingleType,
     GeoDomainType,
+    GridType,
     IntType,
     ListType,
     NoneType,
@@ -41,7 +42,7 @@ from fiab_core.types.definitions import (
     UnionType,
 )
 from fiab_core.types.exceptions import NotFableType
-from fiab_core.types.traits import DivisibleBy, FableTrait, NonNegative, Positive
+from fiab_core.types.traits import DivisibleBy, FableTrait, Finite, NonNegative, Positive
 
 GRAMMAR = files("fiab_core.types").joinpath("fable_types.lark").read_text(encoding="utf-8")
 """The lark grammar of Fable type expressions, read from the package resources."""
@@ -107,6 +108,9 @@ class FableTypeTransformer(lark.Transformer[lark.Token, FableType]):
     def bounding_box_wsen_type(self, _: list[Any]) -> FableType:
         return BoundingBoxWSENType()
 
+    def grid_type(self, _: list[Any]) -> FableType:
+        return GridType()
+
     def enum_items(self, children: list[lark.Token]) -> list[str]:
         return [_enum_item_value(token) for token in children]
 
@@ -135,6 +139,9 @@ class FableTypeTransformer(lark.Transformer[lark.Token, FableType]):
 
     def non_negative(self, _: list[Any]) -> FableTrait:
         return NonNegative()
+
+    def finite(self, _: list[Any]) -> FableTrait:
+        return Finite()
 
     def divisible_by(self, children: list[lark.Token]) -> FableTrait:
         return DivisibleBy(children[0].value)
@@ -195,6 +202,9 @@ class AstDumpTransformer(lark.Transformer[lark.Token, AstNode]):
     def bounding_box_wsen_type(self, _: list[Any]) -> AstNode:
         return {"name": "BoundingBoxWSEN"}
 
+    def grid_type(self, _: list[Any]) -> AstNode:
+        return {"name": "Grid"}
+
     def enum_items(self, children: list[lark.Token]) -> list[str]:
         return [_enum_item_value(token) for token in children]
 
@@ -223,6 +233,9 @@ class AstDumpTransformer(lark.Transformer[lark.Token, AstNode]):
 
     def non_negative(self, _: list[Any]) -> AstNode:
         return {"name": "NonNegative"}
+
+    def finite(self, _: list[Any]) -> AstNode:
+        return {"name": "Finite"}
 
     def divisible_by(self, children: list[lark.Token]) -> AstNode:
         return {"name": "DivisibleBy", "arg": children[0].value}
