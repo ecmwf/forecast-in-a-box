@@ -1292,16 +1292,16 @@ wheels = [
 
 [[package]]
 name = "earthkit-workflows-anemoi"
-version = "0.9.0"
+version = "0.10.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anemoi-utils" },
     { name = "earthkit-workflows" },
     { name = "qubed" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ed/7c/6eb941a8ff41a7d14c3a9b0faa81f5fd04c4f76a2c3ac6187572c888ec43/earthkit_workflows_anemoi-0.9.0.tar.gz", hash = "sha256:6376c719f00a2e4c963973450261025fd892063c4f2e00ef883aa9ab445cefad", size = 53065, upload-time = "2026-10-22T09:38:57.474Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/0c/31/db3776c6b22963cb55ac0c0ee6052369c46c95ef871b70233213ef326969/earthkit_workflows_anemoi-0.10.0.tar.gz", hash = "sha256:efd733e52a9bc913b26070dfed4d1f40b90e89af636b3d75a72727eb8c9632a4", size = 72191, upload-time = "2026-11-02T15:15:21.71Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/4e/05/595449027b2276547b1a9fd3683fd10860beef601bb78757ccfd7a2a5071/earthkit_workflows_anemoi-0.9.0-py3-none-any.whl", hash = "sha256:eeb77f76043583b2504bda3d15f88b87a7d6f8f400eeabf7aa1780402692f452", size = 24446, upload-time = "2026-10-22T09:38:56.451Z" },
+    { url = "https://files.pythonhosted.org/packages/8b/ef/2b23991de27d14a5ed922b8cb9a11fc8bc9b24d797bfefebcd89ca78d79e/earthkit_workflows_anemoi-0.10.0-py3-none-any.whl", hash = "sha256:4119ffd78544014c37eed8ed2ee0b241c34ce0d7ce40caea77e6a9c2e3aa227e", size = 28530, upload-time = "2026-11-02T15:15:20.71Z" },
 ]
 
 [package.optional-dependencies]
@@ -1676,7 +1676,7 @@ requires-dist = [
     { name = "earthkit-data", marker = "extra == 'runtime'", specifier = ">=0.18.2,<1" },
     { name = "earthkit-plots", marker = "extra == 'runtime'", specifier = ">=0.3.5,<1.0" },
     { name = "earthkit-workflows", specifier = ">=0.18.0" },
-    { name = "earthkit-workflows-anemoi", specifier = ">=0.9.0" },
+    { name = "earthkit-workflows-anemoi", specifier = ">=0.10.0" },
     { name = "earthkit-workflows-anemoi", extras = ["runtime-inference"], marker = "extra == 'runtime'" },
     { name = "fiab-core", editable = "packages/fiab-core" },
     { name = "mir-python", marker = "extra == 'runtime'" },
