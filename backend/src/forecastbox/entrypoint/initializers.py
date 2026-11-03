@@ -32,6 +32,7 @@ import forecastbox.schemata
 from forecastbox.domain.artifact.base import get_artifact_local_path
 from forecastbox.domain.artifact.manager import ArtifactManager, submit_refresh_catalog
 from forecastbox.domain.experiment.scheduling.background import start_scheduler, stop_scheduler
+from forecastbox.domain.experiment.triggers.listener import AvisoListener
 from forecastbox.domain.gateway.service import ensure_gateway, launch_gateway, shutdown_processes
 from forecastbox.domain.lens.manager import shutdown_all_lens_instances
 from forecastbox.domain.notification.service import init_broadcaster
@@ -103,6 +104,23 @@ def _discover_dispatchers() -> None:
     freeze_registration()
 
 
+def _register_aviso_listener() -> None:
+    """Register the Aviso listener thread when enabled.  The readiness barriers are module level
+    futures which exist before the execution runtime starts, so they are passed in directly.
+    The listener is placed in stage 1, so it starts after and stops before the stage 0 pools."""
+    if not config.aviso.enabled:
+        return
+    logger.debug("registering aviso listener thread")
+    listener = AvisoListener(config.aviso, prerequisites=(PluginsCatalogInitialized, GatewayInitialized))
+    execution_manager.register_thread(
+        ConcurrentThreads.AvisoListener,
+        listener.entrypoint,
+        status_provider=listener.component_status,
+        stop_request=listener.request_stop,
+        stage=1,
+    )
+
+
 def _start_execution_runtime() -> None:
     try:
         _discover_dispatchers()
@@ -122,6 +140,7 @@ def _start_execution_runtime() -> None:
             stop_request=dispatcher_stop_request,
             stage=0,
         )
+        _register_aviso_listener()
         execution_manager.start(timeout=config.backend.concurrency.startup_timeout_seconds)
     except BaseException:
         # NOTE partial registration may have happened above -- make sure it's cleaned up, since

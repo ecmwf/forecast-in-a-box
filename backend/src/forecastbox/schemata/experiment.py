@@ -7,19 +7,19 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""ORM models for the experiment domain, including its scheduling subdomain.
+"""ORM models for the experiment domain, including its scheduling and triggers subdomains.
 
-Covers both ``ExperimentDefinition`` (owned by ``domain.experiment``) and
-``ExperimentNext`` (owned by ``domain.experiment.scheduling``) -- the scheduling
-subdomain does not get its own schemata module, its table is declared here alongside
-its parent domain's. Shares the jobs database with the other schemata modules in this
+Covers ``ExperimentDefinition`` (owned by ``domain.experiment``), ``ExperimentNext``
+(owned by ``domain.experiment.scheduling``) and ``ExperimentTriggerEvent`` (owned by
+``domain.experiment.triggers``) -- the subdomains do not get their own schemata modules,
+their tables are declared here alongside their parent domain's. Shares the jobs database with the other schemata modules in this
 package -- see ``forecastbox.schemata.jobs`` for the engine/session setup and ``Base``
 declaration.
 """
 
 from typing import Literal
 
-from sqlalchemy import JSON, Boolean, Column, ForeignKeyConstraint, Integer, String
+from sqlalchemy import JSON, BigInteger, Boolean, Column, ForeignKeyConstraint, Integer, String, UniqueConstraint
 
 from forecastbox.schemata.jobs import Base
 from forecastbox.utility.time import UTCDateTime
@@ -76,3 +76,28 @@ class ExperimentNext(Base):
     experiment_id = Column(String(255), nullable=False, unique=True)
     scheduled_at = Column(UTCDateTime, nullable=False)
     updated_at = Column(UTCDateTime, nullable=False)
+
+
+class ExperimentTriggerEvent(Base):
+    """Mutable record of an external event handled by an external_trigger experiment.
+
+    The unique key (experiment_id, source, event_type, sequence) identifies an event;
+    its presence means the event has been handled. `source` is one of: aviso | synthetic.
+    `status` is one of: claimed | submitted | failed | skipped_stale.
+    """
+
+    __tablename__ = "experiment_trigger_event"
+
+    event_row_id = Column(Integer, primary_key=True, autoincrement=True)
+    experiment_id = Column(String(255), nullable=False, index=True)
+    source = Column(String(32), nullable=False)
+    event_type = Column(String(255), nullable=False)
+    sequence = Column(BigInteger, nullable=False)
+    status = Column(String(32), nullable=False)
+    run_id = Column(String(255), nullable=True)
+    message = Column(String(1024), nullable=True)
+    published_at = Column(UTCDateTime, nullable=False)
+    created_at = Column(UTCDateTime, nullable=False)
+    updated_at = Column(UTCDateTime, nullable=False)
+
+    __table_args__ = (UniqueConstraint("experiment_id", "source", "event_type", "sequence", name="uq_experiment_trigger_event_key"),)

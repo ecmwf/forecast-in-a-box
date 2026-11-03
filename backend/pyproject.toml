@@ -55,6 +55,10 @@ dependencies = [
   "websockets",
 ]
 
+optional-dependencies.aviso = [
+  "pyaviso>=2.4,<3", # NOTE 2.x is ecmwf/aviso-client; 1.x is an unrelated deprecated project of the same name
+]
+
 urls."Source code" = "https://github.com/ecmwf/forecast-in-a-box"
 
 [dependency-groups]

@@ -50,6 +50,7 @@ class ConcurrentThreads(StrEnum):
     EventDispatcher = "event-dispatcher"
     Scheduler = "scheduler"
     DatabaseGarbageCollector = "database-garbage-collector"
+    AvisoListener = "aviso-listener"
 
 
 class PoolSettings(FiabBaseModel):
@@ -403,6 +404,15 @@ class CascadeSettings(FiabBaseModel):
             assert_never(self.gateway)
 
 
+class AvisoSettings(FiabBaseModel):
+    enabled: bool = False
+    """Whether the Aviso listener thread is started. Requires the optional `aviso` extra (pyaviso)."""
+    base_url: str | None = None
+    """Aviso server base url. If None, pyaviso resolves it from AVISO_BASE_URL or its own config file."""
+    reconnect_backoff_seconds: int = Field(default=30, gt=0)
+    """Delay between attempts to re-establish a failed Aviso listen connection."""
+
+
 class FIABConfig(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_nested_delimiter="__", env_prefix="fiab__", case_sensitive=True)
 
@@ -414,6 +424,7 @@ class FIABConfig(BaseSettings):
     external: ExternalServicesSettings = Field(default_factory=ExternalServicesSettings)
     backend: BackendSettings = Field(default_factory=BackendSettings)
     cascade: CascadeSettings = Field(default_factory=CascadeSettings)
+    aviso: AvisoSettings = Field(default_factory=AvisoSettings)
 
     @classmethod
     def settings_customise_sources(
