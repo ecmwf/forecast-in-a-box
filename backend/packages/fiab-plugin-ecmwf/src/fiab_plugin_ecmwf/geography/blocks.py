@@ -43,7 +43,7 @@ from ..constants import (
     DOMAIN,
     GRID,
 )
-from ..qubed_utils import collapse, coxpand, dimensions, expand
+from ..qubed_utils import collapse, dimensions, expand
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +130,9 @@ class GeographicalTransform(Transform):
             output = expand(output, {GRID: [grid_axis_value(grid)]})
 
         domain = block.config_as_geodomain(DOMAIN).with_bbox_mars().value
-        return coxpand(output, DOMAIN, {DOMAIN: [domain_axis_value(domain)]})
+        if DOMAIN in dimensions(output):
+            output = collapse(output, DOMAIN)
+        return expand(output, {DOMAIN: [domain_axis_value(domain)]})
 
     def compile(
         self,

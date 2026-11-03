@@ -427,10 +427,15 @@ class TestGeographicalTransformValidate:
         with pytest.raises(BlockInstanceConfigurationError, match="Unsupported input type"):
             GeographicalTransform().validate(block=_block(None, "auto"), inputs={}, restrictions={})  # type: ignore[arg-type]
 
-    def test_validate_requires_domain_axis_in_input(self) -> None:
+    @pytest.mark.parametrize("grid", [None, "O96"])
+    def test_validate_adds_domain_axis_when_missing_from_input(self, grid: str | None) -> None:
         no_domain = QubedOutput(dataqube=Qube.from_datacube({"param": ["167"], "step": [0, 6]}))
-        with pytest.raises(ValueError, match="'domain' not in dataqube dimensions"):
-            GeographicalTransform().validate(block=_block(None, "global"), inputs={"dataset": no_domain}, restrictions={})  # type: ignore[arg-type]
+        output = GeographicalTransform().validate(block=_block(grid, "Germany"), inputs={"dataset": no_domain}, restrictions={})  # type: ignore[arg-type]
+        assert isinstance(output, QubedOutput)
+        output_axes = axes(output)
+        assert output_axes["domain"] == {"Germany"}
+        assert output_axes["param"] == {"167"}
+        assert output_axes["step"] == {0, 6}
 
     def test_validate_through_plugin(self, sample_forecast_source_output: QubedOutput) -> None:
         validation = plugin().validator(
