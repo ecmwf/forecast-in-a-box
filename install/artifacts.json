@@ -3261,7 +3261,7 @@
         "tags": {
           "status": "demo"
         },
-        "disk_size_bytes": 1016336351,
+        "disk_size_bytes": 1016145113,
         "supported_platforms": [
           "linux",
           "macos"
