@@ -35,8 +35,6 @@ from forecastbox.domain.experiment.exceptions import SchedulerDisabled, Schedule
 from forecastbox.domain.experiment.scheduling.background import (
     max_sleep_seconds,
     schedule_due_experiments,
-    scheduler_lock,
-    timeout_acquire_background,
 )
 from forecastbox.utility.concurrency.manager import LifecycleError, StatusModel, execution_manager
 from forecastbox.utility.concurrency.synchronization import timed_acquire
@@ -46,6 +44,13 @@ from forecastbox.utility.time import current_time
 logger = logging.getLogger(__name__)
 
 SCHEDULER_STOP_TIMEOUT_SECONDS = 10.0
+
+# NOTE this lock can be locked externally, eg when updating schedules. For all operations
+# potentially involving the ScheduleNext table etc, as well as scheduler instance itself
+# to guarantee the singleton nature
+scheduler_lock = threading.Lock()
+timeout_acquire_request = 3  # aggressive timeout, we dont want to block async worker for long
+timeout_acquire_background = 5  # the loop retries; bounds how long a stop request can go unnoticed
 
 
 class SchedulerState(StrEnum):
@@ -82,8 +87,12 @@ def arm_start_gate(gate: Future[None]) -> None:
 def _wait_for_gate(gate: Future[None], stop_event: threading.Event) -> bool:
     """Return True if the gate opened successfully, False if the scheduler should not run."""
     _publish(state=SchedulerState.waiting_for_prerequisites)
+    # NOTE the gate completion and the stop request both set `wake`; a prod is a harmless spurious wakeup
+    gate.add_done_callback(lambda _: SchedulerRuntime.wake.set())
     while not gate.done():
-        if stop_event.wait(1.0):
+        SchedulerRuntime.wake.wait()
+        SchedulerRuntime.wake.clear()
+        if stop_event.is_set():  # stop_event is set before wake, so a stop wake erased by the clear is not lost
             return False
     if gate.cancelled() or gate.exception() is not None:
         error = "cancelled" if gate.cancelled() else repr(gate.exception())
@@ -101,6 +110,8 @@ def scheduler_entrypoint(stop_event: threading.Event) -> None:
             return
         while not stop_event.is_set():
             SchedulerRuntime.wake.clear()
+            if stop_event.is_set():  # stop_event is set before wake, so a stop wake erased by the clear is not lost
+                break
             now = current_time("liveness")
             _publish(state=SchedulerState.scheduling, last_iteration_at=now)
             with timed_acquire(scheduler_lock, timeout_acquire_background) as acquired:
@@ -117,7 +128,11 @@ def scheduler_entrypoint(stop_event: threading.Event) -> None:
         logger.info("Scheduler thread stopped.")
 
 
-def scheduler_stop_request(timeout: float) -> None:
+def scheduler_stop_request(_timeout: float) -> None:
+    # NOTE the timeout is not used for waiting: the thread is woken and joined by the manager. It can still
+    # take up to `timeout_acquire_background` to notice the stop while blocked on the lock, so warn if the budget is smaller.
+    if _timeout < timeout_acquire_background:
+        logger.warning(f"scheduler stop budget {_timeout}s is below the lock acquisition timeout {timeout_acquire_background}s")
     SchedulerRuntime.wake.set()
 
 
@@ -149,8 +164,11 @@ def restart_scheduler() -> None:
     """Stop and restart the managed scheduler thread. Blocks while joining, run on a pool worker."""
     if not config.backend.allow_scheduler:
         raise SchedulerDisabled("scheduler is disabled in the configuration")
-    execution_manager.stop_thread(ConcurrentThreads.Scheduler, timeout=SCHEDULER_STOP_TIMEOUT_SECONDS)
     try:
+        stopped = execution_manager.stop_thread(ConcurrentThreads.Scheduler, timeout=SCHEDULER_STOP_TIMEOUT_SECONDS)
+        if stopped.alive:
+            # NOTE a thread that fails to stop is left running as is -- never start a second one
+            raise SchedulerRestartRefused("scheduler thread did not stop within the timeout, not restarting")
         execution_manager.restart_thread(ConcurrentThreads.Scheduler, reset_restart_count=True)
     except LifecycleError as error:
         raise SchedulerRestartRefused(str(error)) from error

@@ -24,13 +24,6 @@ from forecastbox.utility.time import current_time, get_sleepable_difference
 
 logger = logging.getLogger(__name__)
 
-# NOTE this lock can be locked externally, eg when updating schedules. For all operations
-# potentially involving the ScheduleNext table etc, as well as scheduler instance itself
-# to guarantee the singleton nature
-scheduler_lock = threading.Lock()
-timeout_acquire_request = 3  # aggressive timeout, we dont want to block async worker for long
-timeout_acquire_background = 5  # the loop retries; bounds how long a stop request can go unnoticed
-
 # NOTE this does not really affect how often scheduler checks for new jobs --
 # if anything is scheduled for earlier, we sleep for shorter time in advance,
 # or are `prod`ed explicitly. The actual importance of this interval is to

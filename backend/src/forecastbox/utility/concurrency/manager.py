@@ -529,7 +529,8 @@ class ExecutionManager:
                 raise LifecycleError(f"restart policy exhausted: {thread_name}")
             else:
                 record.restart_count += 1
-        self._start_thread(record)
+            # NOTE started under the lock, so that concurrent restarts cannot both pass the liveness check
+            self._start_thread(record)
         return self._thread_snapshot(record)
 
     def _can_submit(self, pool: ManagedPool) -> None:

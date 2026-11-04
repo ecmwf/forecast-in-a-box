@@ -3,6 +3,7 @@ import threading
 import time
 from collections.abc import Callable, Iterator
 from concurrent.futures import Future
+from types import SimpleNamespace
 
 import pytest
 
@@ -177,7 +178,10 @@ def test_restart_scheduler(monkeypatch: pytest.MonkeyPatch) -> None:
     def refuse(*args: object, **kwargs: object) -> None:
         raise LifecycleError("nope")
 
-    monkeypatch.setattr(rt.execution_manager, "stop_thread", lambda *a, **k: None)
+    monkeypatch.setattr(rt.execution_manager, "stop_thread", lambda *a, **k: SimpleNamespace(alive=False))
     monkeypatch.setattr(rt.execution_manager, "restart_thread", refuse)
+    with pytest.raises(SchedulerRestartRefused):
+        rt.restart_scheduler()
+    monkeypatch.setattr(rt.execution_manager, "stop_thread", lambda *a, **k: SimpleNamespace(alive=True))
     with pytest.raises(SchedulerRestartRefused):
         rt.restart_scheduler()
