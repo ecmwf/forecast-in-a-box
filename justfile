@@ -129,5 +129,7 @@ dev *args:
         cp ../docs/developer/guidelines/example_dev_config.toml "${FIAB_ROOT}"/config.toml
     fi
 
+    export EARTHKIT_DATA_CACHE_POLICY=${EARTHKIT_DATA_CACHE_POLICY:-"user"}
+    export EARTHKIT_DATA_MAXIMUM_CACHE_SIZE=${EARTHKIT_DATA_MAXIMUM_CACHE_SIZE:-"50G"}
     uv run --no-sync python -m forecastbox.entrypoint.main
     popd
