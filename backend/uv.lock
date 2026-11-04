@@ -1888,6 +1888,11 @@ dependencies = [
     { name = "websockets" },
 ]
 
+[package.optional-dependencies]
+aviso = [
+    { name = "pyaviso" },
+]
+
 [package.dev-dependencies]
 dev = [
     { name = "prek" },
@@ -1918,6 +1923,7 @@ requires-dist = [
     { name = "magics" },
     { name = "orjson" },
     { name = "psutil" },
+    { name = "pyaviso", marker = "extra == 'aviso'", specifier = ">=2.4,<3" },
     { name = "pydantic-settings" },
     { name = "pymetkit", specifier = ">=1.21.0.29" },
     { name = "pyrsistent" },
@@ -1930,6 +1936,7 @@ requires-dist = [
     { name = "uvicorn" },
     { name = "websockets" },
 ]
+provides-extras = ["aviso"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -3432,6 +3439,17 @@ argon2 = [
 ]
 bcrypt = [
     { name = "bcrypt" },
+]
+
+[[package]]
+name = "pyaviso"
+version = "2.4.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b8/3a/e9728b783c55fa3c5c0f18744033c17d37fc42dfd87ba4be468c1828a555/pyaviso-2.4.3.tar.gz", hash = "sha256:4279789ec44825bf05406eff137453aec0b0279225972b3620e062ff9da22cf3", size = 478545, upload-time = "2026-11-03T13:42:25.525Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/dd/31/4eade77c0cafc95e2e13e225d0352ac4da2d4a439e48a5c6b8f1ac49707f/pyaviso-2.4.3-cp310-abi3-macosx_10_12_universal2.macosx_10_12_x86_64.macosx_11_0_arm64.whl", hash = "sha256:f4f9ee1a7498adc7b298592ad426a214b3677c2fcadc7ae7ee30b6088515796b", size = 11069451, upload-time = "2026-11-03T13:42:20.22Z" },
+    { url = "https://files.pythonhosted.org/packages/d6/32/5288a8f131d6961b9046b0f9e2d7f41b31d9f7d33f801da52f06908a0d56/pyaviso-2.4.3-cp310-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:61e829c176064f94ba01e27b2c1d0514dd1931d76a3512ed76c0408db071df63", size = 5928806, upload-time = "2026-11-03T13:42:22.529Z" },
+    { url = "https://files.pythonhosted.org/packages/15/60/d5a38219b5d4b7d14b99436fad6a2734560c5835362aec859153d3a5e256/pyaviso-2.4.3-cp310-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:cae8c338607f944e991eae77a3752fa7af9418dc243d5a78bca2cc8c9447fed3", size = 5977566, upload-time = "2026-11-03T13:42:24.162Z" },
 ]
 
 [[package]]
