@@ -25,6 +25,7 @@ import types
 import webbrowser
 from multiprocessing import Process, get_context
 
+import earthkit.data as ekd
 import httpx
 from fiab_core.fable import PluginCompositeId
 
@@ -42,7 +43,9 @@ logger = logging.getLogger(__name__ if __name__ != "__main__" else __package__)
 def launch_all(config: FIABConfig, attempts: int = 20) -> ChildProcessGroup:
     setup_process()
     logger.info("main process starting")
-    logger.debug(f"loaded config {config.model_dump()}")
+    logger.debug(f"loaded fiab config {config.model_dump()}")
+    ekd_config = repr(ekd.config).replace("\n", ", ")
+    logger.debug(f"loedad earthkit config {ekd_config}")
 
     if not config.backend.allow_service:
         previous_cleanup()
