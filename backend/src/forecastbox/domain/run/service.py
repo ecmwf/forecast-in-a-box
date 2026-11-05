@@ -470,7 +470,6 @@ def _poll_and_update_once(execution: RunRecord, detailed_report: bool) -> RunDet
         )
         if jobprogress is None:
             if status == "stopping":
-                # TODO -- uncertain, have cascade properly report stopped jobs
                 write_status("stopped", **outputs_kwargs)
                 available_task_ids = cached_available()
                 pop_memcache(run_id)
@@ -480,11 +479,15 @@ def _poll_and_update_once(execution: RunRecord, detailed_report: bool) -> RunDet
             pop_memcache(run_id)
             return _build(status_override="failed", error_override="evicted from gateway")
         elif jobprogress.failure:
-            # NOTE for a stopping run this means the stop did not come first, or the gateway reports stops as failures
-            write_status("failed", error=jobprogress.failure, **outputs_kwargs)
+            # NOTE the api for stop communication from gw is overall a bit odd, as is it leaves error set on the entity despite its not a genuine error -- improve when you rework this whole thing
+            if status == "stopping" and jobprogress.failure.startswith("terminated by gateway"):
+                final_status = "stopped"
+            else:
+                final_status = "failed"
+            write_status(final_status, error=jobprogress.failure, **outputs_kwargs)
             available_task_ids = cached_available()
             pop_memcache(run_id)
-            return _build(status_override="failed", error_override=jobprogress.failure)
+            return _build(status_override=final_status, error_override=jobprogress.failure)
         elif jobprogress.completed or jobprogress.pct == "100.00":
             write_status("completed", progress="100.00", **outputs_kwargs)
             return _build(status_override="completed", progress_override="100.00")
