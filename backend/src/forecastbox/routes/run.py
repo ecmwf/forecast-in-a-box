@@ -557,6 +557,7 @@ async def get_run_logs(
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> Response:
     """Return a zip archive of logs for the given execution attempt."""
+    logger.info("will fetch logs for {spec=}")  # NOTE we log this at info to include this line in the output even if debug=off
     run_record = await _resolve_run_record(spec, auth_context)
     if run_record.cascade_job_id is None:
         raise HTTPException(status_code=409, detail=f"Run {spec.run_id!r} has not been submitted to cascade yet.")

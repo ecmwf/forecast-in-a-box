@@ -20,7 +20,6 @@ time.
 """
 
 # TODO currently no authentication here. Add auth and propagate into the manager itself
-# TODO currently no log propagation -- consider routing stdout of skinnywms to files, and allow retrieval here via a new route
 
 import json
 import logging
