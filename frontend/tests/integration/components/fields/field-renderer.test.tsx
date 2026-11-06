@@ -105,6 +105,21 @@ describe('FieldRenderer Integration', () => {
         .element(screen.getByText('A helpful description'))
         .toBeVisible()
     })
+
+    it('renders "- " description lines as a bullet list', async () => {
+      const screen = await renderWithProviders(
+        <ControlledFieldRenderer
+          valueType="str"
+          description={'Pick one.\n- first: a\n- second: b\nAfter.'}
+        />,
+      )
+      await expect.element(screen.getByText('Pick one.')).toBeVisible()
+      const items = screen.getByRole('listitem')
+      await expect.element(items.nth(0)).toHaveTextContent('first: a')
+      await expect.element(items.nth(1)).toHaveTextContent('second: b')
+      expect(items.all()).toHaveLength(2)
+      await expect.element(screen.getByText('After.')).toBeVisible()
+    })
   })
 
   describe('Number field', () => {

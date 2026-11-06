@@ -71,10 +71,36 @@ export function FieldRenderer({
           {label}
         </Label>
       )}
-      {description && (
-        <p className="text-sm text-muted-foreground">{description}</p>
-      )}
+      {description && <FieldDescription text={description} />}
       {inputElement}
+    </div>
+  )
+}
+
+/** Plain text; consecutive `- ` lines render as a bullet list. */
+function FieldDescription({ text }: { text: string }) {
+  const blocks: Array<string | Array<string>> = []
+  for (const line of text.split('\n')) {
+    const item = /^\s*- (.*)$/.exec(line)?.[1]
+    const last = blocks.at(-1)
+    if (item === undefined) {
+      if (line.trim()) blocks.push(line)
+    } else if (Array.isArray(last)) last.push(item)
+    else blocks.push([item])
+  }
+  return (
+    <div className="space-y-0.5 text-sm text-muted-foreground">
+      {blocks.map((block, i) =>
+        Array.isArray(block) ? (
+          <ul key={i} className="list-disc space-y-0.5 pl-4">
+            {block.map((item, j) => (
+              <li key={j}>{item}</li>
+            ))}
+          </ul>
+        ) : (
+          <p key={i}>{block}</p>
+        ),
+      )}
     </div>
   )
 }
