@@ -68,7 +68,7 @@ jobs:
     strategy:
       matrix:
         registry: ["ghcr", "eccr"]
-    runs-on: [self-hosted, macOS]
+    runs-on: [Linux, platform-builder-docker-xl] # NOTE the step is tiny but still a docker binary must be present
     steps:
       - name: Log in to a Container Registry
         if: ${{ github.event_name == 'release' || inputs.push }}
