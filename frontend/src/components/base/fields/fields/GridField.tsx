@@ -230,8 +230,9 @@ function GridRow({ item }: { item: string }) {
         <span
           className={cn(
             'ml-auto pl-2 text-xs whitespace-nowrap tabular-nums',
+            // `!` beats the highlighted item's descendant recolour.
             points.count > LARGE_GRID_POINTS
-              ? 'text-warning'
+              ? 'text-warning!'
               : 'text-muted-foreground',
           )}
         >
