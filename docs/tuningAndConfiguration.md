@@ -25,7 +25,7 @@ launch_browser = false
 | Section | Controls | Notes |
 |---|---|---|
 | `backend` | The HTTP server, scheduler, concurrency and browser launch. | `uvicorn_host` defaults to `0.0.0.0`, so the server listens on all interfaces. `uvicorn_port` defaults to `8000`. `launch_browser` defaults to `true`. |
-| `auth` | Authentication: the JWT secret, OIDC login, public URL and domain allowlist. | The default `jwt_secret` is a placeholder. Set your own for any shared installation. |
+| `auth` | Authentication: passthrough mode, the JWT secret, OIDC login, public URL and domain allowlist. | `passthrough` defaults to `true`, which bypasses authentication and grants unauthenticated requests an admin context. For any shared installation, set `passthrough = false` and replace the placeholder `jwt_secret` with your own secret. |
 | `db` | Paths of the users and jobs SQLite databases. | Both default to files in the FIAB root. |
 | `external` | Default plugins, plugin stores, artifact stores and the model repository. | Stores and default plugin ids are described in [Plugins (Operator)](operator/plugins.md). |
 | `cascade` | The gateway that runs jobs, and its host and worker limits. | Defaults run everything on the local machine. |
