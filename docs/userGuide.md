@@ -79,7 +79,7 @@ Pre-requisites:
    method = "localSingle"
    ```
 
-   Then install the plugin from the Plugins screen. Plugin adevelopment is covered in [Plugins (Developer)](developer/guidelines/plugins.md).
+   Stop the backend and run `just dev` again after saving `config.toml`, then install the plugin from the Plugins screen. Plugin development is covered in [Plugins (Developer)](developer/guidelines/plugins.md).
 
 4. Before committing, run the checks described in [Backend Development](../backend/development.md) and the frontend commands in [Frontend Development](../frontend/README.md). In short, run at the root:
 ```bash
