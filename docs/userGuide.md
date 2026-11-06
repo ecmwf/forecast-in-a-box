@@ -84,7 +84,7 @@ Pre-requisites:
 4. Before committing, run the checks described in [Backend Development](../backend/development.md) and the frontend commands in [Frontend Development](../frontend/README.md). In short, run at the root:
 ```bash
 just val
-uv run prek
+uv run --project backend prek
 ```
 
 5. To reset a checkout's state, run:
