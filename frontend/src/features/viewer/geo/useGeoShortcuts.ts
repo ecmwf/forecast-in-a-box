@@ -30,6 +30,7 @@ import { useCallback, useEffect, useEffectEvent, useState } from 'react'
 import { formatForDisplay, useHotkey } from '@tanstack/react-hotkeys'
 import { NAV_ZOOM_STEP } from './map-nav'
 import { COMPARE_MODES } from './types'
+import type { DisplayHotkey } from '@tanstack/react-hotkeys'
 import type { CompareMode } from './types'
 import { useHoldPan } from '@/hooks/useHoldPan'
 
@@ -81,7 +82,7 @@ function dialogOpen(): boolean {
 }
 
 /** Platform-aware display label for a hotkey (TanStack formatting). */
-export function keyLabel(hotkey: string): string {
+export function keyLabel(hotkey: DisplayHotkey): string {
   return formatForDisplay(hotkey)
 }
 

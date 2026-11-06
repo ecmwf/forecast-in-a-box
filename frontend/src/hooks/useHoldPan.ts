@@ -41,16 +41,17 @@ export function useHoldPan(
     // TanStack's tracker clears keyups the OS swallows during ⌘-chords.
     const tracker = getKeyStateTracker()
     // Armed = passed the gates on keydown; panning needs armed AND held.
-    const armed = new Set<string>()
+    // Values keep e.key: the tracker matches named keys case-sensitively.
+    const armed = new Map<string, string>()
     let raf = 0
     let last = 0
     const tick = (t: number) => {
-      for (const k of armed) if (!tracker.isKeyHeld(k)) armed.delete(k)
+      for (const [k, key] of armed) if (!tracker.isKeyHeld(key)) armed.delete(k)
       const dt = last ? Math.min(MAX_FRAME_S, (t - last) / 1000) : 0
       last = t
       let dx = 0
       let dy = 0
-      for (const k of armed) {
+      for (const k of armed.keys()) {
         dx += vec[k][0]
         dy += vec[k][1]
       }
@@ -73,7 +74,7 @@ export function useHoldPan(
       if (el?.closest('input, textarea, select, [contenteditable="true"]'))
         return
       e.preventDefault()
-      armed.add(k)
+      armed.set(k, e.key)
       if (!raf) raf = requestAnimationFrame(tick)
     }
     window.addEventListener('keydown', down)
