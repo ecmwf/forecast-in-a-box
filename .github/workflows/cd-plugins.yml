@@ -65,7 +65,8 @@ jobs:
           uv pip install "fiab-core==${TAG_FIABCORE}"
           just build
           source $REPO_ROOT/scripts/cicd/tearDownVenv.sh
-          source $REPO_ROOT/scripts/cicd/prepareValVenv.sh dist/*whl
+          whl=$(ls dist/*whl)
+          source $REPO_ROOT/scripts/cicd/prepareValVenv.sh "$whl"[runtime]
           RELEASE=1 just test
           source $REPO_ROOT/scripts/cicd/tearDownVenv.sh
           mv dist/* ../packagesDist
