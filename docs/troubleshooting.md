@@ -1,7 +1,7 @@
 # Troubleshooting
 
 Please refer to the headings below for troubleshooting. Platform-specific help is available for **[macOS]**, **[Linux]** and **[containers]**.
-For how to collect full logs, see [How to get logs](operator/tuningAndConfiguration.md#how-to-get-logs).
+For how to collect full logs, see [How to get logs](tuningAndConfiguration.md#how-to-get-logs).
 
 ## Installation
 
