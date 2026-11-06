@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils'
 // Hairlines are the 1px gaps showing the border-coloured grid behind;
 // multiply blends opaque white logo backgrounds into the hover wash.
 const CELL =
-  'flex items-center justify-center bg-background p-12 outline-none transition-colors hover:bg-muted/40 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset [&_img]:mix-blend-multiply dark:[&_img]:mix-blend-normal'
+  'flex items-center justify-center bg-background p-6 outline-none sm:p-8 lg:p-12 transition-colors hover:bg-muted/40 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset [&_img]:mix-blend-multiply dark:[&_img]:mix-blend-normal'
 
 function PartnerLink({
   href,
@@ -67,25 +67,37 @@ export function Collaboration() {
             href="https://en.ilmatieteenlaitos.fi"
             className="lg:col-span-2"
           >
+            {/* No taller than the EU flag (h-12 below). */}
             <img
               src="/logos/org/FMI.png"
               alt={t('brand.fmi')}
-              className="h-14 w-auto dark:hidden"
+              className="h-11 w-auto dark:hidden"
             />
             <img
               src="/logos/org/FMI-dark.png"
               alt={t('brand.fmi')}
-              className="hidden h-14 w-auto dark:block"
+              className="hidden h-11 w-auto dark:block"
             />
           </PartnerLink>
           <PartnerLink
             href="https://destination-earth.eu"
-            className="lg:col-span-3"
+            className="gap-3 lg:col-span-3"
           >
+            {/* EU flag >= the other logos; only the wordmark shrinks. */}
             <img
-              src="/logos/org/destine-fund.png"
+              src="/logos/org/eu-flag.svg"
+              alt={t('brand.eu')}
+              className="h-12 w-auto shrink-0 object-contain"
+            />
+            <img
+              src="/logos/org/destine-wordmark.svg"
               alt={t('brand.destinE')}
-              className="w-50 object-contain"
+              className="h-6 w-auto min-w-0 object-contain dark:hidden"
+            />
+            <img
+              src="/logos/org/destine-wordmark-dark.svg"
+              alt={t('brand.destinE')}
+              className="hidden h-6 w-auto min-w-0 object-contain dark:block"
             />
           </PartnerLink>
           {/* ArcX has no logo of its own; its materials set the name in type. */}
