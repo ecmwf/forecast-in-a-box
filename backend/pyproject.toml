@@ -100,7 +100,9 @@ filterwarnings = [
     "error",
     'ignore:diagnostic_variables is unsupported:deprecation.UnsupportedWarning',
     'ignore:prognostic_variables is unsupported:deprecation.UnsupportedWarning',
-    'ignore:fix this test -- it was written for old qubed'
+    'ignore:fix this test -- it was written for old qubed',
+    "ignore:_pytest.python.CallSpec2 has been renamed to CallSpec:pytest.PytestRemovedIn10Warning",
+    'ignore:The configuration option "asyncio_default_fixture_loop_scope" is unset.',
 ]
 
 [tool.mypy]
