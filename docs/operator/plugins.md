@@ -32,7 +32,7 @@ This list is read only on the first run. It is never changed by the backend afte
 ## Updating and removing plugins
 
 - After you update a plugin, restart the backend. A changed package is not reloaded into a running process.
-- Uninstalling or updating a plugin removes or replaces only the plugin package. Its external requirements stay installed. If a new version needs different external requirements, fix them by hand in the environment.
+- Uninstalling a plugin removes its database record and unloads its catalogue and templates; its package and dependencies remain installed. Updating can replace the plugin package and add new dependencies, but preserves every other installed distribution. An update requiring incompatible changes to those distributions is refused.
 
 ## Troubleshooting
 
