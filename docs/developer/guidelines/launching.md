@@ -7,8 +7,8 @@ This document describes how to launch the Forecast-in-a-Box as a developer -- as
 Tools that are expected to be found on `$PATH`:
 * `curl` - get data off the web (the only dependency needed by `scripts/fiab.sh`)
 * `just` - run project commands
-* `uv` - efficiently create and manage Python virtual environments
-* `npm` - Node package manager
+* `uv` - create and manage Python virtual environments
+* `npm` - node package manager
 * `docker` - build and run Docker container images (optional)
 
 ## How to Launch
@@ -20,7 +20,7 @@ There are two ways of launching:
 The `fiab.sh` is a standalone script, meaning you don't need to check out the repo itself, and it installs itself in `~/.fiab` (configurable).
 It generally pulls the most recent released version, but it is still based on a `venv`, and you can configure it arbitrarily, including editable installs of plugins.
 However, a plugin should be installed through UI (or backend API call to be precise) rather than directly through pip into the venv, at least for the first time, as that puts the right entities into the database.
-Consult [plugins.md](./plugins.md) for more details about plugin installations.
+Consult [Plugins (Developer)](plugins.md) for more details about plugin installations.
 
 The `just dev`, on the other hand, reflects the current state of the repo you have checked out, meaning every component (the backend, the frontend, the core for plugin contract) is an editable install in the repo.
 And similarly to the `fiab.sh`, you can configure it arbitrarily, including editable installs of plugins.
@@ -39,7 +39,7 @@ The difference is where the file is expected to exist:
 To understand what should be in the file, consult the file `utility/config.py` in the backend codebase -- its the Pydantic model directly corresponding to that file.
 
 The `fiab.sh` works ok without any `config.toml` thanks to the code-based defaults, but `just dev` requires some overrides.
-Consult the [example](./example_dev_config.toml) -- this one is automatically copied if none is found when you run `just dev`.
+Consult the [example](example_dev_config.toml) -- this one is automatically copied if none is found when you run `just dev`.
 You can change it in the `<repo>/backend/.fiab` directory at will -- once a file is there, the `just dev` itself does not mutate it.
 
 ## Persistence

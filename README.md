@@ -17,22 +17,29 @@
 > \[!IMPORTANT\]
 > This software is **Emerging** and subject to ECMWF's guidelines on [Software Maturity](https://github.com/ecmwf/codex/raw/refs/heads/main/Project%20Maturity).
 
-Forecast-In-A-Box is a prototype AI solution concept piloted by ECMWF, through an effort jointly funded by [Destination Earth](https://destination-earth.eu/) and ECMWF core activities. It showcases a way to containerize and package complete AI-based forecasting pipelines, bringing together ECMWF’s open-source software and AI models — such as ANEMOI, EarthKit, AIFS, PProc and other components of the ECMWF stack — to cover all stages of the forecasting process, from using data inputs from ECMWF’s analyses to the execution of AI models, post-processing, and visualization.
+## Overview
+Forecast-in-a-Box (FiaB) is a prototype piloted by ECMWF, through an effort jointly funded by [Destination Earth](https://destination-earth.eu/).
+It is an open-source software package for running AI-driven weather models end-to-end on a single machine.
+FiaB brings together ECMWF’s open-source software stack and AI models — such as ANEMOI, EarthKit, AIFS, PProc — from initial conditions, to the execution of AI-driven models, post-processing (products), and visualisation.
+As a monorepo, FiaB builds into one installable Python wheel, `forecast-in-a-box`, which includes the bundled web frontend. Plugins extend it with data sources and products, and are versioned separately.
 
-It allows to run any model that subscribes to the Anemoi-Inference interface.
+For more information about the project, please read: [AI-driven solutions for the Digital Twin Engine](https://destine.ecmwf.int/news/forecast-in-a-box-portable-ai-forecasting-workflows-within-the-destine-digital-twin-engine/).
 
-For more information read: [AI-driven solutions for the Digital Twin Engine](https://destine.ecmwf.int/news/forecast-in-a-box-portable-ai-forecasting-workflows-within-the-destine-digital-twin-engine/).
+## User guides
+The following guides are available for different user profiles:
+**[Operator]** Researcher or domain expert with low-to-medium technical proficiency
+**[Developer]** Active contributer of Forecast-in-a-Box with medium-to-high technical proficiency
 
-There are the following guides:
-* [User Guide](docs/userGuide.md) -- basic installation and usage on a personal laptop. Audience: Researcher
-* [Troubleshooting](docs/troubleshooting.md) -- general purpose troubleshooting and tuning. Audience: Operator, Developer
-* [Advanced Installation](docs/operator/installation.md) -- cluster, cloud, and docker deployments. Audience: Operator, Developer
-* [Frontend Development](frontend/README.md) -- specifics to the javascript frontend. Audience: Developer
-* [Backend Development](backend/development.md) -- specifics to the python backend. Audience: Developer
+* [User guide](docs/userGuide.md) -- quick start installation and usage on a laptop or server. Audience: Operator, Developer
+* [Troubleshooting](docs/troubleshooting.md) -- troubleshooting and tuning. Audience: Operator, Developer
+* [Advanced Installation](docs/installation.md) -- upgrade, reinstall and containerised setup. Audience: Operator, Developer
+* [Frontend Development](frontend/README.md) -- frontend development. Audience: Developer
+* [Backend Development](backend/development.md) -- backend and plugins development. Audience: Developer
+* [CI/CD](docs/developer/cicd.md) -- workflows, runners and local run checks. Audience: Developer
 
 ## Contributions and Support
-Due to the maturity and status of the project, there is no support provided -- unless the usage of this project happens within some higher-status initiative that ECMWF participates at.
-For external contributions, see [CONTRIBUTING.md](./CONTRIBUTING.md).
+Forecast-in-a-Box is provided by ECMWF as an open source software, without support.
+External contributions are welcome - please read the [Guidelines](./CONTRIBUTING.md) for more information.
 
 ## License
-See [license](./LICENSE).
+Please consult Forecast-in-a-Box [License Terms](./LICENSE).
