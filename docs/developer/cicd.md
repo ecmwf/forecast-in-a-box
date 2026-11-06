@@ -44,4 +44,4 @@ The scripts that the workflows call live in [`scripts/cicd/`](../../scripts/cicd
 | Frontend checks | `npm run check`, then `npm run test:run`, then `npm run build` in `frontend/`. |
 | CLI | `cargo test` in `cli/`. |
 | CI/CD scripts | `just val-cicd-scripts` at the root. |
-| Pre-commit hooks | `uv run prek` at the root. |
+| Pre-commit hooks | `uv run prek` at the backend. |
