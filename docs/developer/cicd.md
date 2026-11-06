@@ -1,6 +1,6 @@
 # CI/CD
 
-Workflows are defined in [`.github/workflows/`](../../.github/workflows/). The `ci` workflow runs on every push and pull request. The `cd-*` and `bigtest` workflows are started by hand, except `cd-docker`, which also runs when a release is published.
+Workflows are defined in [`.github/workflows/`](../../.github/workflows/). The `ci` workflow runs on pushes to `main` and pull requests that touch its configured paths (`backend/`, `frontend/`, `cli/`, `.github/`, `scripts/cicd/` or `install/`), and can also be started manually. The `cd-*` and `bigtest` workflows are started by hand, except `cd-docker`, which also runs when a release is published.
 
 ## Workflows
 
