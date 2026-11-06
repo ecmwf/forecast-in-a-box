@@ -14,6 +14,7 @@ import {
   PRESET_DOMAINS,
   boxHandles,
   clampBboxLatitudeForMercator,
+  cutsOutDomain,
   detectMode,
   isAutoDomain,
   isBboxTokens,
@@ -150,6 +151,20 @@ describe('isAutoDomain', () => {
     expect(isAutoDomain(' Auto ')).toBe(true)
     expect(isAutoDomain('auto,Germany')).toBe(false)
     expect(isAutoDomain('')).toBe(false)
+  })
+})
+
+describe('cutsOutDomain', () => {
+  it('is false for an empty value and the whole-area values', () => {
+    for (const value of ['', ' ', 'auto', 'Global', 'datadefined']) {
+      expect(cutsOutDomain(value)).toBe(false)
+    }
+  })
+
+  it('is true for names and boxes', () => {
+    expect(cutsOutDomain('Central Europe')).toBe(true)
+    expect(cutsOutDomain('Germany,France')).toBe(true)
+    expect(cutsOutDomain('-10,35,30,70')).toBe(true)
   })
 })
 

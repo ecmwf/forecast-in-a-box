@@ -11,6 +11,7 @@
 import { useMemo, useState } from 'react'
 import { SearchIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { cutsOutDomain } from './geo-domain'
 import { GlyphFieldWrapper } from './GlyphFieldWrapper'
 import {
   AUTO_GRID,
@@ -41,6 +42,7 @@ import {
   ComboboxTrigger,
 } from '@/components/ui/combobox'
 import { InputGroupAddon } from '@/components/ui/input-group'
+import { useBlockDomain } from '@/features/fable-builder/context/BlockConfigContext'
 import { cn } from '@/lib/utils'
 
 export interface GridFieldProps {
@@ -89,6 +91,9 @@ export function GridField({
   const queryResult = trimmed ? parseGrid(trimmed) : null
   const queryError =
     !closed && queryResult && !queryResult.ok ? queryResult.error : null
+
+  const domain = useBlockDomain()
+  const cutsOut = domain !== null && cutsOutDomain(domain)
 
   const current = parseGrid(value)
   const spacing = current.ok ? gridSpacingLabel(t, current.spec) : null
@@ -189,6 +194,11 @@ export function GridField({
               </ComboboxGroup>
             )}
           </ComboboxList>
+          {cutsOut && (
+            <p className="border-t px-3 py-1.5 text-xs text-muted-foreground">
+              {t('grid.pointsGlobal')}
+            </p>
+          )}
         </ComboboxContent>
       </Combobox>
     </GlyphFieldWrapper>

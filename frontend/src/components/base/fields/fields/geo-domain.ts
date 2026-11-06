@@ -54,6 +54,15 @@ export function isAutoDomain(value: string): boolean {
   return value.trim().toLowerCase() === AUTO_DOMAIN
 }
 
+/** The values core accepts for the whole area: `auto`, `global`, `datadefined`. */
+const NO_CUT_OUT = new Set([AUTO_DOMAIN, 'global', 'datadefined'])
+
+/** True if the value cuts the data out to an area. */
+export function cutsOutDomain(value: string): boolean {
+  const normalized = value.trim().toLowerCase()
+  return normalized !== '' && !NO_CUT_OUT.has(normalized)
+}
+
 // Signed decimal degrees, mirroring core's float bbox type.
 const NUMERIC = /^-?(\d+(\.\d*)?|\.\d+)$/
 

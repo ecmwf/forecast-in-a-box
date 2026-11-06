@@ -241,6 +241,7 @@
     "spacing": "~{{km}} km",
     "points": "{{count}} points",
     "pointsApprox": "~{{count}} points",
+    "pointsGlobal": "Point counts are for the whole globe, before the domain cut-out",
     "groupCustom": "Your entry",
     "groupLatlon": "Regular lat/lon",
     "groupOctahedral": "Octahedral Gaussian",

@@ -28,6 +28,7 @@ import {
   useDownloadActions,
 } from '@/api/hooks/useArtifacts'
 import { FieldRenderer } from '@/components/base/fields/FieldRenderer'
+import { BlockConfigProvider } from '@/features/fable-builder/context/BlockConfigContext'
 
 /**
  * Controlled wrapper to capture onChange values
@@ -412,6 +413,43 @@ describe('FieldRenderer Integration', () => {
         .element(screen.getByTestId('current-value'))
         .toHaveTextContent('N640')
     })
+
+    it('notes that the counts are global when the block cuts out a domain', async () => {
+      const screen = await renderWithProviders(
+        <BlockConfigProvider
+          values={{ domain: 'Central Europe' }}
+          valueTypes={{ domain: 'geodomain', 'test-field': gridType }}
+        >
+          <ControlledFieldRenderer valueType={gridType} initialValue="auto" />
+        </BlockConfigProvider>,
+      )
+      await screen.getByText('Keep input grid').click()
+      const row = screen.getByRole('option', { name: /0\.25°/ })
+      await expect.element(row.getByText('1M points')).toBeVisible()
+      await expect
+        .element(screen.getByText(/whole globe, before the domain cut-out/))
+        .toBeVisible()
+    })
+
+    it.each(['auto', 'Global'])(
+      'has no note when the domain is %s',
+      async (domain) => {
+        const screen = await renderWithProviders(
+          <BlockConfigProvider
+            values={{ domain }}
+            valueTypes={{ domain: 'geodomain', 'test-field': gridType }}
+          >
+            <ControlledFieldRenderer valueType={gridType} initialValue="auto" />
+          </BlockConfigProvider>,
+        )
+        await screen.getByText('Keep input grid').click()
+        const row = screen.getByRole('option', { name: /0\.25°/ })
+        await expect.element(row.getByText('1M points')).toBeVisible()
+        await expect
+          .element(screen.getByText(/whole globe, before the domain cut-out/))
+          .not.toBeInTheDocument()
+      },
+    )
 
     it('explains why a typed grid is invalid', async () => {
       const screen = await renderWithProviders(
