@@ -6,7 +6,7 @@ Workflows are defined in [`.github/workflows/`](../../.github/workflows/). The `
 
 | Workflow | Triggers | What it does |
 |---|---|---|
-| `ci.yml` | push, pull request, manual | Detects which parts changed, then runs only the matching jobs (below). |
+| `ci.yml` | push, pull request, manual | Selects jobs by changed paths for pull requests; selects all validation areas for push and manual runs, subject to each job's condition. |
 | `cd-core.yml` | manual | Builds and validates `fiab-core` and `fiab-plugin-test`. Runs a release validation when releasing. |
 | `cd-plugins.yml` | manual | Builds and tests the demo and ECMWF plugins. |
 | `cd-backend.yml` | manual | Runs `just fiabwheel`, which builds the frontend and packages the backend wheel, then runs the tests. |
@@ -16,7 +16,7 @@ Workflows are defined in [`.github/workflows/`](../../.github/workflows/). The `
 
 ## Jobs in `ci.yml`
 
-A `changes` job checks which paths were touched. Each job below runs only when its paths changed.
+For pull requests, a `changes` job selects validation areas using the path filters in `ci.yml`; changes to shared workflow files can select multiple areas. For push and manual runs, all validation areas are selected. Each job's additional condition still applies.
 
 | Job | Runs on | Runs when | What it does |
 |---|---|---|---|
