@@ -20,13 +20,13 @@ For pull requests, a `changes` job selects validation areas using the path filte
 
 | Job | Runs on | Runs when | What it does |
 |---|---|---|---|
-| `macos` | Self-hosted macOS, one job per architecture | Backend changed, and the pull request comes from `ecmwf/forecast-in-a-box` or the run was started by hand | Runs `just val`. |
+| `macos` | Self-hosted macOS ARM64, one job per Python version (3.11, 3.12, 3.13) | Backend validation is selected, and the pull request targets `ecmwf/forecast-in-a-box` or the run was started by hand | Runs `just val`. |
 | `ubuntu` | GitHub-hosted Ubuntu | Backend changed | Runs `just val`. |
 | `frontend` | GitHub-hosted Ubuntu | Frontend changed | Checks formatting and linting, runs the unit and integration tests, and checks that the build succeeds. Playwright end-to-end tests are not run here. |
 | `cli` | Self-hosted macOS ARM64 | CLI changed | Runs the Cargo tests. |
 | `CI/CD scripts` | GitHub-hosted Ubuntu | `scripts/cicd` changed | Runs `just val-cicd-scripts`. |
 
-Pull requests from forks do not run the `macos` job, because its condition requires the pull request to target `ecmwf/forecast-in-a-box`.
+Pull requests targeting a fork do not run the `macos` job. Pull requests from forks targeting `ecmwf/forecast-in-a-box` can run it when backend validation is selected.
 
 ## Self-hosted runners
 
