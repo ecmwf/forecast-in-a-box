@@ -91,14 +91,17 @@ def domain_runtime_value(domain: GeoDomainRuntimeType) -> list[str] | list[float
 
 
 class GeographicalTransform(Transform):
-    title: str = "GeographicalTransform"
+    title: str = "Geographical Transform"
     description: str = "Transform the data to a different grid or area"
     configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
         GRID: BlockConfigurationOption(
             title="Grid",
             description=(
-                "Grid to regrid to: a resolution in degrees such as '0.25' (at least 0.01), a west-east/south-north pair such as "
-                "'0.25/0.5', or a Gaussian grid such as 'N320' or 'O96' (number from 1 to 8000); auto leaves the grid unchanged"
+                "Regrid data to:\n"
+                "- a resolution in degrees such as '0.25'\n"
+                "- a west-east/south-north pair such as '0.25/0.5'\n"
+                "- a Gaussian grid such as 'N320' or 'O96'\n"
+                "- auto: no regridding"
             ),
             value_type=OpenEnumType(["auto", "0.25", "0.5", "1", "O96", "O320", "N320"], GridType()),
             default_value="auto",
@@ -106,10 +109,10 @@ class GeographicalTransform(Transform):
         DOMAIN: BlockConfigurationOption(
             title="Domain",
             description=(
-                "Area the data is cut out to: everything outside the area is dropped for all downstream blocks. Choose auto or global "
-                "to leave the area unchanged, one or more named regions/countries, or a drawn bounding box; "
-                "several names are cut out as the smallest latitude/longitude box containing all of them, not as the union of their shapes; "
-                "leave empty to regrid without cutting out"
+                "Area the data is cut out to: everything outside the area is dropped for all downstream blocks.\n"
+                "- auto or global: no cut-out\n"
+                "- named regions/countries: the smallest lat/lon box containing all of them\n"
+                "- a drawn bounding box"
             ),
             value_type=GeoDomainType(),
             default_value="auto",
