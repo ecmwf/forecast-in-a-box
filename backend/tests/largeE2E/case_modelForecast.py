@@ -107,11 +107,11 @@ def _build_blueprint_builder(plugin: dict[str, str]) -> dict:
                     "input_source": "dummy",
                     "lead_time": str(LEAD_TIME_HOURS),
                     "base_time": base_time,
-                    "number": "1",
+                    "number": "none",
                 },
                 {},
             ),
-            block("selectParam", "select", {"dimension": "param", "values": "2t"}, {"dataset": "source"}),
+            block("selectParam", "select", {"dimension": "param", "values": "167"}, {"dataset": "source"}),
             block("selectStep", "select", {"dimension": "step", "values": SELECTED_STEP}, {"dataset": "selectParam"}),
             block("selectLevtype", "select", {"dimension": "levtype", "values": "sfc"}, {"dataset": "selectStep"}),
             block(
