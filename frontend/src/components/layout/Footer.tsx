@@ -17,18 +17,28 @@ import { cn, isExternalUrl } from '@/lib/utils'
 
 // Partner logos for the footer band. The SVGs are white-fill, so the footer
 // keeps a fixed navy background regardless of theme.
+// EU flag >= the other logos; only the wordmark shrinks.
 const partnerLogos = [
   {
-    src: '/logos/ecmwf.svg',
-    altKey: 'footer.logoEcmwf',
     href: 'https://www.ecmwf.int/',
-    className: 'h-9',
+    images: [
+      { src: '/logos/ecmwf.svg', altKey: 'footer.logoEcmwf', className: 'h-9' },
+    ],
   },
   {
-    src: '/logos/destination_earth_logo.svg',
-    altKey: 'footer.logoDestinationEarth',
     href: 'https://destination-earth.eu',
-    className: 'h-8',
+    images: [
+      {
+        src: '/logos/org/eu-flag.svg',
+        altKey: 'footer.logoEu',
+        className: 'h-10 shrink-0',
+      },
+      {
+        src: '/logos/org/destine-wordmark-dark.svg',
+        altKey: 'footer.logoDestinationEarth',
+        className: 'h-6',
+      },
+    ],
   },
 ] as const
 
@@ -66,17 +76,23 @@ export function Footer() {
         <div className="flex flex-wrap items-center justify-center gap-x-24 gap-y-8 py-10">
           {partnerLogos.map((logo) => (
             <a
-              key={logo.altKey}
+              key={logo.href}
               href={logo.href}
               target="_blank"
               rel="noopener noreferrer"
-              className="rounded-sm opacity-90 transition-opacity hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none"
+              className="flex max-w-full items-center gap-3 rounded-sm opacity-90 transition-opacity hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none"
             >
-              <img
-                src={logo.src}
-                alt={t(logo.altKey)}
-                className={cn('block w-auto', logo.className)}
-              />
+              {logo.images.map((image) => (
+                <img
+                  key={image.src}
+                  src={image.src}
+                  alt={t(image.altKey)}
+                  className={cn(
+                    'block w-auto min-w-0 object-contain',
+                    image.className,
+                  )}
+                />
+              ))}
             </a>
           ))}
         </div>
