@@ -8,7 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { SearchIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { cutsOutDomain } from './geo-domain'
@@ -67,6 +67,9 @@ const GROUP_LABEL_KEY = {
   reduced: 'grid.groupReduced',
 } as const satisfies Record<Exclude<GridGroupKey, 'keep'>, string>
 
+/** Room below the field (px) that keeps the list there: about five rows. */
+const MIN_ROOM_BELOW = 240
+
 /** Grouped grid picker with a validated free entry. */
 export function GridField({
   id,
@@ -82,6 +85,8 @@ export function GridField({
   const { t } = useTranslation('common')
   const resolvedPlaceholder = placeholder ?? t('grid.placeholder')
   const [query, setQuery] = useState('')
+  const [stayBelow, setStayBelow] = useState(true)
+  const triggerRef = useRef<HTMLButtonElement>(null)
   const trimmed = query.trim()
   const typed = closed || !trimmed ? null : canonicalGrid(trimmed)
   const groups = useMemo(
@@ -128,11 +133,16 @@ export function GridField({
         filter={matches}
         onInputValueChange={setQuery}
         onOpenChange={(open) => {
-          if (!open) setQuery('')
+          if (!open) return setQuery('')
+          const rect = triggerRef.current?.getBoundingClientRect()
+          setStayBelow(
+            !rect || window.innerHeight - rect.bottom >= MIN_ROOM_BELOW,
+          )
         }}
         disabled={disabled}
       >
         <ComboboxTrigger
+          ref={triggerRef}
           id={id}
           render={
             <Button
@@ -161,7 +171,11 @@ export function GridField({
             </span>
           )}
         </ComboboxTrigger>
-        <ComboboxContent className="min-w-(--anchor-width)">
+        {/* Below when there is room, else flips; the list fills the popup. */}
+        <ComboboxContent
+          collisionAvoidance={stayBelow ? { side: 'none' } : undefined}
+          className="flex min-w-(--anchor-width) flex-col"
+        >
           <ComboboxInput
             showTrigger={false}
             placeholder={t('grid.search')}
@@ -176,7 +190,7 @@ export function GridField({
               ? gridErrorMessage(t, queryError)
               : t('field.noMatches')}
           </ComboboxEmpty>
-          <ComboboxList>
+          <ComboboxList className="max-h-none min-h-0 flex-1">
             {(group: GridGroup) => (
               <ComboboxGroup key={group.value} items={group.items}>
                 {group.value !== 'keep' && (
@@ -195,7 +209,7 @@ export function GridField({
             )}
           </ComboboxList>
           {cutsOut && (
-            <p className="border-t px-3 py-1.5 text-xs text-muted-foreground">
+            <p className="shrink-0 border-t px-3 py-1.5 text-xs text-muted-foreground">
               {t('grid.pointsGlobal')}
             </p>
           )}
