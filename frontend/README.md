@@ -12,17 +12,17 @@ npm ci
 
 ## Common commands
 
-| Command | Use it to |
-|---|---|
-| `npm run dev` | Run the Vite dev server on port 3000 against a running backend. |
-| `npm run dev:mock` | Run the dev server with MSW mocks, without a backend. |
-| `npm run build` | Type-check and build the production bundle into `dist/`. |
-| `npm run test:unit` | Run the unit tests (hooks, stores, utilities, API client). |
-| `npm run test:integration` | Run integration tests with MSW-mocked API responses. |
-| `npm run test:run` | Run the Vitest suites once. |
-| `npm run test:e2e` | Run the Playwright end-to-end tests. These are slow, so run them locally. |
-| `npm run check` | Run Prettier, ESLint with zero warnings, and the TypeScript check. |
-| `npm run fix` | Apply Prettier and ESLint fixes. |
+| Command                    | Use it to                                                                 |
+| -------------------------- | ------------------------------------------------------------------------- |
+| `npm run dev`              | Run the Vite dev server on port 3000 against a running backend.           |
+| `npm run dev:mock`         | Run the dev server with MSW mocks, without a backend.                     |
+| `npm run build`            | Type-check and build the production bundle into `dist/`.                  |
+| `npm run test:unit`        | Run the unit tests (hooks, stores, utilities, API client).                |
+| `npm run test:integration` | Run integration tests with MSW-mocked API responses.                      |
+| `npm run test:run`         | Run the Vitest suites once.                                               |
+| `npm run test:e2e`         | Run the Playwright end-to-end tests. These are slow, so run them locally. |
+| `npm run check`            | Run Prettier, ESLint with zero warnings, and the TypeScript check.        |
+| `npm run fix`              | Apply Prettier and ESLint fixes.                                          |
 
 To build the bundle that the backend serves, use `just fiabfrontend` from the repository root. It builds the bundle and links it into `backend/src/forecastbox/static`.
 
