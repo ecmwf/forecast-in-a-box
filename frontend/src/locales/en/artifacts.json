@@ -16,18 +16,23 @@
   "filters": {
     "searchPlaceholder": "Search models",
     "availabilityLabel": "Filter by availability",
+    "maturityLabel": "Filter by maturity",
+    "allMaturities": "All maturities",
     "all": "All",
     "downloaded": "Downloaded",
     "available": "Available"
   },
   "status": {
     "downloaded": "Downloaded",
+    "downloadedHint": "Stored on this machine. Runs use it right away.",
     "downloading": "Downloading {{progress}}%",
     "available": "Available",
+    "availableHint": "Not on this machine yet. Runs download it before they start.",
     "downloadFailed": "Download failed"
   },
   "table": {
     "model": "Model",
+    "maturity": "Maturity",
     "size": "Size",
     "availability": "Availability",
     "actions": "Actions"
@@ -66,8 +71,9 @@
   },
   "compatibility": {
     "compatible": "Compatible",
-    "notCompatible": "Not compatible",
-    "notCompatibleDetail": "Not compatible: {{detail}}"
+    "notCompatible": "Incompatible",
+    "notCompatibleHint": "This model can't run on this machine.",
+    "notCompatibleDetail": "Incompatible: {{detail}}"
   },
   "emptyState": {
     "noModels": "No models available",

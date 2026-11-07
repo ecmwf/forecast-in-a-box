@@ -40,7 +40,7 @@
     },
     "models": {
       "readyToUse": "Ready to use",
-      "incompatible": "Not compatible",
+      "incompatible": "Incompatible",
       "notDownloaded": "Not downloaded",
       "total": "Total models",
       "manage": "Manage models"

@@ -22,7 +22,6 @@ import {
   Copy,
   Download,
   ExternalLink,
-  HardDrive,
   RotateCcw,
   Trash2,
   TriangleAlert,
@@ -30,9 +29,8 @@ import {
 import { useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
-import { ArtifactCompatibilityBadge } from './ArtifactCompatibilityBadge'
 import { ArtifactIdLine } from './ArtifactIdLine'
-import { ArtifactStatusBadge } from './ArtifactStatusBadge'
+import { ArtifactStatusText } from './ArtifactStatusText'
 import { ArtifactTagChips } from './ArtifactTagChips'
 import { QubeTree } from './QubeTree'
 import type {
@@ -40,9 +38,17 @@ import type {
   MlModelDetail,
 } from '@/api/types/artifacts.types'
 import { useQubeParamLabels } from '@/features/artifacts/hooks/useQubeParamLabels'
-import { formatBytes } from '@/api/types/artifacts.types'
+import {
+  artifactMaturity,
+  formatBytes,
+  nonMaturityTags,
+} from '@/api/types/artifacts.types'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import {
+  CatalogueFact,
+  CatalogueFacts,
+} from '@/components/common/catalogue/CatalogueFacts'
 import { Card } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
@@ -80,6 +86,17 @@ export function ArtifactDetailPage({
       [detail.input_qube, detail.output_qube],
     ),
   )
+  const maturity = artifactMaturity(detail.tags)
+  const size = formatBytes(detail.disk_size_bytes)
+  // Maturity has its own field.
+  const otherTags = nonMaturityTags(detail.tags)
+  const busyLabel = isDownloading
+    ? downloadProgress === undefined
+      ? t('actions.downloading')
+      : t('status.downloading', { progress: Math.round(downloadProgress) })
+    : isDeleting
+      ? t('actions.deleting')
+      : undefined
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
@@ -101,32 +118,40 @@ export function ArtifactDetailPage({
           <H1 className="text-2xl">{detail.display_name}</H1>
           <P className="mt-1 text-muted-foreground">{detail.display_author}</P>
           <ArtifactIdLine id={detail.composite_id} className="mt-0.5" />
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <ArtifactStatusBadge
-              isAvailable={detail.is_available}
-              downloadProgress={isDownloading ? downloadProgress : undefined}
-              downloadError={downloadError}
-            />
-            <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-0.5 text-sm font-medium text-muted-foreground">
-              <HardDrive className="h-3.5 w-3.5" />
-              {formatBytes(detail.disk_size_bytes)}
-            </span>
-            {detail.supported_platforms.map((platform) => (
-              <span
-                key={platform}
-                className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-sm font-medium text-muted-foreground"
-              >
-                {platform}
-              </span>
-            ))}
-            <ArtifactTagChips tags={detail.tags} />
-            <ArtifactCompatibilityBadge
-              artifact={{
-                isLocallyCompatible: detail.is_locally_compatible,
-                localCompatibilityDetail: detail.local_compatibility_detail,
-              }}
-            />
-          </div>
+          {/* The catalogue's columns as labelled values, plus platforms. */}
+          <CatalogueFacts className="mt-4">
+            {maturity !== null && (
+              <CatalogueFact label={t('table.maturity')}>
+                <span className="capitalize">{maturity}</span>
+              </CatalogueFact>
+            )}
+            {size !== '-' && (
+              <CatalogueFact label={t('table.size')}>
+                <span className="tabular-nums">{size}</span>
+              </CatalogueFact>
+            )}
+            {detail.supported_platforms.length > 0 && (
+              <CatalogueFact label={t('detail.platforms')}>
+                {detail.supported_platforms.join(', ')}
+              </CatalogueFact>
+            )}
+            <CatalogueFact label={t('table.availability')}>
+              <ArtifactStatusText
+                artifact={{
+                  isAvailable: detail.is_available,
+                  isLocallyCompatible: detail.is_locally_compatible,
+                  localCompatibilityDetail: detail.local_compatibility_detail,
+                }}
+                busyLabel={busyLabel}
+                downloadError={downloadError}
+              />
+            </CatalogueFact>
+          </CatalogueFacts>
+          {Object.keys(otherTags).length > 0 && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <ArtifactTagChips tags={otherTags} />
+            </div>
+          )}
         </div>
         <div className="flex gap-2">
           {/* http(s) only — blocks javascript: XSS. */}
