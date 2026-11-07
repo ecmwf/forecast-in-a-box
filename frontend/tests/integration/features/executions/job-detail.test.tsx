@@ -844,6 +844,26 @@ describe('RunDetailPage Integration', () => {
         .not.toBeInTheDocument()
     })
 
+    it('hides and shows block parameters with a checkbox', async () => {
+      injectMockExecution(resolvedConfigExecution)
+      const screen = await renderDetailPage('job-resolved-009')
+
+      const toggle = screen.getByRole('checkbox', { name: 'Parameters' })
+      await expect.element(toggle).toBeChecked()
+      await expect.element(screen.getByText('grib')).toBeVisible()
+
+      // DOM clicks: unstyled, the box is too small to hit.
+      ;(toggle.element() as HTMLElement).click()
+      await expect.element(toggle).not.toBeChecked()
+      await expect.element(screen.getByText('grib')).not.toBeInTheDocument()
+
+      // The whole pill toggles, not just the box.
+      const pill = screen.getByText('Parameters', { exact: true })
+      ;(pill.element() as HTMLElement).click()
+      await expect.element(toggle).toBeChecked()
+      await expect.element(screen.getByText('grib')).toBeVisible()
+    })
+
     it('falls back to stored templates on runs without a recorded resolution', async () => {
       // Same glyphed fable, but a pre-#640 run: no resolution recorded.
       injectMockExecution({

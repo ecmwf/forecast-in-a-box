@@ -7,8 +7,7 @@
   "detail": {
     "backLink": "Runs",
     "untitledJob": "Untitled run",
-    "showParameters": "Show parameters",
-    "hideParameters": "Hide parameters",
+    "parameters": "Parameters",
     "maximizeCanvas": "Maximize canvas",
     "restoreCanvas": "Exit full screen (Esc)",
     "graphUnavailable": "Graph visualisation unavailable",
