@@ -123,6 +123,12 @@
       "details": "Later runs overwrite files with the same name, so an earlier run can silently show newer data. A shared folder also slows down the map viewer as it fills.",
       "action": "Use run folder",
       "actionTooltip": "Writes each run and attempt to its own folder:"
+    },
+    "fileName": {
+      "missing": "No file name",
+      "details": "The run will fail at this sink. The path ends with /, so it names a folder, and the GRIB sink needs a file name after the last /.",
+      "action": "Add file name",
+      "actionTooltip": "Writes one GRIB file per parameter:"
     }
   },
   "confirmDelete": {

@@ -14,7 +14,10 @@ import type { ReactNode } from 'react'
 import type { BlockInstance } from '@/api/types/fable.types'
 import type { GlyphInfo } from '@/features/fable-builder/hooks/useAllGlyphs'
 import { GlyphContext } from '@/features/fable-builder/context/GlyphContext'
-import { useOutputPathCheck } from '@/features/fable-builder/hooks/useOutputPathCheck'
+import {
+  useFileNameCheck,
+  useOutputPathCheck,
+} from '@/features/fable-builder/hooks/useOutputPathCheck'
 
 const RUN = 'c34bba52-6932-4f1e-9d1a-0b6f2a7e1c55'
 
@@ -132,5 +135,28 @@ describe('useOutputPathCheck', () => {
       resolved: null,
     })
     expect(result.current).toBeNull()
+  })
+})
+
+describe('useFileNameCheck', () => {
+  it('offers a file name for a GRIB path ending in a folder', () => {
+    const { result } = renderHook(() =>
+      useFileNameCheck(
+        block('gribSink', '${outDir}/${runId}__${attemptCount}/'),
+      ),
+    )
+    expect(result.current).toEqual({
+      path: '${outDir}/${runId}__${attemptCount}/[shortName].grib',
+    })
+  })
+
+  it('ignores GRIB file paths, Zarr stores and other blocks', () => {
+    for (const b of [
+      block('gribSink', '/tmp/out/[shortName].grib'),
+      block('zarrSink', '/tmp/out/store.zarr/'),
+      block('mapPlot', '/tmp/out/'),
+    ]) {
+      expect(renderHook(() => useFileNameCheck(b)).result.current).toBeNull()
+    }
   })
 })

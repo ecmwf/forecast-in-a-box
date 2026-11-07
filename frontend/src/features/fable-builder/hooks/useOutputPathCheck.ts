@@ -15,8 +15,10 @@ import { useGlyphContext } from '@/features/fable-builder/context/GlyphContext'
 import { containsGlyphs } from '@/features/fable-builder/utils/glyph-display'
 import {
   isSharedAcrossRuns,
+  lacksFileName,
   namesRunId,
   runScopedPath,
+  withFileName,
   withRunFolder,
 } from '@/features/fable-builder/utils/run-folder-nudge'
 
@@ -56,5 +58,19 @@ export function useOutputPathCheck(
     () =>
       shared && configKey && scope ? { [configKey]: { scope, fix } } : null,
     [shared, configKey, scope, fix],
+  )
+}
+
+/** The block's GRIB path without a file name, by config key: the fixed value. */
+export function useFileNameCheck(
+  block: BlockInstance | null,
+): Record<string, string> | null {
+  const path = block ? runScopedPath(block.factory_id) : null
+  const configKey = path?.scope === 'folder' ? path.configKey : null
+  const value = (configKey && block?.configuration_values[configKey]) || ''
+  const fix = value && lacksFileName(value) ? withFileName(value) : null
+  return useMemo(
+    () => (configKey && fix ? { [configKey]: fix } : null),
+    [configKey, fix],
   )
 }

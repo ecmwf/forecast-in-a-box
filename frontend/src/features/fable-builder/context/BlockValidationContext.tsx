@@ -26,6 +26,8 @@ interface BlockValidation {
   missingGlyphs?: Record<string, ReadonlyArray<string>> | null
   /** Output paths shared across runs, by config key; null when none. */
   sharedOutputPaths?: Record<string, SharedOutputPath> | null
+  /** GRIB paths without a file name, by config key: the fixed value. */
+  missingFileNames?: Record<string, string> | null
 }
 
 const BlockValidationContext = createContext<BlockValidation>({
@@ -33,6 +35,7 @@ const BlockValidationContext = createContext<BlockValidation>({
   resolvedConfig: null,
   missingGlyphs: null,
   sharedOutputPaths: null,
+  missingFileNames: null,
 })
 
 export function BlockValidationProvider({
@@ -40,11 +43,24 @@ export function BlockValidationProvider({
   resolvedConfig,
   missingGlyphs = null,
   sharedOutputPaths = null,
+  missingFileNames = null,
   children,
 }: BlockValidation & { children: ReactNode }) {
   const value = useMemo(
-    () => ({ fieldErrors, resolvedConfig, missingGlyphs, sharedOutputPaths }),
-    [fieldErrors, resolvedConfig, missingGlyphs, sharedOutputPaths],
+    () => ({
+      fieldErrors,
+      resolvedConfig,
+      missingGlyphs,
+      sharedOutputPaths,
+      missingFileNames,
+    }),
+    [
+      fieldErrors,
+      resolvedConfig,
+      missingGlyphs,
+      sharedOutputPaths,
+      missingFileNames,
+    ],
   )
   return (
     <BlockValidationContext.Provider value={value}>
@@ -73,4 +89,8 @@ export function useSharedOutputPaths(): Record<
   SharedOutputPath
 > | null {
   return useContext(BlockValidationContext).sharedOutputPaths ?? null
+}
+
+export function useMissingFileNames(): Record<string, string> | null {
+  return useContext(BlockValidationContext).missingFileNames ?? null
 }
