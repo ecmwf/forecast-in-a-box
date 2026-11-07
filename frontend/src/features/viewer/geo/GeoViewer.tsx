@@ -1081,7 +1081,7 @@ export function GeoViewer({
     : null
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-2">
+    <div data-geo-viewer className="flex h-full min-h-0 flex-col gap-2">
       {hasB && sourceB.error && (
         <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm">
           <span className="min-w-0 truncate">

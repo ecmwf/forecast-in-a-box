@@ -24,6 +24,7 @@ import {
   SETTING_PREFIX,
   compareDimValues,
   compareDims,
+  dayNeighbor,
   dimLine,
   dimNeighbor,
   dimValue,
@@ -62,6 +63,7 @@ import {
 import { P } from '@/components/base/typography'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { useSpaceKey } from '@/hooks/useSpaceKey'
 import { groupByKey } from '@/lib/group-by'
 import { cn } from '@/lib/utils'
 import { useUiStore } from '@/stores/uiStore'
@@ -771,9 +773,9 @@ function ActiveViewerHost({
   const lastItem = series.length > 1 ? (series.at(-1) ?? null) : null
   // Shift+arrows: +-24 h.
   const step = fastKey === 'step' ? Number(dimValue(item, 'step')) : NaN
-  const nextDay = line.find(([v]) => Number(v) >= step + 24)?.[1] ?? null
-  const prevDay =
-    line.filter(([v]) => Number(v) <= step - 24).at(-1)?.[1] ?? null
+  const steps = line.map(([v, it]) => [Number(v), it] as const)
+  const nextDay = dayNeighbor(steps, step, 1)
+  const prevDay = dayNeighbor(steps, step, -1)
 
   const stepTo = useCallback(
     (next: OutputItem) =>
@@ -811,18 +813,10 @@ function ActiveViewerHost({
     return () => window.clearTimeout(timer)
   }, [isPlaying, playNext, fastKey, viewable, queryClient, stepTo])
 
-  // Keep Space from also clicking a focused button.
-  const canPlay = playNext !== null
-  useEffect(() => {
-    if (!canPlay) return
-    const onKeyUp = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && e.target instanceof Element) {
-        if (e.target.closest('button')) e.preventDefault()
-      }
-    }
-    window.addEventListener('keyup', onKeyUp, true)
-    return () => window.removeEventListener('keyup', onKeyUp, true)
-  }, [canPlay])
+  useSpaceKey(togglePlay, {
+    enabled: playNext !== null,
+    scope: '[data-output-viewer]',
+  })
 
   // Arrow + vi-style output nav (PDF page nav stays on header buttons).
   useHotkey('ArrowLeft', goPrev, { enabled: !!prevItem, ignoreInputs: true })
@@ -831,7 +825,6 @@ function ActiveViewerHost({
   useHotkey('J', goNext, { enabled: !!nextItem, ignoreInputs: true })
   useHotkey('ArrowUp', goUp, { enabled: !!upItem, ignoreInputs: true })
   useHotkey('ArrowDown', goDown, { enabled: !!downItem, ignoreInputs: true })
-  useHotkey('Space', togglePlay, { enabled: !!playNext, ignoreInputs: true })
   useHotkey('Shift+ArrowLeft', goTo(prevDay), {
     enabled: !!prevDay,
     ignoreInputs: true,

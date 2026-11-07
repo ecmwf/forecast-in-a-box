@@ -75,7 +75,7 @@ function panBlocked(): boolean {
 }
 
 /** Letter keys yield to open dialogs — C must not copy behind a modal. */
-function dialogOpen(): boolean {
+export function dialogOpen(): boolean {
   return (
     document.querySelector('[role="dialog"], [role="alertdialog"]') !== null
   )

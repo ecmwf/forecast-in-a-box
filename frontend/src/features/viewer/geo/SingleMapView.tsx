@@ -55,6 +55,7 @@ import { LoupeOverlay } from './LoupeOverlay'
 import { PanelCorner, SlotStatusBadges } from './SlotStatusBadges'
 import { MapNavControls } from './MapNavControls'
 import { NAV_CLEARANCE, navEaseMs, panView, zoomView } from './map-nav'
+import { dialogOpen } from './useGeoShortcuts'
 import type { PinnedLegendItem } from '../components/PinnedLegendsBar'
 import type { MapAnnotation } from './annotations'
 import type { ContextOverlay } from './overlays'
@@ -70,6 +71,7 @@ import type {
   FitBboxAction,
   SingleMapMode,
 } from './types'
+import { useSpaceKey } from '@/hooks/useSpaceKey'
 import { cn } from '@/lib/utils'
 import { useUiStore } from '@/stores/uiStore'
 
@@ -626,19 +628,11 @@ export function SingleMapView({
     () => setFlickerFrame((f) => (f === 'a' ? 'b' : 'a')),
     [],
   )
-  useEffect(() => {
-    if (mode !== 'flicker' || solo) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.code !== 'Space') return
-      const target = e.target as HTMLElement | null
-      if (target && target.closest('input, button, textarea, [role="slider"]'))
-        return
-      e.preventDefault()
-      toggleFlicker()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [mode, solo, toggleFlicker])
+  useSpaceKey(toggleFlicker, {
+    enabled: mode === 'flicker' && !solo,
+    scope: '[data-geo-viewer]',
+    isBlocked: dialogOpen,
+  })
 
   // Swipe divider drag + keyboard.
   const updateSwipe = useCallback(

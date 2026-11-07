@@ -507,6 +507,58 @@ describe('RunDetailPage Integration', () => {
         .element(header('2t · step 12'), { timeout: 3000 })
         .toBeVisible()
     })
+
+    it('keeps viewer keys working on its focused buttons and timeline', async () => {
+      injectMockExecution(splitPlotExecution)
+      const screen = await renderDetailPage('job-split-007')
+      await expect.element(screen.getByText('msl · step 0')).toBeVisible()
+      await screen.getByRole('button', { name: 'View' }).first().click()
+      const header = (label: string) =>
+        screen.getByText(`map_plot · ${label}`, { exact: true })
+      await expect.element(header('msl · step 0')).toBeVisible()
+
+      await screen.getByRole('button', { name: /^Play through/ }).click()
+      const pause = screen.getByRole('button', { name: 'Pause' })
+      await expect.element(pause).toHaveFocus()
+      await userEvent.keyboard(' ')
+      await expect
+        .element(screen.getByRole('button', { name: /^Play through/ }))
+        .toHaveAttribute('aria-pressed', 'false')
+
+      await userEvent.keyboard('{Home}')
+      await expect.element(header('msl · step 0')).toBeVisible()
+      await userEvent.keyboard('{ArrowRight}')
+      await expect.element(header('msl · step 12')).toBeVisible()
+
+      // Space plays and pauses over another button, without clicking it.
+      const nextParam = screen.getByRole('button', { name: 'Next Parameter' })
+      ;(nextParam.element() as HTMLElement).focus()
+      await userEvent.keyboard(' ')
+      await expect
+        .element(screen.getByRole('button', { name: 'Pause' }))
+        .toBeVisible()
+      await userEvent.keyboard(' ')
+      await expect
+        .element(screen.getByRole('button', { name: /^Play through/ }))
+        .toHaveAttribute('aria-pressed', 'false')
+      await userEvent.keyboard('{Home}')
+      await expect.element(header('msl · step 0')).toBeVisible()
+
+      const timeline = screen.getByRole('slider', { name: 'Forecast steps' })
+      ;(timeline.element() as HTMLElement).focus()
+      await userEvent.keyboard('{ArrowRight}')
+      await expect.element(header('msl · step 12')).toBeVisible()
+      await userEvent.keyboard('{ArrowLeft}')
+      await expect.element(header('msl · step 0')).toBeVisible()
+      await userEvent.keyboard('{ArrowDown}')
+      await expect.element(header('2t · step 0')).toBeVisible()
+      await userEvent.keyboard('{Shift>}{ArrowRight}{/Shift}')
+      await expect.element(header('2t · step 24')).toBeVisible()
+      await userEvent.keyboard('{End}')
+      await expect.element(header('2t · step 36')).toBeVisible()
+      // The timeline handled these keys itself.
+      await expect.element(timeline).toHaveFocus()
+    })
   })
 
   describe('validated option types on the canvas', () => {
