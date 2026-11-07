@@ -500,5 +500,12 @@
     "zoom": "Zoom",
     "zoomIn": "Zoom in",
     "zoomOut": "Zoom out"
+  },
+  "wmsUrl": {
+    "copy": "Copy WMS URL",
+    "hint": "Paste it into QGIS, GeoWeb or any other WMS client.",
+    "notReady": "Available once the WMS server runs",
+    "copied": "WMS URL copied to clipboard",
+    "copyFailed": "Could not copy WMS URL"
   }
 }

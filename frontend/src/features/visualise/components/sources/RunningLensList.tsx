@@ -11,6 +11,7 @@
 /**
  * Running lens servers as addable sources (picker dialog and hub).
  * Basket-backed lenses stop via source removal; strays get a manual Stop.
+ * Running ones offer their WMS URL for external clients.
  * Renders nothing while no lens runs.
  */
 
@@ -18,10 +19,12 @@ import { useMemo } from 'react'
 import { CircleStop, Radar } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { AddToComparisonButton } from '../AddToComparisonButton'
+import { CopyWmsUrlButton } from '../CopyWmsUrlButton'
 import { entryRef } from '@/features/visualise/entry-ref'
 import { useLensPathIndex } from '@/features/visualise/hooks/useLensPathIndex'
 import { useComparisonStore } from '@/features/visualise/stores/comparisonStore'
 import { useLensList, useStopLens } from '@/api/hooks/useLens'
+import { buildAbsoluteWmsCapabilitiesUrl } from '@/api/endpoints/lens'
 import { Button } from '@/components/ui/button'
 import { P } from '@/components/base/typography'
 import { showToast } from '@/lib/toast'
@@ -105,6 +108,14 @@ export function RunningLensList({ query = '' }: { query?: string }) {
                         runCreatedAt: match.runCreatedAt,
                       }
                     : { kind: 'path', path, label: path }
+                }
+              />
+              <CopyWmsUrlButton
+                className="h-8 w-8"
+                url={
+                  lens.status === 'running'
+                    ? buildAbsoluteWmsCapabilitiesUrl(lens.lens_instance_id)
+                    : null
                 }
               />
               {!inBasket && (
