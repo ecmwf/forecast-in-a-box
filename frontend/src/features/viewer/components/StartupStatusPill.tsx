@@ -45,7 +45,8 @@ export function StartupStatusPill({
   }, [])
   const active = steps[activeIndex] ?? steps[steps.length - 1]
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-4 z-10 flex justify-center px-4">
+    // Above the panes' bottom overlays: pointer readout, hints, attribution.
+    <div className="pointer-events-none absolute inset-x-0 bottom-20 z-10 flex justify-center px-4">
       <div
         role="status"
         aria-label={t('startup.status', {
