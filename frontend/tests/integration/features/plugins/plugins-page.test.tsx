@@ -34,7 +34,11 @@ type Screen = Awaited<ReturnType<typeof renderPage>>
 const segment = (screen: Screen, name: RegExp) =>
   screen.getByRole('radio', { name })
 
-const diagnosticPlugin = (loadErrors: Array<object>, installErrors = []) =>
+const diagnosticPlugin = (
+  loadErrors: Array<object>,
+  installErrors = [],
+  isEnabled = true,
+) =>
   HttpResponse.json({
     plugins: {
       "store='ecmwf' local='diag-test'": {
@@ -55,7 +59,7 @@ const diagnosticPlugin = (loadErrors: Array<object>, installErrors = []) =>
           install_errors: installErrors,
         },
         settings_data: {
-          isEnabled: true,
+          isEnabled,
           excluded_templates: [],
           included_templates: [],
           glyph_remapping: {},
@@ -149,6 +153,56 @@ describe('Plugins page', () => {
         .element(screen.getByText('Warning', { exact: true }))
         .toBeVisible()
       await expect.element(screen.getByText('Loaded')).not.toBeInTheDocument()
+    })
+
+    it('lists the diagnostics on the status, without a triangle', async () => {
+      worker.use(
+        http.get(API_ENDPOINTS.plugin.list, () =>
+          diagnosticPlugin([
+            {
+              source: 'template_ingest',
+              detail: "template 'x' failed validation",
+              severity: 'warning',
+            },
+          ]),
+        ),
+      )
+      const screen = await renderPage()
+
+      const status = screen.getByText('Warning', { exact: true })
+      await status.hover()
+      await expect
+        .element(screen.getByText(/template 'x' failed validation/))
+        .toBeVisible()
+      // The status says it; no second signal next to the name.
+      const name = screen.getByRole('heading', { name: 'Diag Test' }).element()
+      expect(name.parentElement?.querySelector('svg')).toBeNull()
+    })
+
+    it('keeps a disabled plugin Disabled, its diagnostics on hover', async () => {
+      worker.use(
+        http.get(API_ENDPOINTS.plugin.list, () =>
+          diagnosticPlugin(
+            [
+              {
+                source: 'load',
+                detail: 'version mismatch',
+                severity: 'warning',
+              },
+            ],
+            [],
+            false,
+          ),
+        ),
+      )
+      const screen = await renderPage()
+
+      await screen.getByText('Disabled', { exact: true }).last().hover()
+      await expect
+        .element(screen.getByText(/^Its blocks stay out of the block palette/))
+        .toBeVisible()
+      // Regex: the detail shares its element with the source label.
+      await expect.element(screen.getByText(/version mismatch/)).toBeVisible()
     })
 
     it('keeps the red Errored badge when any diagnostic is an error', async () => {

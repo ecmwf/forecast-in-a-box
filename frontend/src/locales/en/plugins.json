@@ -62,6 +62,14 @@
     "incompatible": "Incompatible",
     "error": "Plugin system error"
   },
+  "statusHint": {
+    "loaded": "Enabled. Its blocks are in the block palette.",
+    "disabled": "Its blocks stay out of the block palette until you enable it.",
+    "errored": "The plugin failed to load. See its details page.",
+    "update": "Version {{version}} is available.",
+    "updateUnknown": "A newer version is available.",
+    "available": "Not installed yet."
+  },
   "diagnostics": {
     "seeDetails": "See the details page for the full text",
     "moreAndSeeDetails_one": "+{{count}} more — see the details page for the full text",
@@ -110,10 +118,10 @@
     "loadingBlockFactories": "Loading block factories...",
     "enableToViewBlockFactories": "Enable this plugin to view block factories.",
     "installToViewBlockFactories": "Install this plugin to view block factories.",
-    "notFound": "Plugin not found: {{id}}",
-    "versionSuffix": " · v{{version}}"
+    "notFound": "Plugin not found: {{id}}"
   },
   "card": {
+    "version": "Version",
     "updatedAgo": "Updated {{time}}",
     "versionArrow": "→ v{{version}}"
   },
