@@ -19,7 +19,6 @@ import type {
   BlockConfigurationOption,
   BlockValidationState,
 } from '@/api/types/fable.types'
-import type { ValueLabel } from '@/features/fable-builder/hooks/useConfigValueLabels'
 import { AddNodeButton } from '@/features/fable-builder/components/graph-mode/AddNodeButton'
 import { useNodeDimensions } from '@/features/fable-builder/hooks/useNodeDimensions'
 import { useConfigValueLabels } from '@/features/fable-builder/hooks/useConfigValueLabels'
@@ -43,12 +42,11 @@ import {
 } from '@/components/ui/alert-dialog'
 import { BlockActionMenu } from '@/features/fable-builder/components/shared/BlockActionMenu'
 import { BlockErrorOverlay } from '@/features/fable-builder/components/graph-mode/nodes/BlockErrorOverlay'
-import { parseGlyphSegments } from '@/features/fable-builder/utils/glyph-display'
 import { TOUR, tourAttr } from '@/features/tutorials/anchors'
 import { cn } from '@/lib/utils'
 import { BlockName } from '@/features/fable-builder/components/shared/BlockName'
-import { ValueLabelHint } from '@/features/fable-builder/components/shared/ValueLabelHint'
-import { TooltipProvider } from '@/components/ui/tooltip'
+import { BlockValueChips } from '@/features/fable-builder/components/graph-mode/nodes/BlockValueChips'
+import { blockValueEntries } from '@/features/fable-builder/utils/block-values'
 
 export type FableNode = Node<FableNodeData>
 
@@ -118,14 +116,10 @@ export const BlockNode = memo(function ({
     openMobileConfig(id)
   }
 
-  const configuredEntries = Object.entries(
+  const valueEntries = blockValueEntries(
     instance.configuration_values,
-  ).filter(([, value]) => value)
-  const configSummary = configuredEntries.slice(0, 3)
-
-  // Count only configured (non-empty) values — empty keys aren't shown as
-  // badges, so they must not inflate the "+N more" count.
-  const remainingConfigCount = configuredEntries.length - configSummary.length
+    factory.configuration_options,
+  )
 
   // Last-known restrictions; validationState is null mid-edit.
   const restrictionsRef = useRef<Record<string, string>>({})
@@ -136,9 +130,9 @@ export const BlockNode = memo(function ({
     restrictionsRef.current = blockState?.configurationRestrictions ?? {}
   }
   const valueLabels = useConfigValueLabels(
-    Object.fromEntries(configSummary.map(([key, v]) => [key, String(v)])),
+    Object.fromEntries(valueEntries.map(({ key, value }) => [key, value])),
     Object.fromEntries(
-      configSummary.map(([key]) => [
+      valueEntries.map(({ key }) => [
         key,
         (restrictionsRef.current[key] as string | undefined) ??
           (
@@ -249,54 +243,15 @@ export const BlockNode = memo(function ({
           {factory.description}
         </P>
 
-        {configSummary.length > 0 && (
-          <TooltipProvider delay={120}>
-            <div className="flex flex-wrap gap-1.5">
-              {configSummary.map(([key, value]) => {
-                const valueLabel = valueLabels[key] as ValueLabel | undefined
-                const stringValue = valueLabel?.compact ?? String(value)
-                const truncated =
-                  stringValue.length > 15
-                    ? `${stringValue.slice(0, 15)}...`
-                    : stringValue
-                const segments = parseGlyphSegments(truncated)
-                const hasGlyphs = segments.some((s) => s.isGlyph)
-                return (
-                  <ValueLabelHint key={key} label={valueLabel}>
-                    <span
-                      className={cn(
-                        'rounded-md border px-2 py-0.5 text-xs font-bold',
-                        metadata.bgColor,
-                        metadata.borderColor,
-                        metadata.color,
-                      )}
-                    >
-                      {hasGlyphs
-                        ? segments.map((seg, i) =>
-                            seg.isGlyph ? (
-                              <span
-                                key={i}
-                                className="rounded-md bg-primary/15 px-0.5 font-mono text-primary"
-                              >
-                                {seg.text}
-                              </span>
-                            ) : (
-                              <span key={i}>{seg.text}</span>
-                            ),
-                          )
-                        : truncated}
-                    </span>
-                  </ValueLabelHint>
-                )
-              })}
-              {remainingConfigCount > 0 && (
-                <span className="rounded-md border bg-muted px-2 py-0.5 text-xs font-bold text-muted-foreground">
-                  {t('blockNode.moreCount', { count: remainingConfigCount })}
-                </span>
-              )}
-            </div>
-          </TooltipProvider>
-        )}
+        <BlockValueChips
+          entries={valueEntries}
+          labels={valueLabels}
+          choiceClassName={cn(
+            metadata.bgColor,
+            metadata.borderColor,
+            metadata.color,
+          )}
+        />
       </div>
       <BlockErrorOverlay errors={errors} />
 
