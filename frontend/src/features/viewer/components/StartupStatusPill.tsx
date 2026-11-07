@@ -16,11 +16,23 @@
 
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { cn } from '@/lib/utils'
 
 export interface StartupStep {
   id: string
   label: string
+}
+
+/** A lens source's steps: its server, the run's files, the layer catalogue. */
+export function lensStartupSteps(
+  t: TFunction<'visualise'>,
+): Array<StartupStep> {
+  return [
+    { id: 'server', label: t('startup.server') },
+    { id: 'files', label: t('startup.files') },
+    { id: 'catalogue', label: t('startup.catalogue') },
+  ]
 }
 
 export function StartupStatusPill({

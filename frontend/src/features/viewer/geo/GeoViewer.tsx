@@ -66,7 +66,10 @@ import {
   skinnyWmsBasemap,
   unionBbox,
 } from '../wms-capabilities'
-import { StartupStatusPill } from '../components/StartupStatusPill'
+import {
+  StartupStatusPill,
+  lensStartupSteps,
+} from '../components/StartupStatusPill'
 import { beforeRunLayers, effectiveRuns, mergeEpochLayers } from './run-window'
 import { GeoPanelResizeStrip } from './GeoPanelResizeStrip'
 import { useGeoPanelWidths } from './useGeoPanelWidths'
@@ -1062,11 +1065,7 @@ export function GeoViewer({
   const startup = sourceA.loadingLayers
     ? isLensProxyUrl(a.baseUrl)
       ? {
-          steps: [
-            { id: 'server', label: t('startup.server') },
-            { id: 'files', label: t('startup.files') },
-            { id: 'catalogue', label: t('startup.catalogue') },
-          ],
+          steps: lensStartupSteps(t),
           // Capabilities failing = SkinnyWMS still booting / reading GRIBs.
           activeIndex: sourceA.retrying ? 1 : 2,
           hint: t('startup.firstStartHint'),
