@@ -236,14 +236,29 @@ class TestShutdownAllInstances:
 
 
 class TestStartSkinnyWms:
-    def test_worker_timeout_outlasts_a_slow_first_scan(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_preloads_the_indexed_app_and_recycles_the_worker(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv(BACKEND_LOG_DIRECTORY_ENV, str(tmp_path))
         with patch("forecastbox.domain.lens.manager.subprocess.Popen") as mock_popen:
             start_skinny_wms("/data/run")
         cmd = mock_popen.call_args.args[0]
-        # gunicorn's 30 s default kills the worker mid-scan, and every retry rescans
-        assert int(cmd[cmd.index("--timeout") + 1]) > 30
-        assert cmd[-1] == "skinnywms.wmssvr:application"
+        # The master indexes the data folder once; workers fork from it
+        assert "--preload" in cmd
+        assert cmd[-1] == "forecastbox.domain.lens.skinnywms_app:application"
+        # Magics leaks every rendered image: the worker must not live forever
+        assert 0 < int(cmd[cmd.index("--max-requests") + 1]) <= 50
+        assert int(cmd[cmd.index("--max-requests-jitter") + 1]) > 0
+
+    @pytest.mark.parametrize(("platform", "expected"), [("darwin", "YES"), ("linux", None)])
+    def test_lifts_the_macos_fork_check_for_preloaded_workers(
+        self, platform: str, expected: str | None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv(BACKEND_LOG_DIRECTORY_ENV, str(tmp_path))
+        monkeypatch.delenv("OBJC_DISABLE_INITIALIZE_FORK_SAFETY", raising=False)
+        monkeypatch.setattr("forecastbox.domain.lens.manager.sys.platform", platform)
+        with patch("forecastbox.domain.lens.manager.subprocess.Popen") as mock_popen:
+            start_skinny_wms("/data/run")
+        # Workers drawing text crash on macOS otherwise; Linux has no such check
+        assert mock_popen.call_args.kwargs["env"].get("OBJC_DISABLE_INITIALIZE_FORK_SAFETY") == expected
 
     def test_failing_popen_raises_runtime_error_and_cleans_up(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv(BACKEND_LOG_DIRECTORY_ENV, str(tmp_path))
