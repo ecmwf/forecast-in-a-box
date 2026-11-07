@@ -28,7 +28,7 @@ from functools import partial
 from typing import TYPE_CHECKING, Annotated, Any, Self, cast, get_args
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response
 
 from forecastbox.domain.auth.users import get_auth_context
 from forecastbox.domain.lens import metadata_db
@@ -166,7 +166,7 @@ async def proxy_lens(
     upstream_path: str,
     request: Request,
     auth_context: AuthContext = Depends(get_auth_context),
-) -> StreamingResponse:
+) -> Response:
     """Reverse-proxy a request to the running lens instance identified by `lens_instance_id`.
 
     See `domain.lens.proxy` for the full client/lens contract.

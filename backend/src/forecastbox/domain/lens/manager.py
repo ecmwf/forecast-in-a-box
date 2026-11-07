@@ -71,6 +71,8 @@ class LensInstance:
     lens_params: dict[str, Any]
     lens_name: LensName
     ports: set[int]
+    # Ports seen accepting connections; set once, while the process lives
+    bound: bool = False
 
 
 class LensInstanceManager:
@@ -101,8 +103,10 @@ def _compute_status(instance: LensInstance) -> LensInstanceDetail:
             status = "starting"
         elif instance.process.poll() is not None:
             status = "terminated" if instance.process.returncode == 0 else "failed"
-        elif all(check_server_ready(port=port) for port in instance.ports):
+        elif instance.bound or all(check_server_ready(port=port) for port in instance.ports):
             # process alive and its port(s) are bound -- guvicorn/gunicorn finished starting
+            # Probe once: a busy lens's queue holds each probe connection
+            instance.bound = True
             status = "running"
         else:
             # process alive but not yet listening -- still starting up

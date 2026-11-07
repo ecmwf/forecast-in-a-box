@@ -91,6 +91,25 @@ class TestComputeStatus:
         with patch("forecastbox.domain.lens.manager.check_server_ready", return_value=False):
             assert _compute_status(instance).status == "starting"
 
+    def test_bound_lens_is_probed_once(self) -> None:
+        mock_proc = MagicMock(spec=subprocess.Popen)
+        mock_proc.poll.return_value = None  # still alive
+        instance = _make_instance(process=mock_proc)
+        with patch("forecastbox.domain.lens.manager.check_server_ready", return_value=True) as probe:
+            assert _compute_status(instance).status == "running"
+            assert _compute_status(instance).status == "running"
+        # Each probe connection would wait in a busy lens's accept queue
+        probe.assert_called_once()
+
+    def test_bound_lens_that_exits_is_failed(self) -> None:
+        mock_proc = MagicMock(spec=subprocess.Popen)
+        mock_proc.poll.return_value = None
+        instance = _make_instance(process=mock_proc)
+        assert _compute_status(instance).status == "running"
+        mock_proc.poll.return_value = -9
+        mock_proc.returncode = -9
+        assert _compute_status(instance).status == "failed"
+
     def test_process_exited_zero_is_terminated(self) -> None:
         instance = _make_instance(returncode=0)
         assert _compute_status(instance).status == "terminated"
