@@ -414,6 +414,8 @@
       "badges": "Show each key on the toolbar (the next key or click hides them)",
       "pan": "Pan the map (arrow keys too)",
       "zoom": "Zoom in / out",
+      "play": "Play / pause the time steps (not in flicker mode)",
+      "step": "Previous / next time step",
       "annotate": "Toggle the annotate tool (Esc disarms)"
     }
   },

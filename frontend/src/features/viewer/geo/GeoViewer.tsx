@@ -1429,6 +1429,8 @@ export function GeoViewer({
       <GeoTimeSlider
         hasB={hasB}
         soloSlot={focusSlot}
+        // Flicker mode flips A/B on Space (SingleMapView), so it can't play
+        playKey={!(focusSlot === null && mode === 'flicker' && mapSourceB)}
         timeline={displayTimeline}
         failures={trackFailures}
         index={safeStep}

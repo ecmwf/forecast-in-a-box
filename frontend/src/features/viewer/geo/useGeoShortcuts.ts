@@ -48,6 +48,10 @@ export const COMPARE_KEYS = {
   loupe: 'Z',
   modes: ['1', '2', '3', '4', '5'],
   pan: ['W', 'A', 'S', 'D'],
+  /** Play/pause the shared time axis (raw handler; flicker mode keeps Space). */
+  play: 'Space',
+  /** Previous/next time step (raw handler, as the transport buttons). */
+  step: [',', '.'],
   /** Raw keydown, not useHotkey: '+' needs Shift on some layouts, which hotkey matching rejects. */
   zoom: ['+', '-'],
 } as const
