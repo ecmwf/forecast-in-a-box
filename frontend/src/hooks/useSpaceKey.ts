@@ -17,7 +17,7 @@ import { useEffect, useEffectEvent } from 'react'
 
 /** Text fields and widgets that use Space themselves (ARIA roles). */
 const KEEPS_SPACE = [
-  'input:not([type=button],[type=submit],[type=reset])',
+  'input:not([type=button],[type=submit],[type=reset],[type=range])',
   'textarea',
   'select',
   'summary',

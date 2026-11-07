@@ -29,6 +29,7 @@ function Viewer(props: {
           Inside
         </button>
         <input aria-label="Search" />
+        <input type="range" aria-label="Time" />
         <span
           role="switch"
           aria-checked="false"
@@ -40,9 +41,10 @@ function Viewer(props: {
   )
 }
 
-const ROLES: Partial<Record<string, 'textbox' | 'switch'>> = {
+const ROLES: Partial<Record<string, 'textbox' | 'switch' | 'slider'>> = {
   Search: 'textbox',
   Link: 'switch',
+  Time: 'slider',
 }
 
 async function setup() {
@@ -79,6 +81,13 @@ describe('useSpaceKey', () => {
     cleanup = () => window.removeEventListener('keydown', prevent)
     const { onSpace, focus } = await setup()
     focus('Inside')
+    await userEvent.keyboard(' ')
+    expect(onSpace).toHaveBeenCalledOnce()
+  })
+
+  it('runs over a focused slider, which has no use for Space', async () => {
+    const { onSpace, focus } = await setup()
+    focus('Time')
     await userEvent.keyboard(' ')
     expect(onSpace).toHaveBeenCalledOnce()
   })

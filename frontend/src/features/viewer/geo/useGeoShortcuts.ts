@@ -32,7 +32,7 @@ import { NAV_ZOOM_STEP } from './map-nav'
 import { COMPARE_MODES } from './types'
 import type { DisplayHotkey } from '@tanstack/react-hotkeys'
 import type { CompareMode } from './types'
-import { useHoldPan } from '@/hooks/useHoldPan'
+import { isTextEntry, useHoldPan } from '@/hooks/useHoldPan'
 
 /** The viewer's keymap — badges, tooltips, and help all render from it. */
 export const COMPARE_KEYS = {
@@ -59,18 +59,26 @@ const ZOOM_DIRECTION: Partial<Record<string, number>> = {
   _: -1,
 }
 
+const ARROW_KEYS = new Set(['arrowup', 'arrowdown', 'arrowleft', 'arrowright'])
+
 /**
- * Arrows/WASD must yield to widgets that consume them: the swipe
- * divider (role=slider), open selects/menus, dialogs. Plain inputs are
- * already excluded by ignoreInputs.
+ * Viewer keys yield to the focused widget that uses them: every key inside
+ * open selects/menus (typeahead) and dialogs, only arrows inside a slider
+ * (swipe divider, time track, range inputs). Text fields: see isTextEntry.
  */
-function panBlocked(): boolean {
+export function viewerKeyBlocked(key: string): boolean {
   const el = document.activeElement
   if (!el || el === document.body) return false
-  return (
+  if (
     el.closest(
-      '[role="slider"], [role="listbox"], [role="option"], [role="menu"], [role="dialog"]',
-    ) !== null
+      '[role="listbox"], [role="option"], [role="menu"], [role="dialog"]',
+    )
+  ) {
+    return true
+  }
+  return (
+    ARROW_KEYS.has(key.toLowerCase()) &&
+    el.closest('[role="slider"], input[type="range"]') !== null
   )
 }
 
@@ -165,15 +173,14 @@ export function useGeoShortcuts(handlers: {
     ...opts,
     enabled: onAnnotateDisarm.enabled,
   })
-  useHoldPan(onPan, { arrows: true, isBlocked: panBlocked })
+  useHoldPan(onPan, { arrows: true, isBlocked: viewerKeyBlocked })
 
   // One step per press, flat or globe: key repeat is ignored.
   const zoomKey = useEffectEvent((e: KeyboardEvent) => {
     const direction = ZOOM_DIRECTION[e.key]
     if (!direction || e.repeat || e.metaKey || e.ctrlKey || e.altKey) return
-    const el = e.target as HTMLElement | null
-    if (el?.closest('input, textarea, select, [contenteditable="true"]')) return
-    if (panBlocked() || dialogOpen()) return
+    if (isTextEntry(e.target)) return
+    if (viewerKeyBlocked(e.key) || dialogOpen()) return
     e.preventDefault()
     onZoom(direction * NAV_ZOOM_STEP)
   })
