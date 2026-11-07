@@ -62,6 +62,7 @@ import { EcmwfKeyDialog } from '@/features/visualise/components/sources/EcmwfKey
 import { useEcmwfKeyStore } from '@/stores/ecmwfKeyStore'
 import { NavToggle } from '@/components/layout/NavToggle'
 import { StatusDetailsPopover } from '@/components/common/StatusDetailsPopover'
+import { LensServersSection } from '@/features/visualise/components/LensServersSection'
 import { StatusIndicator } from '@/components/common/StatusIndicator'
 import { useAuth } from '@/features/auth/AuthContext'
 import { cn } from '@/lib/utils'
@@ -133,7 +134,7 @@ export function AuthenticatedHeader() {
         {/* Right side - Status, Help, Settings */}
         <div className="flex min-w-0 flex-1 items-center justify-end gap-3 text-muted-foreground">
           {/* System Status Badge - only show label when there's an issue */}
-          <StatusDetailsPopover>
+          <StatusDetailsPopover extra={<LensServersSection />}>
             <StatusIndicator
               status={trafficLightStatus}
               variant="badge"

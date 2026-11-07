@@ -10,6 +10,8 @@
 
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { LensInstanceDetailResponse } from '@/api/types/lens.types'
+import type { ParsedLayer } from '@/features/viewer/wms-capabilities'
+import { timeRange } from '@/features/visualise/components/LensServersSection'
 import { pickMatchedLens, setLensOwner } from '@/features/visualise/lens-owners'
 
 const DIR = '/data/output/run-1__1'
@@ -49,5 +51,29 @@ describe('pickMatchedLens', () => {
     expect(
       pickMatchedLens([lens('b', 'running')], DIR, 'run-1#1')?.lens_instance_id,
     ).toBe('b')
+  })
+})
+
+describe('timeRange', () => {
+  const layer = (raw?: string): ParsedLayer => ({
+    name: 'l',
+    title: 'l',
+    styles: [],
+    ...(raw ? { time: { raw } } : {}),
+  })
+
+  it('spans the earliest and latest advertised times', () => {
+    const range = timeRange([
+      layer('2026-11-06T06:00:00Z/2026-11-06T12:00:00Z/PT6H'),
+      layer('2026-11-05T00:00:00Z,2026-11-07T00:00:00Z'),
+    ])
+    expect(range).toEqual([
+      Date.parse('2026-11-05T00:00:00Z'),
+      Date.parse('2026-11-07T00:00:00Z'),
+    ])
+  })
+
+  it('is null without a time dimension', () => {
+    expect(timeRange([layer()])).toBeNull()
   })
 })

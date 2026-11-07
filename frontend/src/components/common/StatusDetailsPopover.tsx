@@ -31,6 +31,8 @@ interface StatusDetailsPopoverProps {
   align?: 'start' | 'center' | 'end'
   /** Side of the popover */
   side?: 'top' | 'bottom' | 'left' | 'right'
+  /** Sections below the component list, e.g. running WMS servers. */
+  extra?: ReactNode
 }
 
 /** i18n keys (common namespace) for each component's display label. */
@@ -141,6 +143,7 @@ export function StatusDetailsPopover({
   children,
   align = 'end',
   side = 'bottom',
+  extra,
 }: StatusDetailsPopoverProps) {
   const { t } = useTranslation('common')
   const {
@@ -160,6 +163,8 @@ export function StatusDetailsPopover({
       trigger={children}
       align={align}
       side={side}
+      // Grows with the extra sections' content, up to 24rem.
+      contentClassName={extra ? 'w-max max-w-96 min-w-64' : undefined}
       title={
         <>
           <Activity className="h-4 w-4 text-primary" />
@@ -206,6 +211,7 @@ export function StatusDetailsPopover({
               />
             ))}
       </div>
+      {extra}
     </SummaryPopover>
   )
 }

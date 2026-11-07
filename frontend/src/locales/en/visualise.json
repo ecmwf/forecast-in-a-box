@@ -507,5 +507,16 @@
     "notReady": "Available once the WMS server runs",
     "copied": "WMS URL copied to clipboard",
     "copyFailed": "Could not copy WMS URL"
+  },
+  "servers": {
+    "title": "WMS servers",
+    "count_one": "{{count}} running",
+    "count_other": "{{count}} running",
+    "starting": "Starting",
+    "params_one": "{{count}} parameter",
+    "params_other": "{{count}} parameters",
+    "submitted": "submitted {{when}}",
+    "range": "{{from}} – {{to}}",
+    "stop": "Stop WMS server"
   }
 }
