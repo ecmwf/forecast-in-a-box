@@ -38,6 +38,7 @@ import type { LostTaskIds } from '@/features/executions/outputs/availability'
 import { classifyOutput } from '@/features/executions/outputs/availability'
 import { blockDisplayNames } from '@/features/fable-builder/utils/block-names'
 import {
+  useLensList,
   useLensStatus,
   useSkinnyWmsAvailable,
   useStartSkinnyWms,
@@ -52,7 +53,11 @@ import { isGribDirMime } from '@/features/executions/outputs/adapters/grib'
 import { isFetchableMime } from '@/features/executions/outputs/mime'
 import { OutputZipButton } from '@/features/executions/outputs/OutputZipButton'
 import { SLOT_B_OFF, entryRef } from '@/features/visualise/entry-ref'
-import { lensOwnerKey, setLensOwner } from '@/features/visualise/lens-owners'
+import {
+  lensOwnerKey,
+  pickMatchedLens,
+  setLensOwner,
+} from '@/features/visualise/lens-owners'
 import { showToast } from '@/lib/toast'
 import { cn, copyToClipboard } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -213,14 +218,20 @@ function StoredOutputRowItem({
   const stopMutation = useStopLens()
   const dirQuery = useStoredDirPath(jobId, row.taskId, row.isAvailable)
   const dirPath = dirQuery.data
-  // The row owns its lens instance.
-  const [lensId, setLensId] = useState<string | null>(null)
+  // A lens this row just started, else any live lens on its folder.
+  const [startedId, setStartedId] = useState<string | null>(null)
+  // Stopped here: ignored until the list drops it.
+  const [stoppedId, setStoppedId] = useState<string | null>(null)
+  const matched = pickMatchedLens(useLensList().data, dirPath ?? null, owner)
+  const adopted = matched?.lens_instance_id === stoppedId ? undefined : matched
+  const lensId = startedId ?? adopted?.lens_instance_id ?? null
   const statusQuery = useLensStatus(lensId ?? undefined)
 
-  const status = lensId ? statusQuery.data?.status : undefined
+  const status = startedId ? statusQuery.data?.status : adopted?.status
   const running = status === 'running'
+  // Only a launch from this row reports failure; adopted lenses just drop.
   const failed =
-    !!lensId &&
+    !!startedId &&
     (statusQuery.isError || status === 'failed' || status === 'terminated')
 
   const copyUrl = (lensInstanceId: string) => {
@@ -244,7 +255,7 @@ function StoredOutputRowItem({
   useEffect(() => {
     if (!failed) return
     showToast.error(statusQuery.error?.message ?? t('storedOutputs.lensFailed'))
-    setLensId(null)
+    setStartedId(null)
   }, [failed])
 
   /** Start the SkinnyWMS lens on the resolved directory. */
@@ -255,7 +266,7 @@ function StoredOutputRowItem({
       {
         onSuccess: (id) => {
           setLensOwner(id, owner)
-          setLensId(id)
+          setStartedId(id)
         },
         onError: (err) => showToast.error(err.message),
       },
@@ -292,7 +303,8 @@ function StoredOutputRowItem({
       { lensInstanceId: lensId },
       { onError: (err) => showToast.error(err.message) },
     )
-    setLensId(null)
+    setStoppedId(lensId)
+    setStartedId(null)
   }
 
   const isStarting = startMutation.isPending || (!!lensId && !running)

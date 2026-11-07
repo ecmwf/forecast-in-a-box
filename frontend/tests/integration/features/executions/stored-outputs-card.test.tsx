@@ -32,11 +32,17 @@ import {
   createRoute,
   createRouter,
 } from '@tanstack/react-router'
-import { listMockLenses, resetLensState } from '@tests/../mocks/data/lens.data'
+import {
+  injectMockLens,
+  listMockLenses,
+  resetLensState,
+} from '@tests/../mocks/data/lens.data'
 import { resetJobsState, setMockGribDir } from '@tests/../mocks/data/job.data'
 import type { JobStatus, RunOutputs } from '@/api/types/job.types'
+import type { LensInstanceDetailResponse } from '@/api/types/lens.types'
 import { StoredOutputsCard } from '@/features/executions/components/StoredOutputsCard'
 import { lensOwner } from '@/features/visualise/lens-owners'
+import { showToast } from '@/lib/toast'
 import i18n from '@/lib/i18n'
 import { useConfigStore } from '@/stores/configStore'
 
@@ -109,6 +115,21 @@ beforeEach(() => {
   resetJobsState()
   resetLensState()
 })
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
+
+/** A running server on the job-completed-001 GRIB folder. */
+function runningLens(id: string): LensInstanceDetailResponse {
+  return {
+    lens_instance_id: id,
+    status: 'running',
+    lens_name: 'skinnyWMS',
+    lens_params: { local_path: '/data/output/job-completed-001_1' },
+    ports: [54300],
+  }
+}
 
 describe('StoredOutputsCard', () => {
   it('renders one row per sink block and resolves the directory from the payload', async () => {
@@ -255,6 +276,37 @@ describe('StoredOutputsCard', () => {
       .element(screen.getByRole('button', { name: /start wms server/i }))
       .toBeVisible()
     await expect.poll(() => listMockLenses()).toHaveLength(0)
+  })
+
+  it('adopts a server already running on its folder', async () => {
+    // A fresh mount: the server was started elsewhere or before a reload.
+    injectMockLens(runningLens('lens-earlier'))
+    const { screen } = await renderCard(outputsWithMarkers)
+    await expect
+      .element(screen.getByRole('button', { name: /copy wms url/i }))
+      .toBeVisible()
+    await expect
+      .element(screen.getByRole('button', { name: /start wms server/i }))
+      .not.toBeInTheDocument()
+  })
+
+  it('stops adopted duplicates one by one without a failure toast', async () => {
+    const error = vi.spyOn(showToast, 'error')
+    injectMockLens(runningLens('lens-1'))
+    injectMockLens(runningLens('lens-2'))
+    const { screen } = await renderCard(outputsWithMarkers)
+    const stopButton = screen.getByRole('button', { name: /stop wms server/i })
+
+    await stopButton.click()
+    await expect.poll(() => listMockLenses()).toHaveLength(1)
+    // The second server takes over the row.
+    await expect.element(stopButton).toBeEnabled()
+    await stopButton.click()
+    await expect
+      .element(screen.getByRole('button', { name: /start wms server/i }))
+      .toBeVisible()
+    await expect.poll(() => listMockLenses()).toHaveLength(0)
+    expect(error).not.toHaveBeenCalled()
   })
 
   it('Visualise opens /visualise with the output pinned as a single view', async () => {
