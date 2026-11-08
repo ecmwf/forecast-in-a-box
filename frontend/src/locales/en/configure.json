@@ -98,11 +98,10 @@
     }
   },
   "blockActions": {
+    "more": "More block actions",
     "duplicate": "Duplicate",
     "duplicateWithChildren": "Duplicate with children",
-    "saveAsPreset": "Save config as preset",
-    "deleteBlock": "Delete block",
-    "comingSoonPreset": "Coming soon: Saving configurations as presets will be available soon."
+    "deleteBlock": "Delete block"
   },
   "layout": {
     "hideBlockPalette": "Hide block palette",

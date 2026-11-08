@@ -10,19 +10,18 @@
 
 /** Block "more actions" menu for the graph node. */
 
-import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Bookmark, Copy, CopyPlus, MoreHorizontal } from 'lucide-react'
+import { Copy, CopyPlus, MoreHorizontal } from 'lucide-react'
 import type { MouseEvent } from 'react'
 import type { BlockInstanceId } from '@/api/types/fable.types'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
-import { showToast } from '@/lib/toast'
 import { Button } from '@/components/ui/button'
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 
 interface BlockActionMenuProps {
@@ -33,37 +32,29 @@ interface BlockActionMenuProps {
   stopPropagation?: boolean
 }
 
-const ITEM_CLASS =
-  'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent'
-
 export function BlockActionMenu({
   instanceId,
   triggerClassName,
   stopPropagation,
 }: BlockActionMenuProps) {
   const { t } = useTranslation('configure')
-  const [open, setOpen] = useState(false)
   const duplicateBlock = useFableBuilderStore((state) => state.duplicateBlock)
   const duplicateBlockWithChildren = useFableBuilderStore(
     (state) => state.duplicateBlockWithChildren,
   )
-
-  function run(action: () => void) {
-    action()
-    setOpen(false)
-  }
 
   const stop = stopPropagation
     ? (event: MouseEvent) => event.stopPropagation()
     : undefined
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
+    <DropdownMenu>
+      <DropdownMenuTrigger
         render={
           <Button
             variant="ghost"
             size="icon"
+            aria-label={t('blockActions.more')}
             className={cn(
               'text-muted-foreground hover:text-foreground',
               triggerClassName,
@@ -73,32 +64,19 @@ export function BlockActionMenu({
         }
       >
         <MoreHorizontal className="h-4 w-4" />
-      </PopoverTrigger>
-      <PopoverContent className="w-48 p-1" align="end" onClick={stop}>
-        <button
-          className={ITEM_CLASS}
-          onClick={() => run(() => duplicateBlock(instanceId))}
-        >
-          <Copy className="h-4 w-4" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-auto" onClick={stop}>
+        <DropdownMenuItem onClick={() => duplicateBlock(instanceId)}>
+          <Copy />
           {t('blockActions.duplicate')}
-        </button>
-        <button
-          className={ITEM_CLASS}
-          onClick={() => run(() => duplicateBlockWithChildren(instanceId))}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => duplicateBlockWithChildren(instanceId)}
         >
-          <CopyPlus className="h-4 w-4" />
+          <CopyPlus />
           {t('blockActions.duplicateWithChildren')}
-        </button>
-        <button
-          className={ITEM_CLASS}
-          onClick={() =>
-            run(() => showToast.info(t('blockActions.comingSoonPreset')))
-          }
-        >
-          <Bookmark className="h-4 w-4" />
-          {t('blockActions.saveAsPreset')}
-        </button>
-      </PopoverContent>
-    </Popover>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

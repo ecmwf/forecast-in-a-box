@@ -229,7 +229,8 @@ export const BlockNode = memo(function ({
 
             <BlockActionMenu
               instanceId={id}
-              triggerClassName="nodrag h-7 w-7"
+              // nopan: the menu opens on mouse-down, which canvas panning would take.
+              triggerClassName="nodrag nopan h-7 w-7"
               stopPropagation
             />
           </div>
