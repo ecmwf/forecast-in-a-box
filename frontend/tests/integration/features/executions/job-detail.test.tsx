@@ -899,4 +899,36 @@ describe('RunDetailPage Integration', () => {
       await expect.element(screen.getByText('${format}')).toBeVisible()
     })
   })
+
+  describe('specification tab', () => {
+    it('shows the workflow JSON with line numbers and a copy button', async () => {
+      injectMockExecution(resolvedConfigExecution)
+      const screen = await renderDetailPage('job-resolved-009')
+      await screen.getByRole('tab', { name: 'Specification' }).click()
+
+      await expect
+        .element(screen.getByText('Workflow specification'))
+        .toBeVisible()
+      await expect
+        .element(screen.getByRole('button', { name: 'Copy specification' }))
+        .toBeVisible()
+      await expect
+        .poll(
+          () =>
+            document.querySelectorAll('[data-slot="code-block-line"]').length,
+        )
+        .toBeGreaterThan(3)
+      expect(
+        document.querySelector(
+          '[data-slot="code-block-content"][data-numbered]',
+        ),
+      ).not.toBeNull()
+      // Keys and string values are coloured.
+      const key = document.querySelector(
+        '[data-slot="code-block-line"] span span',
+      )
+      expect(key?.textContent).toBe('"blocks"')
+      expect(key?.className).toContain('text-blue-600')
+    })
+  })
 })
