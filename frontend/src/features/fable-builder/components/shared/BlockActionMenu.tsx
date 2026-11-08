@@ -8,14 +8,21 @@
  * does it submit to any jurisdiction.
  */
 
-/** Block "more actions" menu for the graph node. */
+/** A block's actions, in its "..." menu and on right-click. */
 
 import { useTranslation } from 'react-i18next'
 import { Copy, CopyPlus, MoreHorizontal } from 'lucide-react'
-import type { MouseEvent } from 'react'
+import type { LucideIcon } from 'lucide-react'
+import type { MouseEvent, ReactElement } from 'react'
 import type { BlockInstanceId } from '@/api/types/fable.types'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import { Button } from '@/components/ui/button'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +30,38 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
+
+interface BlockAction {
+  key: string
+  icon: LucideIcon
+  label: string
+  run: () => void
+}
+
+function useBlockActions(instanceId: BlockInstanceId): Array<BlockAction> {
+  const { t } = useTranslation('configure')
+  const duplicateBlock = useFableBuilderStore((state) => state.duplicateBlock)
+  const duplicateBlockWithChildren = useFableBuilderStore(
+    (state) => state.duplicateBlockWithChildren,
+  )
+  return [
+    {
+      key: 'duplicate',
+      icon: Copy,
+      label: t('blockActions.duplicate'),
+      run: () => duplicateBlock(instanceId),
+    },
+    {
+      key: 'duplicateWithDownstream',
+      icon: CopyPlus,
+      label: t('blockActions.duplicateWithDownstream'),
+      run: () => duplicateBlockWithChildren(instanceId),
+    },
+  ]
+}
+
+// Menus portal out, but React events still bubble to the node and select it.
+const stopPropagation = (event: MouseEvent) => event.stopPropagation()
 
 interface BlockActionMenuProps {
   instanceId: BlockInstanceId
@@ -35,17 +74,11 @@ interface BlockActionMenuProps {
 export function BlockActionMenu({
   instanceId,
   triggerClassName,
-  stopPropagation,
+  stopPropagation: stop,
 }: BlockActionMenuProps) {
   const { t } = useTranslation('configure')
-  const duplicateBlock = useFableBuilderStore((state) => state.duplicateBlock)
-  const duplicateBlockWithChildren = useFableBuilderStore(
-    (state) => state.duplicateBlockWithChildren,
-  )
-
-  const stop = stopPropagation
-    ? (event: MouseEvent) => event.stopPropagation()
-    : undefined
+  const actions = useBlockActions(instanceId)
+  const onClick = stop ? stopPropagation : undefined
 
   return (
     <DropdownMenu>
@@ -59,24 +92,44 @@ export function BlockActionMenu({
               'text-muted-foreground hover:text-foreground',
               triggerClassName,
             )}
-            onClick={stop}
+            onClick={onClick}
           />
         }
       >
         <MoreHorizontal className="h-4 w-4" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-auto" onClick={stop}>
-        <DropdownMenuItem onClick={() => duplicateBlock(instanceId)}>
-          <Copy />
-          {t('blockActions.duplicate')}
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={() => duplicateBlockWithChildren(instanceId)}
-        >
-          <CopyPlus />
-          {t('blockActions.duplicateWithChildren')}
-        </DropdownMenuItem>
+      <DropdownMenuContent align="end" className="w-auto" onClick={onClick}>
+        {actions.map(({ key, icon: Icon, label, run }) => (
+          <DropdownMenuItem key={key} onClick={run}>
+            <Icon />
+            {label}
+          </DropdownMenuItem>
+        ))}
       </DropdownMenuContent>
     </DropdownMenu>
+  )
+}
+
+/** Opens the block's actions on right-click of `children`. */
+export function BlockContextMenu({
+  instanceId,
+  children,
+}: {
+  instanceId: BlockInstanceId
+  children: ReactElement
+}) {
+  const actions = useBlockActions(instanceId)
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger render={children} />
+      <ContextMenuContent onClick={stopPropagation}>
+        {actions.map(({ key, icon: Icon, label, run }) => (
+          <ContextMenuItem key={key} onClick={run}>
+            <Icon />
+            {label}
+          </ContextMenuItem>
+        ))}
+      </ContextMenuContent>
+    </ContextMenu>
   )
 }

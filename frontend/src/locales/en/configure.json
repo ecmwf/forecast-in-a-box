@@ -100,7 +100,7 @@
   "blockActions": {
     "more": "More block actions",
     "duplicate": "Duplicate",
-    "duplicateWithChildren": "Duplicate with children",
+    "duplicateWithDownstream": "Duplicate with downstream blocks",
     "deleteBlock": "Delete block"
   },
   "layout": {
