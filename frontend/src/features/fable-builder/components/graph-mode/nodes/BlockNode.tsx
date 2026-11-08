@@ -147,7 +147,7 @@ export const BlockNode = memo(function ({
   )
 
   return (
-    <BlockContextMenu instanceId={id}>
+    <BlockContextMenu instanceId={id} catalogue={catalogue}>
       <div
         ref={containerRef}
         role="button"
@@ -237,6 +237,7 @@ export const BlockNode = memo(function ({
 
               <BlockActionMenu
                 instanceId={id}
+                catalogue={catalogue}
                 // nopan: the menu opens on mouse-down, which canvas panning would take.
                 triggerClassName="nodrag nopan h-7 w-7"
                 stopPropagation

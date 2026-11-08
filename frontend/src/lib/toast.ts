@@ -32,6 +32,15 @@ export const showToast = {
     toast.success(message, { description, id }),
 
   /**
+   * Show a success toast with one action button, e.g. Undo.
+   */
+  successWithAction: (
+    message: string,
+    description: string | undefined,
+    action: { label: string; onClick: () => void },
+  ) => toast.success(message, { description, action }),
+
+  /**
    * Show an error toast notification.
    */
   error: (message: string, description?: string, id?: string) =>

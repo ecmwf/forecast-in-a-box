@@ -20,6 +20,7 @@ import type { FableBuilderV1 } from '@/api/types/fable.types'
 import { API_ENDPOINTS } from '@/api/endpoints'
 import { FableBuilderV1Schema } from '@/api/types/fable.types'
 import { FableBuilderPage } from '@/features/fable-builder/components/FableBuilderPage'
+import { showToast } from '@/lib/toast'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import {
   fableToEdges,
@@ -425,6 +426,82 @@ describe('Graph Mode - Builder Integration', () => {
     await expect
       .poll(() => Object.keys(useFableBuilderStore.getState().fable.blocks))
       .toHaveLength(before.length + 1)
+  })
+
+  /** Replaces product1 with the first choice; returns the toast's arguments. */
+  async function replaceProduct() {
+    const toast = vi.spyOn(showToast, 'successWithAction')
+    onTestFinished(() => toast.mockRestore())
+    const screen = await renderWithRouter(<FableBuilderPage />)
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
+    useFableBuilderStore.getState().setFable(createMultiBlockFable())
+    await expect
+      .poll(() => useFableBuilderStore.getState().validationState)
+      .not.toBeNull()
+
+    const node = document.querySelector(
+      '.react-flow__node [data-block-kind="product"]',
+    )
+    node?.dispatchEvent(
+      new MouseEvent('contextmenu', {
+        bubbles: true,
+        clientX: 50,
+        clientY: 50,
+      }),
+    )
+    const replaceWith = screen.getByRole('menuitem', { name: 'Replace with' })
+    await expect.element(replaceWith).toBeVisible()
+    ;(replaceWith.element() as HTMLElement).click()
+
+    const menus = () => [...document.querySelectorAll('[role="menu"]')]
+    await expect.poll(() => menus().length).toBe(2)
+    const choice = menus()[1].querySelector<HTMLElement>('[role="menuitem"]')
+    const title = choice?.textContent
+    choice?.click()
+
+    await expect.poll(() => productFactory()).not.toBe('ensembleStatistics')
+    const [message, , action] = toast.mock.calls[0]
+    return { title, message, action }
+  }
+
+  const productFactory = () =>
+    useFableBuilderStore.getState().fable.blocks.product1.factory_id.factory
+
+  it('replaces a block in place from its right-click menu', async () => {
+    const { title, message } = await replaceProduct()
+
+    const { blocks } = useFableBuilderStore.getState().fable
+    expect(Object.values(blocks.product1.input_ids)).toEqual(['source1'])
+    expect(blocks.sink1.input_ids).toEqual({ dataset: 'product1' })
+    expect(message).toMatch(new RegExp(`^Replaced .+ with ${title}$`))
+  })
+
+  it("undoes the replace from the toast's Undo", async () => {
+    const { action } = await replaceProduct()
+
+    expect(action.label).toBe('Undo')
+    action.onClick()
+    expect(productFactory()).toBe('ensembleStatistics')
+    expect(
+      useFableBuilderStore.getState().fable.blocks.product1
+        .configuration_values,
+    ).toEqual({ statistic: 'mean' })
+    // A plain undo: redo brings the replacement back.
+    useFableBuilderStore.getState().redo()
+    expect(productFactory()).not.toBe('ensembleStatistics')
+  })
+
+  it('undoes only the replace when other edits came after it', async () => {
+    const { action } = await replaceProduct()
+    useFableBuilderStore
+      .getState()
+      .updateBlockConfig('sink1', 'path', '/tmp/other.zarr')
+
+    action.onClick()
+    const { blocks } = useFableBuilderStore.getState().fable
+    expect(productFactory()).toBe('ensembleStatistics')
+    expect(blocks.product1.configuration_values).toEqual({ statistic: 'mean' })
+    expect(blocks.sink1.configuration_values.path).toBe('/tmp/other.zarr')
   })
 
   it('shows the empty configuration panel when no block is selected', async () => {

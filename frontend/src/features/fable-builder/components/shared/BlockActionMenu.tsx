@@ -10,25 +10,54 @@
 
 /** A block's actions, in its "..." menu and on right-click. */
 
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Copy, CopyPlus, MoreHorizontal } from 'lucide-react'
+import { Copy, CopyPlus, MoreHorizontal, Replace } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { MouseEvent, ReactElement } from 'react'
-import type { BlockInstanceId } from '@/api/types/fable.types'
+import type {
+  BlockFactoryCatalogue,
+  BlockInstance,
+  BlockInstanceId,
+  FableBuilderV1,
+} from '@/api/types/fable.types'
+import type { ReplacementCandidate } from '@/features/fable-builder/utils/replace-block'
+import {
+  factoryIdToKey,
+  getFactory,
+  pluginIdToDisplayKey,
+} from '@/api/types/fable.types'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
+import {
+  collidingTitles,
+  qualifiedFactoryTitle,
+} from '@/features/fable-builder/utils/block-names'
+import {
+  replaceBlockInstance,
+  replacementCandidates,
+} from '@/features/fable-builder/utils/replace-block'
 import { Button } from '@/components/ui/button'
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { showToast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
 interface BlockAction {
@@ -60,11 +89,111 @@ function useBlockActions(instanceId: BlockInstanceId): Array<BlockAction> {
   ]
 }
 
+interface Replacements {
+  /** `null` while the workflow is being checked. */
+  candidates: Array<ReplacementCandidate> | null
+  replace: (candidate: ReplacementCandidate) => void
+}
+
+function useReplacements(
+  instanceId: BlockInstanceId,
+  catalogue: BlockFactoryCatalogue,
+): Replacements {
+  const { t } = useTranslation('configure')
+  const fable = useFableBuilderStore((state) => state.fable)
+  const validation = useFableBuilderStore((state) => state.validationState)
+  const replaceBlock = useFableBuilderStore((state) => state.replaceBlock)
+  const candidates = useMemo(
+    () =>
+      validation
+        ? replacementCandidates(instanceId, fable, catalogue, validation)
+        : null,
+    [instanceId, fable, catalogue, validation],
+  )
+
+  const replace = ({ factoryId, factory, label }: ReplacementCandidate) => {
+    const block = fable.blocks[instanceId]
+    const from = getFactory(catalogue, block.factory_id)
+    if (!from) return
+    const { instance, kept, dropped } = replaceBlockInstance(
+      block,
+      from,
+      factoryId,
+      factory,
+    )
+    replaceBlock(instanceId, instance)
+    const swapped = useFableBuilderStore.getState().fable
+    const fromLabel = qualifiedFactoryTitle(
+      from.title,
+      pluginIdToDisplayKey(block.factory_id.plugin),
+      collidingTitles(catalogue),
+    )
+    showToast.successWithAction(
+      t('blockActions.replaced', { from: fromLabel, to: label }),
+      kept.length + dropped.length > 0
+        ? t('blockActions.keptOptions', {
+            kept: kept.length,
+            count: kept.length + dropped.length,
+          })
+        : undefined,
+      {
+        label: t('header.undo'),
+        onClick: () => undoReplace(instanceId, block, instance, swapped),
+      },
+    )
+  }
+
+  return { candidates, replace }
+}
+
+/** Reverts a replace: a plain undo while nothing changed since, else puts the old block back. */
+function undoReplace(
+  instanceId: BlockInstanceId,
+  original: BlockInstance,
+  replacement: BlockInstance,
+  swapped: FableBuilderV1,
+): void {
+  const state = useFableBuilderStore.getState()
+  if (state.fable === swapped) {
+    state.undo()
+    return
+  }
+  // Only while the block is still the one swapped in.
+  const current = state.fable.blocks[instanceId] as BlockInstance | undefined
+  if (
+    current &&
+    factoryIdToKey(current.factory_id) ===
+      factoryIdToKey(replacement.factory_id)
+  ) {
+    state.replaceBlock(instanceId, original)
+  }
+}
+
+/** The candidates, or one disabled line saying why there are none. */
+function replaceItems(
+  { candidates, replace }: Replacements,
+  empty: string,
+  Item: typeof DropdownMenuItem | typeof ContextMenuItem,
+) {
+  if (!candidates || candidates.length === 0) {
+    return <Item disabled>{empty}</Item>
+  }
+  return candidates.map((candidate) => (
+    <Item
+      key={factoryIdToKey(candidate.factoryId)}
+      onClick={() => replace(candidate)}
+    >
+      {candidate.label}
+    </Item>
+  ))
+}
+
 // Menus portal out, but React events still bubble to the node and select it.
 const stopPropagation = (event: MouseEvent) => event.stopPropagation()
 
 interface BlockActionMenuProps {
   instanceId: BlockInstanceId
+  catalogue: BlockFactoryCatalogue
   /** Trigger button classes — sizing differs between graph node and form card. */
   triggerClassName?: string
   /** Graph nodes stop click propagation so the canvas doesn't deselect. */
@@ -73,6 +202,7 @@ interface BlockActionMenuProps {
 
 export function BlockActionMenu({
   instanceId,
+  catalogue,
   triggerClassName,
   stopPropagation: stop,
 }: BlockActionMenuProps) {
@@ -105,19 +235,60 @@ export function BlockActionMenu({
             {label}
           </DropdownMenuItem>
         ))}
+        <DropdownMenuSeparator />
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <Replace />
+            {t('blockActions.replaceWith')}
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="w-auto">
+            <ReplaceDropdownItems
+              instanceId={instanceId}
+              catalogue={catalogue}
+            />
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
       </DropdownMenuContent>
     </DropdownMenu>
   )
 }
 
+// The candidates load only while the submenu is open.
+function ReplaceDropdownItems(props: {
+  instanceId: BlockInstanceId
+  catalogue: BlockFactoryCatalogue
+}) {
+  const { t } = useTranslation('configure')
+  const replacements = useReplacements(props.instanceId, props.catalogue)
+  const empty = replacements.candidates
+    ? t('blockActions.noReplacement')
+    : t('blockActions.checking')
+  return replaceItems(replacements, empty, DropdownMenuItem)
+}
+
+function ReplaceContextItems(props: {
+  instanceId: BlockInstanceId
+  catalogue: BlockFactoryCatalogue
+}) {
+  const { t } = useTranslation('configure')
+  const replacements = useReplacements(props.instanceId, props.catalogue)
+  const empty = replacements.candidates
+    ? t('blockActions.noReplacement')
+    : t('blockActions.checking')
+  return replaceItems(replacements, empty, ContextMenuItem)
+}
+
 /** Opens the block's actions on right-click of `children`. */
 export function BlockContextMenu({
   instanceId,
+  catalogue,
   children,
 }: {
   instanceId: BlockInstanceId
+  catalogue: BlockFactoryCatalogue
   children: ReactElement
 }) {
+  const { t } = useTranslation('configure')
   const actions = useBlockActions(instanceId)
   return (
     <ContextMenu>
@@ -129,6 +300,19 @@ export function BlockContextMenu({
             {label}
           </ContextMenuItem>
         ))}
+        <ContextMenuSeparator />
+        <ContextMenuSub>
+          <ContextMenuSubTrigger className="gap-2">
+            <Replace />
+            {t('blockActions.replaceWith')}
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent>
+            <ReplaceContextItems
+              instanceId={instanceId}
+              catalogue={catalogue}
+            />
+          </ContextMenuSubContent>
+        </ContextMenuSub>
       </ContextMenuContent>
     </ContextMenu>
   )

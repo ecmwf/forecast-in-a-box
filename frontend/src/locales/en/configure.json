@@ -101,7 +101,13 @@
     "more": "More block actions",
     "duplicate": "Duplicate",
     "duplicateWithDownstream": "Duplicate with downstream blocks",
-    "deleteBlock": "Delete block"
+    "deleteBlock": "Delete block",
+    "replaceWith": "Replace with",
+    "checking": "Checking which blocks fit...",
+    "noReplacement": "No other block fits here",
+    "replaced": "Replaced {{from}} with {{to}}",
+    "keptOptions_one": "Kept {{kept}} of {{count}} option",
+    "keptOptions_other": "Kept {{kept}} of {{count}} options"
   },
   "layout": {
     "hideBlockPalette": "Hide block palette",
