@@ -75,6 +75,7 @@ import {
   formatLogTime,
   inWindow,
   locateFailure,
+  logFileGroup,
   meetsLevel,
   parseLogFile,
   runWindow,
@@ -286,7 +287,10 @@ export function LogsPanel({
     else if (target) openFile(target.file)
   }
 
-  const hasRunFiles = parsed.some((p) => p.file.group === 'run')
+  const skipped = archive.data?.skipped ?? []
+  const hasRunFiles =
+    parsed.some((p) => p.file.group === 'run') ||
+    skipped.some((f) => logFileGroup(f.name) === 'run')
   const collectError = parsed.find(
     (p) => p.file.name === 'logs_directory.error.txt',
   )
@@ -488,6 +492,15 @@ export function LogsPanel({
           archive.data &&
           parsed.length > 0 &&
           !hasRunFiles && <Notice>{t('logs.noRunFiles')}</Notice>
+        )}
+        {skipped.length > 0 && (
+          <Notice>
+            {t('logs.skippedLarge', {
+              files: skipped
+                .map((f) => `${f.label} (${formatBytes(f.bytes)})`)
+                .join(', '),
+            })}
+          </Notice>
         )}
 
         {archive.isPending ? (

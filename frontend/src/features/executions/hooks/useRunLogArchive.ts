@@ -9,15 +9,14 @@
  */
 
 import { useQuery } from '@tanstack/react-query'
-import type { LogFile } from '@/features/executions/utils/run-logs'
+import type { LogArchive } from '@/features/executions/utils/run-logs'
 import { downloadJobLogs } from '@/api/endpoints/job'
 import { jobKeys } from '@/api/hooks/useJobs'
 import { unpackLogArchive } from '@/features/executions/utils/run-logs'
 
-export interface RunLogArchive {
+export interface RunLogArchive extends LogArchive {
   /** The zip as served. */
   blob: Blob
-  files: Array<LogFile>
   fetchedAt: number
 }
 
@@ -27,8 +26,8 @@ export function useRunLogArchive(runId: string) {
     queryKey: jobKeys.logs(runId),
     queryFn: async () => {
       const blob = await downloadJobLogs(runId)
-      const files = unpackLogArchive(new Uint8Array(await blob.arrayBuffer()))
-      return { blob, files, fetchedAt: Date.now() }
+      const archive = unpackLogArchive(new Uint8Array(await blob.arrayBuffer()))
+      return { ...archive, blob, fetchedAt: Date.now() }
     },
     staleTime: Infinity,
     refetchOnWindowFocus: false,

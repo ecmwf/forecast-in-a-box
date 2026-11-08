@@ -61,10 +61,39 @@ export function logFileLabel(name: string): string {
   return name.replace(/(?:\.logs)?\.txt$/, '')
 }
 
+export interface LogArchive {
+  files: Array<LogFile>
+  /** Files left packed because their declared size is over the limits. */
+  skipped: Array<{ name: string; label: string; bytes: number }>
+}
+
+/** fflate allocates the size a zip header declares before inflating (CVE-2026-122146). */
+export const ARCHIVE_LIMITS = {
+  fileBytes: 100 * 2 ** 20,
+  totalBytes: 400 * 2 ** 20,
+}
+
 /** Non-empty files, this run's first, each group by label. */
-export function unpackLogArchive(data: Uint8Array): Array<LogFile> {
-  return Object.entries(unzipSync(data))
-    .filter(([name, bytes]) => !name.endsWith('/') && bytes.length > 0)
+export function unpackLogArchive(
+  data: Uint8Array,
+  limits = ARCHIVE_LIMITS,
+): LogArchive {
+  const skipped: LogArchive['skipped'] = []
+  let total = 0
+  const entries = unzipSync(data, {
+    filter: ({ name, originalSize }) => {
+      if (name.endsWith('/')) return false
+      const fits =
+        originalSize <= limits.fileBytes &&
+        total + originalSize <= limits.totalBytes
+      if (fits) total += originalSize
+      else
+        skipped.push({ name, label: logFileLabel(name), bytes: originalSize })
+      return fits
+    },
+  })
+  const files = Object.entries(entries)
+    .filter(([, bytes]) => bytes.length > 0)
     .map(([name, bytes]) => ({
       name,
       label: logFileLabel(name),
@@ -76,6 +105,7 @@ export function unpackLogArchive(data: Uint8Array): Array<LogFile> {
         GROUP_ORDER[a.group] - GROUP_ORDER[b.group] ||
         a.label.localeCompare(b.label),
     )
+  return { files, skipped }
 }
 
 export function decodeLogFile(file: LogFile): string {

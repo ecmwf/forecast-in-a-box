@@ -59,11 +59,30 @@ describe('unpackLogArchive', () => {
       [`${JOB}.host_0.executor.logs.txt`]: strToU8('executor'),
       [`${JOB}.controller.logs.txt`]: strToU8('controller'),
     })
-    expect(unpackLogArchive(zip).map((f) => f.label)).toEqual([
+    expect(unpackLogArchive(zip).files.map((f) => f.label)).toEqual([
       'controller',
       'host_0.executor',
       'backend',
       'gw_state.json',
+    ])
+  })
+})
+
+describe('unpackLogArchive limits', () => {
+  it('leaves files over the declared-size limits packed', () => {
+    const zip = zipSync({
+      'backend.logs.txt': strToU8('x'.repeat(20)),
+      'gateway.logs.txt': strToU8('y'.repeat(8)),
+      'lens.1.stdout.txt': strToU8('z'.repeat(8)),
+    })
+    const { files, skipped } = unpackLogArchive(zip, {
+      fileBytes: 10,
+      totalBytes: 12,
+    })
+    expect(files.map((f) => f.label)).toEqual(['gateway'])
+    expect(skipped.map((f) => [f.label, f.bytes])).toEqual([
+      ['backend', 20],
+      ['lens.1.stdout', 8],
     ])
   })
 })

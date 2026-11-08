@@ -375,6 +375,7 @@
     "noFiles": "The log archive is empty.",
     "noRunFiles": "This run's own log files are no longer on this server. Each server start keeps its logs in a new folder, so after a restart only the server-wide logs remain.",
     "collectError": "The server couldn't collect this run's logs: {{detail}}",
+    "skippedLarge": "Too large to show here: {{files}}. Download the full logs to read them.",
     "noMatches": "No lines match the filter.",
     "noRunTimeLines": "No lines from while this run went on. Turn off \"During run\" to see the whole file.",
     "errorCount_one": "{{count}} error",
