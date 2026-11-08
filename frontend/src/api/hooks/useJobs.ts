@@ -47,6 +47,7 @@ export const jobKeys = {
     [...jobKeys.all, 'list', page, pageSize, status] as const,
   compilation: (jobId: string) =>
     [...jobKeys.all, 'compilation', jobId] as const,
+  logs: (jobId: string) => [...jobKeys.all, 'logs', jobId] as const,
 }
 
 export function useJobStatus(jobId: string | undefined) {

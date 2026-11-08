@@ -442,7 +442,12 @@ export function RunDetailPage() {
                   />
                 </TabsContent>
                 <TabsContent value="logs" className={WIDE_TAB_CONTENT}>
-                  <LogsPanel jobId={jobId} status={jobData.status} />
+                  <LogsPanel
+                    jobId={jobId}
+                    status={jobData.status}
+                    createdAt={jobData.created_at}
+                    updatedAt={jobData.updated_at}
+                  />
                 </TabsContent>
                 <TabsContent value="compilation" className={WIDE_TAB_CONTENT}>
                   <CompilationPanel
