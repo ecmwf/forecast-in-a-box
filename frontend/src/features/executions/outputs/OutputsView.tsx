@@ -357,34 +357,29 @@ export function OutputsView({
 
   /** Synthesised placeholders when the outputs payload has no rows yet. */
   const blockSkeletons = useMemo<Array<OutputItem>>(() => {
-    if (items.length > 0) return []
+    // Any row, stored ones too, means the payload lists every output.
+    if (Object.keys(outputs ?? {}).length > 0) return []
     // Skeletons are for in-progress runs only.
     if (isTerminalStatus(status)) return []
     if (!plannedBlockIds || plannedBlockIds.length === 0) return []
-    return (
-      plannedBlockIds
-        // GRIB sink blocks belong to the Stored outputs card.
-        .filter((blockId) => !storedStats.blocks.has(blockId))
-        .map((blockId) => {
-          const settings = settingsOf(blockId)
-          return {
-            jobId,
-            taskId: `__planned__:${blockId}`,
-            mimeType: 'application/octet-stream',
-            blockName: blockNames?.[blockId] ?? blockId,
-            originalBlock: blockId,
-            settings,
-            subtitle: settings && dimFormat.dims(settings, 'compact'),
-            isAvailable: false,
-          }
-        })
-    )
+    return plannedBlockIds.map((blockId) => {
+      const settings = settingsOf(blockId)
+      return {
+        jobId,
+        taskId: `__planned__:${blockId}`,
+        mimeType: 'application/octet-stream',
+        blockName: blockNames?.[blockId] ?? blockId,
+        originalBlock: blockId,
+        settings,
+        subtitle: settings && dimFormat.dims(settings, 'compact'),
+        isAvailable: false,
+      }
+    })
   }, [
-    items.length,
+    outputs,
     plannedBlockIds,
     jobId,
     status,
-    storedStats,
     blockNames,
     settingsOf,
     dimFormat,

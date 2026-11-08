@@ -336,6 +336,29 @@ describe('RunDetailPage Integration', () => {
       await expect.element(screen.getByText(/Generated: 0/)).toBeVisible()
     })
 
+    it('adds no placeholder card when every output is a stored GRIB file', async () => {
+      const running = getExecution('job-running-002')
+      if (!running) throw new Error('missing seed')
+      const marker = {
+        mime_type: 'text/plain; fiab-format=gribdir; fiab-fetchable=1',
+        original_block: 'block_sink_1',
+        is_available: false,
+      }
+      injectMockExecution({
+        ...running,
+        run_id: 'job-grib-only-011',
+        outputs: { 'task-grib-1': marker, 'task-grib-2': marker },
+        completed_block_ids: [],
+        planned_block_ids: ['block_source_1'],
+      })
+      const screen = await renderDetailPage('job-grib-only-011')
+
+      await expect
+        .element(screen.getByText('0 of 2 files written'))
+        .toBeVisible()
+      expect(document.querySelector('[aria-busy="true"]')).toBeNull()
+    })
+
     it('shows no outputs message for submitted job with null outputs', async () => {
       const screen = await renderDetailPage('job-submitted-004')
       await expect
