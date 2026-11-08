@@ -1040,6 +1040,41 @@ describe('RunDetailPage Integration', () => {
       ).toBe('highlighted')
     })
 
+    it('opens the failure from the error banner on fresh logs', async () => {
+      let fetches = 0
+      const count = ({ request }: { request: Request }) => {
+        if (request.url.includes('/run/logs')) fetches++
+      }
+      worker.events.on('request:start', count)
+      try {
+        const screen = await openLogs('job-errored-003')
+        await expect
+          .element(screen.getByText(/running task plot/))
+          .toBeVisible()
+        await screen.getByLabelText('Log file').click()
+        await screen.getByRole('option', { name: /^backend/ }).click()
+        await screen.getByRole('tab', { name: 'Outputs' }).click()
+
+        await screen.getByRole('button', { name: 'Show in logs' }).click()
+        await expect
+          .element(screen.getByRole('tab', { name: 'Logs' }))
+          .toHaveAttribute('aria-selected', 'true')
+        await expect
+          .element(screen.getByLabelText('Log file'))
+          .toMatchTextContent('host_0.worker_w0')
+        await expect
+          .poll(() =>
+            document
+              .querySelector('[data-line="2"]')
+              ?.getAttribute('data-variant'),
+          )
+          .toBe('highlighted')
+        expect(fetches).toBe(2)
+      } finally {
+        worker.events.removeListener('request:start', count)
+      }
+    })
+
     it('says so when the run files are gone after a restart', async () => {
       // No cascade job id: only server-wide files.
       const screen = await openLogs('job-submitted-004')

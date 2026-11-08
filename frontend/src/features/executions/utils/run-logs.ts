@@ -237,3 +237,44 @@ export function countEntries(lines: ReadonlyArray<LogLine>): {
   }
   return counts
 }
+
+export interface LogLocation {
+  /** Archive path. */
+  file: string
+  /** Absent when the file has no error. */
+  line?: number
+}
+
+// `host=l0; worker=l0.w1` in a task failure.
+const FAILED_WORKER = /\bhost=l(\d+); worker=l\d+\.(w\d+)\b/
+
+function lastErrorEntry(file: ParsedLogFile): LogLine | undefined {
+  for (let i = file.lines.length - 1; i >= 0; i--) {
+    const line = file.lines[i]
+    if (line.level === 'error' && lineLevel(line.text) !== undefined) {
+      return line
+    }
+  }
+  return undefined
+}
+
+/** Last error of the failing worker, else controller, else most errors. */
+export function locateFailure(
+  files: ReadonlyArray<ParsedLogFile>,
+  message: string,
+): LogLocation | undefined {
+  const runFile = (label: string) =>
+    files.find((f) => f.file.group === 'run' && f.file.label === label)
+  const worker = FAILED_WORKER.exec(message)
+  const candidates = [
+    worker ? runFile(`host_${worker[1]}.worker_${worker[2]}`) : undefined,
+    runFile('controller'),
+    defaultLogFile(files),
+  ].filter((f): f is ParsedLogFile => f !== undefined)
+  for (const file of candidates) {
+    const line = lastErrorEntry(file)
+    if (line) return { file: file.file.name, line: line.number }
+  }
+  const first = candidates.at(0)
+  return first && { file: first.file.name }
+}

@@ -74,6 +74,7 @@ import {
   defaultLogFile,
   formatLogTime,
   inWindow,
+  locateFailure,
   meetsLevel,
   parseLogFile,
   runWindow,
@@ -83,12 +84,20 @@ import { downloadBlob } from '@/lib/download-blob'
 import { showToast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
+/** Request to open a run failure; `at` is when it was made. */
+export interface LogFocus {
+  message: string
+  at: number
+}
+
 interface LogsPanelProps {
   jobId: string
   status: JobStatus
   /** Bounds of the "During run" filter. */
   createdAt: string
   updatedAt: string
+  /** Opens this failure once fresh logs arrive. */
+  focus?: LogFocus | null
 }
 
 /** Lines rendered before "Show all". */
@@ -127,6 +136,7 @@ export function LogsPanel({
   status,
   createdAt,
   updatedAt,
+  focus,
 }: LogsPanelProps) {
   const { t } = useTranslation('executions')
   const archive = useRunLogArchive(jobId)
@@ -260,6 +270,20 @@ export function LogsPanel({
     setLevel(ALL_LEVELS)
     setShowAll(index >= 0 && index < shown.length - RENDER_LIMIT)
     setJumpTo({ file: name, line })
+  }
+
+  // Applied once, when logs newer than the request arrive.
+  const [appliedFocus, setAppliedFocus] = useState<number | null>(null)
+  if (
+    focus &&
+    appliedFocus !== focus.at &&
+    !archive.isFetching &&
+    archive.dataUpdatedAt >= focus.at
+  ) {
+    setAppliedFocus(focus.at)
+    const target = locateFailure(parsed, focus.message)
+    if (target?.line !== undefined) openAt(target.file, target.line)
+    else if (target) openFile(target.file)
   }
 
   const hasRunFiles = parsed.some((p) => p.file.group === 'run')

@@ -19,6 +19,7 @@ import {
   useEffect,
   useLayoutEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 import {
@@ -31,6 +32,7 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
+import { useQueryClient } from '@tanstack/react-query'
 import { RunCanvas } from './RunCanvas'
 import { CompilationForceGraph } from './CompilationForceGraph'
 import { CompilationPanel } from './CompilationPanel'
@@ -41,6 +43,7 @@ import { LogsPanel } from './LogsPanel'
 import { OutputsPanel } from './OutputsPanel'
 import { SpecificationPanel } from './SpecificationPanel'
 import { StoredOutputsCard } from './StoredOutputsCard'
+import type { LogFocus } from './LogsPanel'
 import type { CSSProperties, ReactNode } from 'react'
 import { useBlockDisplayNames } from '@/features/fable-builder/hooks/useBlockDisplayNames'
 import { RunMetadataDialog } from '@/features/journal/components/RunMetadataDialog'
@@ -55,6 +58,7 @@ import { showToast } from '@/lib/toast'
 import { ApiClientError } from '@/api/client'
 import { useBlockCatalogue, useFableRetrieve } from '@/api/hooks/useFable'
 import {
+  jobKeys,
   useDeleteJob,
   useJobStatus,
   useRestartJob,
@@ -119,6 +123,9 @@ export function RunDetailPage() {
   const { jobId } = useParams({ from: '/_authenticated/execute/$jobId' })
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('outputs')
+  const [logFocus, setLogFocus] = useState<LogFocus | null>(null)
+  const tabsRef = useRef<HTMLDivElement>(null)
+  const queryClient = useQueryClient()
   const [metadataOpen, setMetadataOpen] = useState(false)
   const [toolbarSlot, setToolbarSlot] = useState<HTMLDivElement | null>(null)
   const handleToolbarRef = useCallback((node: HTMLDivElement | null) => {
@@ -228,6 +235,17 @@ export function RunDetailPage() {
     )
   }
 
+  // Refetch: the cached archive may predate the failure.
+  const handleShowInLogs = (message: string) => {
+    setLogFocus({ message, at: Date.now() })
+    void queryClient.invalidateQueries({ queryKey: jobKeys.logs(jobId) })
+    setActiveTab('logs')
+    const tabs = tabsRef.current
+    if (tabs && tabs.getBoundingClientRect().top > window.innerHeight / 2) {
+      tabs.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }
+
   const handleEditConfig = () => {
     if (!jobData?.blueprint_id) return
     navigate({
@@ -324,6 +342,7 @@ export function RunDetailPage() {
         <RunErrorBanner
           error={jobData.error}
           jobId={jobId}
+          onShowInLogs={() => handleShowInLogs(jobData.error ?? '')}
           onRestart={handleRestart}
           onEditConfig={handleEditConfig}
           canEditConfig={canEditConfig}
@@ -376,6 +395,7 @@ export function RunDetailPage() {
           details={
             <div className={WIDE_COLUMN}>
               <Tabs
+                ref={tabsRef}
                 value={activeTab}
                 onValueChange={setActiveTab}
                 className="min-[1280px]:flex min-[1280px]:h-full min-[1280px]:min-h-0 min-[1280px]:flex-col"
@@ -447,6 +467,7 @@ export function RunDetailPage() {
                     status={jobData.status}
                     createdAt={jobData.created_at}
                     updatedAt={jobData.updated_at}
+                    focus={logFocus}
                   />
                 </TabsContent>
                 <TabsContent value="compilation" className={WIDE_TAB_CONTENT}>

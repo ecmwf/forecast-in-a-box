@@ -61,6 +61,7 @@
     "editDetails": "Edit details",
     "save": "Save",
     "editConfiguration": "Edit workflow",
+    "showInLogs": "Show in logs",
     "downloadLogs": "Download full logs",
     "downloadLogsFailed": "Failed to download logs",
     "confirmRestart": "This will run the forecast again with the same specification. Continue?",

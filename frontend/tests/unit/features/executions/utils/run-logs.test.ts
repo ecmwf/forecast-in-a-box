@@ -16,6 +16,7 @@ import {
   defaultLogFile,
   formatLogTime,
   inWindow,
+  locateFailure,
   logFileGroup,
   logFileLabel,
   meetsLevel,
@@ -129,6 +130,58 @@ describe('defaultLogFile', () => {
     const backend = file('backend.logs.txt', error)
     expect(defaultLogFile([backend])).toBe(backend)
     expect(defaultLogFile([])).toBeUndefined()
+  })
+})
+
+describe('locateFailure', () => {
+  const file = (name: string, lines: Array<string>) =>
+    parseLogFile({
+      name,
+      label: logFileLabel(name),
+      group: logFileGroup(name),
+      bytes: strToU8(lines.join('\n')),
+    })
+  const at = '2026-11-08 08:39:23,378'
+  const w1 = file(`${JOB}.host_0.worker_w1.logs.txt`, [
+    `${at}:ERROR:cascade.executor.runner.entrypoint:1:pkg install failed`,
+    `${at}:INFO:cascade.executor.runner:1:retrying`,
+    `${at}:ERROR:cascade.executor.runner.entrypoint:1:runner failure`,
+    'Traceback (most recent call last):',
+    'ValueError: matmul: dimension mismatch',
+  ])
+  const w0 = file(`${JOB}.host_0.worker_w0.logs.txt`, [
+    `${at}:ERROR:a:1:x`,
+    `${at}:ERROR:a:1:y`,
+  ])
+  const controller = file(`${JOB}.controller.logs.txt`, [
+    `${at}:INFO:a:1:start`,
+    `${at}:ERROR:cascade.controller.report:1:reporting a controller crash`,
+  ])
+  const files = [controller, w0, w1]
+
+  it('points at the failing worker last error entry', () => {
+    const message = "CascadeUserError('host=l0; worker=l0.w1; task=map_plot"
+    expect(locateFailure(files, message)).toEqual({
+      file: w1.file.name,
+      line: 3,
+    })
+  })
+
+  it('falls back to the controller, then the file with the most errors', () => {
+    expect(locateFailure(files, 'OOM killed')).toEqual({
+      file: controller.file.name,
+      line: 2,
+    })
+    expect(locateFailure([w0, w1], 'OOM killed')).toEqual({
+      file: w0.file.name,
+      line: 2,
+    })
+  })
+
+  it('opens a file without a line when nothing has errors', () => {
+    const quiet = file('backend.logs.txt', [`${at}:INFO:a:1:ok`])
+    expect(locateFailure([quiet], 'x')).toEqual({ file: 'backend.logs.txt' })
+    expect(locateFailure([], 'x')).toBeUndefined()
   })
 })
 
