@@ -240,13 +240,17 @@ class TestRegridBoundingBox:
     # nwse of the cut-out; on the 1 degree grid it holds 26 rows and 41 columns
     AREA_NWSE = [60.0, -10.0, 35.0, 30.0]
 
-    def _assert_cutout(self, result: ekd.FieldList, shape: tuple[int, int]) -> None:
+    # the same area padded for a named domain on the 1 degree grid, by 1 degree for the grid and 0.5 degrees of fixed margin; it holds
+    # 29 rows and 44 columns
+    PADDED_AREA_NWSE = [61.5, -11.5, 33.5, 31.5]
+
+    def _assert_cutout(self, result: ekd.FieldList, shape: tuple[int, int], area: Sequence[float] | None = None) -> None:
         assert len(result) == len(PARAMS)
         for field in result:
             assert field.metadata("gridType") == "regular_ll"
             assert field.shape == shape
             north, west, south, east = _extent(field)
-            np.testing.assert_allclose([north, west, south, east], self.AREA_NWSE)
+            np.testing.assert_allclose([north, west, south, east], self.AREA_NWSE if area is None else area)
         _assert_identity_preserved(result)
         _assert_values_match_analytic(result)
 
@@ -271,7 +275,7 @@ class TestRegridBoundingBox:
 
         result = _regrid(input_fields, grid=1.0, domain="Somewhere")
 
-        self._assert_cutout(result, (26, 41))
+        self._assert_cutout(result, (29, 44), self.PADDED_AREA_NWSE)
 
     @pytest.mark.parametrize("names", [["West", "East"], ["East", "West"]])
     def test_several_named_domains_are_cut_out_as_one_bounding_box(
@@ -293,7 +297,7 @@ class TestRegridBoundingBox:
         result = _regrid(input_fields, grid=1.0, domain=names)
 
         assert lookups == [names]
-        self._assert_cutout(result, (26, 41))
+        self._assert_cutout(result, (29, 44), self.PADDED_AREA_NWSE)
 
     def test_cutout_is_smaller_than_global(self, input_fields: ekd.FieldList) -> None:
         global_result = _regrid(input_fields, grid=1.0)
@@ -311,19 +315,29 @@ class TestRegridAcrossAntimeridian:
     }
     WEST = 175.0
     SHAPE = (13, 16)
+    # Named domains are padded on the 1 degree grid by 1 degree for the grid and 0.5 degrees of fixed margin, so the cut-out is
+    # north -8.5, south -23.5 and longitudes from 173.5 over the 180 line to 191.5, which holds 16 rows and 19 columns.
+    PADDED_SHAPE = (16, 19)
 
-    def _assert_crosses_the_180_line(self, result: ekd.FieldList) -> None:
+    def _assert_crosses_the_180_line(
+        self,
+        result: ekd.FieldList,
+        shape: tuple[int, int] | None = None,
+        latitudes: tuple[float, float] = (-10.0, -22.0),
+        west: float | None = None,
+        width: float = 15.0,
+    ) -> None:
         assert len(result) == len(PARAMS)
         for field in result:
             assert field.metadata("gridType") == "regular_ll"
-            assert field.shape == self.SHAPE
+            assert field.shape == (self.SHAPE if shape is None else shape)
             latlon = field.to_latlon()
             lat = np.asarray(latlon["lat"])
             lon = np.asarray(latlon["lon"])
-            np.testing.assert_allclose([lat.max(), lat.min()], [-10.0, -22.0])
+            np.testing.assert_allclose([lat.max(), lat.min()], latitudes)
             # longitudes measured eastwards from the west edge, whichever way MIR writes the ones past 180
-            eastwards = (lon - self.WEST) % 360.0
-            np.testing.assert_allclose([eastwards.min(), eastwards.max()], [0.0, 15.0])
+            eastwards = (lon - (self.WEST if west is None else west)) % 360.0
+            np.testing.assert_allclose([eastwards.min(), eastwards.max()], [0.0, width])
             wrapped = (lon + 180.0) % 360.0 - 180.0
             assert (wrapped > 0).any()
             assert (wrapped < 0).any()
@@ -339,7 +353,7 @@ class TestRegridAcrossAntimeridian:
 
         result = _regrid(input_fields, grid=1.0, domain=names)
 
-        self._assert_crosses_the_180_line(result)
+        self._assert_crosses_the_180_line(result, shape=self.PADDED_SHAPE, latitudes=(-8.5, -23.5), west=173.5, width=18.0)
 
     @pytest.mark.parametrize("east", [190.0, -170.0])
     def test_mir_regrid_accepts_an_area_with_east_beyond_180(self, input_fields: ekd.FieldList, east: float) -> None:

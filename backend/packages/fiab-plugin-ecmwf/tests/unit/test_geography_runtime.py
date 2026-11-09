@@ -377,6 +377,130 @@ class TestLatLonBoxesForName:
             runtime._latlon_boxes_for_name("Arctic")
 
 
+UNITED_KINGDOM: LatLonBox = (58.635, -7.572, 49.96, 1.68)
+
+
+class TestGridSpacing:
+    def test_o96_latitude_spacing_and_octahedral_longitude_spacing_at_the_poleward_edge(self) -> None:
+        # the row at 58.635 degrees north is the 34th from the pole (ceil(31.365 / 0.9375)), which has 4 * 34 + 16 = 152 points
+        assert runtime.grid_spacing("O96", UNITED_KINGDOM) == pytest.approx((0.9375, 360.0 / 152))
+
+    @pytest.mark.parametrize("name", ["O96", "o96", "N96", "n96", " O96 "])
+    def test_octahedral_and_classical_names_are_case_insensitive_and_alike(self, name: str) -> None:
+        assert runtime.grid_spacing(name, UNITED_KINGDOM) == pytest.approx((0.9375, 360.0 / 152))
+
+    def test_longitude_spacing_uses_the_latitude_nearest_a_pole(self) -> None:
+        # 60 degrees south is further poleward than 10 degrees north: ceil(30 / 0.9375) = 32 rows, 4 * 32 + 16 = 144 points
+        assert runtime.grid_spacing("O96", (10.0, 0.0, -60.0, 10.0)) == pytest.approx((0.9375, 360.0 / 144))
+
+    def test_longitude_spacing_at_a_pole_uses_the_first_row(self) -> None:
+        assert runtime.grid_spacing("O96", (90.0, 0.0, 80.0, 10.0)) == pytest.approx((0.9375, 360.0 / 20))
+
+    def test_longitude_spacing_at_the_equator_uses_the_last_row(self) -> None:
+        assert runtime.grid_spacing("O96", (0.0, 0.0, -0.0, 10.0)) == pytest.approx((0.9375, 360.0 / (4 * 96 + 16)))
+
+    def test_full_gaussian_grid_has_the_same_spacing_in_both_directions(self) -> None:
+        assert runtime.grid_spacing("F320", UNITED_KINGDOM) == pytest.approx((90.0 / 320, 90.0 / 320))
+
+    @pytest.mark.parametrize(
+        "grid, expected",
+        [
+            (0.25, (0.25, 0.25)),
+            (1, (1.0, 1.0)),
+            ([0.5, 0.25], (0.25, 0.5)),
+            ((0.5, 0.25), (0.25, 0.5)),
+            ("0.25", (0.25, 0.25)),
+            ("0.5/0.25", (0.25, 0.5)),
+        ],
+    )
+    def test_numeric_grid_uses_its_increments(self, grid: Any, expected: tuple[float, float]) -> None:
+        assert runtime.grid_spacing(grid, UNITED_KINGDOM) == pytest.approx(expected)
+
+    @pytest.mark.parametrize(
+        "grid",
+        [
+            None,
+            "auto",
+            "unknown",
+            "O",
+            "O0",
+            "H96",
+            "0/1",
+            "1/2/3",
+            0,
+            -1.0,
+            True,
+            float("nan"),
+            [1.0],
+            [1, 2, 3],
+            ["a", 1],
+            {"a": 1},
+        ],
+    )
+    def test_unknown_grid_has_no_spacing(self, grid: Any) -> None:
+        assert runtime.grid_spacing(grid, UNITED_KINGDOM) is None
+
+
+class TestPadNamedBox:
+    def test_o96_pads_by_one_spacing_and_the_fixed_margin(self) -> None:
+        north, west, south, east = runtime.pad_named_box(UNITED_KINGDOM, "O96")
+
+        assert north == pytest.approx(58.635 + 0.9375 + 0.5)
+        assert south == pytest.approx(49.96 - 0.9375 - 0.5)
+        assert west == pytest.approx(-7.572 - 360.0 / 152 - 0.5)
+        assert east == pytest.approx(1.68 + 360.0 / 152 + 0.5)
+
+    def test_numeric_grid_pads_by_its_increment_and_the_fixed_margin(self) -> None:
+        assert runtime.pad_named_box(UNITED_KINGDOM, 0.25) == pytest.approx((59.385, -8.322, 49.21, 2.43))
+
+    def test_west_east_south_north_pair(self) -> None:
+        # longitude uses the first increment and latitude the second
+        assert runtime.pad_named_box(UNITED_KINGDOM, [1.0, 0.25]) == pytest.approx((59.385, -9.072, 49.21, 3.18))
+
+    @pytest.mark.parametrize("grid", [None, "unknown"])
+    def test_unknown_grid_pads_by_the_fixed_margin_only(self, grid: Any, caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level("INFO", logger=runtime.LOG.name):
+            padded = runtime.pad_named_box(UNITED_KINGDOM, grid)
+
+        assert padded == pytest.approx((59.135, -8.072, 49.46, 2.18))
+        assert "unknown" in caplog.text
+
+    def test_known_grid_does_not_log_an_unknown_spacing(self, caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level("INFO", logger=runtime.LOG.name):
+            runtime.pad_named_box(UNITED_KINGDOM, "O96")
+
+        assert caplog.text == ""
+
+    def test_the_fixed_margin_is_half_a_degree(self) -> None:
+        assert runtime.PADDING_MARGIN_DEGREES == 0.5
+
+    def test_latitudes_are_clamped_at_the_poles(self) -> None:
+        north, _, south, _ = runtime.pad_named_box((89.9, 0.0, -89.8, 10.0), 1.0)
+
+        assert (north, south) == (90.0, -90.0)
+
+    def test_box_across_the_antimeridian_keeps_east_beyond_180(self) -> None:
+        north, west, south, east = runtime.pad_named_box((-10.0, 175.0, -22.0, 190.0), 1.0)
+
+        assert (north, south) == pytest.approx((-8.5, -23.5))
+        assert west == pytest.approx(173.5)
+        assert east == pytest.approx(191.5)
+
+    def test_padding_over_the_antimeridian_wraps_west_into_range(self) -> None:
+        _, west, _, east = runtime.pad_named_box((10.0, -179.5, 0.0, -170.0), 1.0)
+
+        assert west == pytest.approx(179.0)
+        assert east == pytest.approx(360.0 - 168.5)
+
+    def test_padded_width_of_the_whole_circle_gives_minus_180_to_180(self) -> None:
+        _, west, _, east = runtime.pad_named_box((50.0, -179.0, 40.0, 179.5), 1.0)
+
+        assert (west, east) == (-180.0, 180.0)
+
+    def test_global_box_stays_global(self) -> None:
+        assert runtime.pad_named_box((50.0, -180.0, 40.0, 180.0), "O96")[1:4:2] == (-180.0, 180.0)
+
+
 class TestRegridArguments:
     @pytest.fixture
     def calls(self, monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
@@ -417,11 +541,20 @@ class TestRegridArguments:
         monkeypatch.setattr(runtime, "_get_bbox_from_names", _bbox)
         return seen
 
-    def test_string_domain_is_resolved_to_bbox(self, calls: list[dict[str, Any]], lookups: list[list[str]]) -> None:
+    # the lookup box (55, 5, 47, 15) padded for O96: latitude 90/96 + 0.5, longitude 360/168 + 0.5 as the row nearest the pole,
+    # at 55 degrees north, is the 38th from it
+    O96_PADDED_AREA = pytest.approx([56.4375, 2.357143, 45.5625, 17.642857])
+
+    def test_string_domain_is_resolved_to_padded_bbox(self, calls: list[dict[str, Any]], lookups: list[list[str]]) -> None:
         regrid("fields", grid="O96", domain="Germany")  # type: ignore[arg-type]
 
         assert lookups == [["Germany"]]
-        assert calls[0]["area"] == [55.0, 5.0, 47.0, 15.0]
+        assert calls[0]["area"] == self.O96_PADDED_AREA
+
+    def test_named_domain_without_grid_is_padded_by_the_fixed_margin(self, calls: list[dict[str, Any]], lookups: list[list[str]]) -> None:
+        regrid("fields", grid=None, domain="Germany")  # type: ignore[arg-type]
+
+        assert calls[0]["area"] == pytest.approx([55.5, 4.5, 46.5, 15.5])
 
     @pytest.mark.parametrize("names", [["Germany"], ["Germany", "France"], ["France", "Germany", "Italy"]])
     def test_name_list_is_resolved_with_one_lookup_in_order(
@@ -430,7 +563,7 @@ class TestRegridArguments:
         regrid("fields", grid="O96", domain=names)  # type: ignore[arg-type]
 
         assert lookups == [names]
-        assert calls[0]["area"] == [55.0, 5.0, 47.0, 15.0]
+        assert calls[0]["area"] == self.O96_PADDED_AREA
 
     def test_name_list_does_not_need_format(self, calls: list[dict[str, Any]], lookups: list[list[str]]) -> None:
         regrid("fields", grid="O96", domain=["Germany", "France"], fmt_if_list=None)  # type: ignore[arg-type]
@@ -444,6 +577,11 @@ class TestRegridArguments:
 
         assert calls == []
         assert lookups == []
+
+    def test_number_list_is_not_padded(self, calls: list[dict[str, Any]], lookups: list[list[str]]) -> None:
+        regrid("fields", grid="O96", domain=[55.0, 5.0, 47.0, 15.0], fmt_if_list="nwse")  # type: ignore[arg-type]
+
+        assert calls[0]["area"] == [55.0, 5.0, 47.0, 15.0]
 
     def test_number_list_does_not_use_lookup(self, calls: list[dict[str, Any]], lookups: list[list[str]]) -> None:
         regrid("fields", grid="O96", domain=[60, -10, 35, 30], fmt_if_list="nwse")  # type: ignore[arg-type]

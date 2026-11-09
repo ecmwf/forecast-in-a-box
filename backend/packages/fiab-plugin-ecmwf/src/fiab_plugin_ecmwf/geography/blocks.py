@@ -108,7 +108,8 @@ class GeographicalTransform(Transform):
             description=(
                 "Area the data is cut out to: everything outside the area is dropped for all downstream blocks. Choose auto or global "
                 "to leave the area unchanged, one or more named regions/countries, or a drawn bounding box; "
-                "several names are cut out as the smallest latitude/longitude box containing all of them, not as the union of their shapes; "
+                "named regions are cut out as the latitude/longitude box containing all of them, not as the union of their shapes, "
+                "widened by one grid spacing plus 0.5 degrees on each side so coastal areas are kept; "
                 "leave empty to regrid without cutting out"
             ),
             value_type=GeoDomainType(),
