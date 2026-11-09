@@ -133,6 +133,37 @@ describe('useGeoShortcuts continuous pan', () => {
     expect(onPan.mock.calls.length).toBe(count)
   })
 
+  it('pans with WASD on a focused slider, which keeps its arrows', async () => {
+    const onPan = vi.fn()
+    await renderHarness(onPan)
+    const slider = document.createElement('input')
+    slider.type = 'range'
+    document.body.append(slider)
+    slider.focus()
+    const key = (type: 'keydown' | 'keyup', k: string) => {
+      const event = new KeyboardEvent(type, {
+        key: k,
+        bubbles: true,
+        cancelable: true,
+      })
+      slider.dispatchEvent(event)
+      return event
+    }
+    try {
+      const arrow = key('keydown', 'ArrowRight')
+      key('keyup', 'ArrowRight')
+      await settle(150)
+      expect(onPan).not.toHaveBeenCalled()
+      expect(arrow.defaultPrevented).toBe(false)
+
+      key('keydown', 'd')
+      await expect.poll(() => onPan.mock.calls.length).toBeGreaterThan(0)
+      key('keyup', 'd')
+    } finally {
+      slider.remove()
+    }
+  })
+
   it('stops panning when the window blurs', async () => {
     const onPan = vi.fn()
     await renderHarness(onPan)
@@ -163,6 +194,23 @@ describe('useGeoShortcuts zoom keys', () => {
     const step = NAV_ZOOM_STEP
     expect(onZoom.mock.calls).toEqual([[step], [step], [-step]])
     expect(plus.defaultPrevented).toBe(true)
+  })
+
+  it('zooms while a slider has focus', async () => {
+    const onZoom = vi.fn()
+    await renderHarness(() => {}, onZoom)
+    const slider = document.createElement('input')
+    slider.type = 'range'
+    document.body.append(slider)
+    slider.focus()
+    try {
+      slider.dispatchEvent(
+        new KeyboardEvent('keydown', { key: '+', bubbles: true }),
+      )
+    } finally {
+      slider.remove()
+    }
+    expect(onZoom.mock.calls).toEqual([[NAV_ZOOM_STEP]])
   })
 
   it('leaves browser zoom chords and text fields alone', async () => {

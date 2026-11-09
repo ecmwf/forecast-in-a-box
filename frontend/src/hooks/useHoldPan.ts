@@ -23,6 +23,19 @@ const WASD: Record<string, [number, number]> = {
   d: [1, 0],
 }
 
+/** Fields that take typed keys: not sliders, toggles or buttons. */
+const TEXT_ENTRY = [
+  'input:not([type=range],[type=checkbox],[type=radio],[type=button],[type=submit],[type=reset],[type=color],[type=file])',
+  'textarea',
+  'select',
+  '[contenteditable]:not([contenteditable=false])',
+].join(',')
+
+/** True when keys pressed at `target` go into a text field. */
+export function isTextEntry(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest(TEXT_ENTRY) !== null
+}
+
 const ARROWS: Record<string, [number, number]> = {
   arrowup: [0, -1],
   arrowdown: [0, 1],
@@ -33,7 +46,11 @@ const ARROWS: Record<string, [number, number]> = {
 /** Hold WASD (optionally arrows) to pan smoothly; OS key-repeat is choppy. */
 export function useHoldPan(
   onPan: (dx: number, dy: number) => void,
-  options: { arrows: boolean; isBlocked?: () => boolean },
+  options: {
+    arrows: boolean
+    /** Gets the lower-cased key: e.g. a focused slider blocks only arrows. */
+    isBlocked?: (key: string) => boolean
+  },
 ): void {
   const { arrows, isBlocked } = options
   useEffect(() => {
@@ -69,10 +86,7 @@ export function useHoldPan(
       // Modifier chords (⌘A, ⌥←, …) belong to the browser, never the pan.
       if (e.metaKey || e.ctrlKey || e.altKey) return
       const k = e.key.toLowerCase()
-      if (!(k in vec) || isBlocked?.()) return
-      const el = e.target as HTMLElement | null
-      if (el?.closest('input, textarea, select, [contenteditable="true"]'))
-        return
+      if (!(k in vec) || isBlocked?.(k) || isTextEntry(e.target)) return
       e.preventDefault()
       armed.set(k, e.key)
       if (!raf) raf = requestAnimationFrame(tick)

@@ -31,6 +31,8 @@ interface RunActivityChartProps {
   data: Array<MonthBucket>
   /** Accessible series name for the bar. */
   seriesName: string
+  /** The count in the tooltip, e.g. "4 runs"; keep it stable across renders. */
+  formatCount: (count: number) => string
 }
 
 const BAR_COLOR = '#10b981'
@@ -44,6 +46,7 @@ const SPRING = {
 export default function RunActivityChart({
   data,
   seriesName,
+  formatCount,
 }: RunActivityChartProps) {
   // The host diffs by definition identity — rebuild only when inputs change.
   const definition = useMemo(
@@ -121,11 +124,10 @@ export default function RunActivityChart({
           anchor: 'point',
           placement: ['top', 'right', 'left'],
           className: 'run-activity-tooltip',
-          format: ({ datum }) =>
-            `${datum.month} · ${datum.count} ${seriesName.toLocaleLowerCase()}`,
+          format: ({ datum }) => `${datum.month} · ${formatCount(datum.count)}`,
         },
       }),
-    [data, seriesName],
+    [data, formatCount],
   )
 
   const renderer = useMemo(() => motion<MonthBucket, string, number>(), [])

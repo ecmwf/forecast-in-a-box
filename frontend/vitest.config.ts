@@ -37,6 +37,7 @@ export default mergeConfig(
         '@tanstack/charts/tooltip',
         '@tanstack/charts/react/tooltip',
         '@base-ui/react/checkbox',
+        '@base-ui/react/context-menu',
         'zustand/react/shallow',
       ],
     },

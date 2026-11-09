@@ -35,6 +35,8 @@ type ShortcutId =
   | 'modes'
   | 'pan'
   | 'zoom'
+  | 'play'
+  | 'step'
   | 'annotate'
   | 'fit'
   | 'projection'
@@ -61,6 +63,8 @@ const SHORTCUTS: ReadonlyArray<{
   },
   { keys: COMPARE_KEYS.pan.map(keyLabel), id: 'pan' },
   { keys: COMPARE_KEYS.zoom, id: 'zoom' },
+  { keys: [keyLabel(COMPARE_KEYS.play)], id: 'play' },
+  { keys: COMPARE_KEYS.step, id: 'step' },
   { keys: [keyLabel(COMPARE_KEYS.annotate)], id: 'annotate' },
   { keys: [keyLabel(COMPARE_KEYS.fit)], id: 'fit' },
   { keys: [keyLabel(COMPARE_KEYS.projection)], id: 'projection' },

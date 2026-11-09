@@ -18,7 +18,7 @@
 import axe from 'axe-core'
 import { createContext, useContext, useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { page } from 'vitest/browser'
+import { page, userEvent } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
 import { I18nextProvider } from 'react-i18next'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -349,6 +349,74 @@ describe('GeoViewer', () => {
     expect(screen.getByText('Run B').elements()).toHaveLength(1)
   })
 
+  it('flips flicker once with Space while a button has focus', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+    await screen.getByText('2 m temperature').first().click()
+
+    const modeButton = screen.getByRole('button', { name: /flicker/i })
+    await modeButton.click()
+    await expect.element(modeButton).toHaveFocus()
+    await userEvent.keyboard(' ')
+    const toggle = screen.getByRole('button', { name: 'Showing: B' })
+    await expect.element(toggle).toBeVisible()
+
+    await toggle.click()
+    await expect
+      .element(screen.getByRole('button', { name: 'Showing: A' }))
+      .toHaveFocus()
+    await userEvent.keyboard(' ')
+    await expect
+      .element(screen.getByRole('button', { name: 'Showing: B' }))
+      .toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('leaves Space to the focused link switch in flicker mode', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+    await screen.getByText('2 m temperature').first().click()
+    await screen.getByRole('button', { name: /flicker/i }).click()
+
+    const link = screen.getByRole('switch', {
+      name: 'Link layer selection across sources',
+    })
+    const before = (link.element() as HTMLElement).getAttribute('aria-checked')
+    ;(link.element() as HTMLElement).focus()
+    await userEvent.keyboard(' ')
+    await expect
+      .element(link)
+      .toHaveAttribute('aria-checked', before === 'true' ? 'false' : 'true')
+    await expect
+      .element(screen.getByRole('button', { name: 'Showing: A' }))
+      .toBeVisible()
+  })
+
+  it('leaves Space to buttons outside the viewer in flicker mode', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const onOutside = vi.fn()
+    const screen = await render(
+      <>
+        <button type="button" onClick={onOutside}>
+          Outside
+        </button>
+        <Harness portA={portA} portB={portB} />
+      </>,
+    )
+    await screen.getByText('2 m temperature').first().click()
+    await screen.getByRole('button', { name: /flicker/i }).click()
+    await expect
+      .element(screen.getByRole('button', { name: 'Showing: A' }))
+      .toBeVisible()
+
+    const outside = screen.getByRole('button', { name: 'Outside' })
+    ;(outside.element() as HTMLElement).focus()
+    await userEvent.keyboard(' ')
+    await expect.poll(() => onOutside.mock.calls.length).toBe(1)
+    await expect
+      .element(screen.getByRole('button', { name: 'Showing: A' }))
+      .toBeVisible()
+  })
+
   it('groups pressure levels and activates one entry on both sources', async () => {
     const { portA, portB } = registerDefaultPair()
     const screen = await render(<Harness portA={portA} portB={portB} />)
@@ -561,6 +629,28 @@ describe('GeoViewer', () => {
     await expect
       .element(screen.getByRole('button', { name: 'B', exact: true }))
       .toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('groups each split button so its chevron cannot take the button clicks', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+    // In a button group the 44 px hit halos grow vertically only.
+    for (const [main, chevron] of [
+      ['Measure area', 'Area shape options'],
+      [/^Annotate/, 'Annotation options'],
+      ['Copy map to clipboard', 'Copy options'],
+      ['Magnifier on', 'Magnifier options'],
+    ] as const) {
+      const group = screen
+        .getByRole('button', { name: chevron })
+        .element()
+        .closest('[data-slot="button-group"]')
+      expect(group, chevron).not.toBeNull()
+      expect(
+        group!.contains(screen.getByRole('button', { name: main }).element()),
+        String(main),
+      ).toBe(true)
+    }
   })
 
   it('exposes export and overlay-upload entry points', async () => {

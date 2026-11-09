@@ -38,6 +38,7 @@ import { RefreshCw } from 'lucide-react'
 import { fromLonLat } from 'ol/proj'
 import { useLensSource } from '../hooks/useLensSource'
 import { AUTOFIT_KEY, createViewerView } from '../hooks/useOlMapBase'
+import { nextMeasurementId } from '../hooks/useMeasure'
 import { formatStep } from '../format'
 import {
   BASEMAPS,
@@ -65,7 +66,10 @@ import {
   skinnyWmsBasemap,
   unionBbox,
 } from '../wms-capabilities'
-import { StartupStatusPill } from '../components/StartupStatusPill'
+import {
+  StartupStatusPill,
+  lensStartupSteps,
+} from '../components/StartupStatusPill'
 import { beforeRunLayers, effectiveRuns, mergeEpochLayers } from './run-window'
 import { GeoPanelResizeStrip } from './GeoPanelResizeStrip'
 import { useGeoPanelWidths } from './useGeoPanelWidths'
@@ -107,7 +111,8 @@ import type {
   CompareModeOptions,
   FitBboxAction,
 } from './types'
-import type { MeasureMode } from '../hooks/useMeasure'
+import type { MeasureMode, Measurement } from '../hooks/useMeasure'
+import type Geometry from 'ol/geom/Geometry'
 import type { ViewerUrlState } from './view-url-state'
 import { CollapsedSidebarHandle } from '@/components/common/CollapsedSidebarHandle'
 import { TOUR, tourAttr } from '@/features/tutorials/anchors'
@@ -349,9 +354,21 @@ export function GeoViewer({
     [],
   )
 
-  // Measure tools (mode-independent): current tool + clear signal.
+  // Measure tools (mode-independent): current tool + measurements (WGS84).
   const [measureMode, setMeasureMode] = useState<MeasureMode>('none')
-  const [measureClearNonce, setMeasureClearNonce] = useState(0)
+  const [measurements, setMeasurements] = useState<Array<Measurement>>([])
+  const onMeasurementAdd = useCallback(
+    (geometry: Geometry, label: string, sourceId: string | null) =>
+      setMeasurements((prev) => [
+        ...prev,
+        { id: nextMeasurementId(), geometry, label, sourceId },
+      ]),
+    [],
+  )
+  const onMeasurementRemove = useCallback(
+    (id: string) => setMeasurements((prev) => prev.filter((m) => m.id !== id)),
+    [],
+  )
 
   // Per-mode tuning surfaced in the toolbar's action row.
   const [modeOptions, setModeOptions] = useState<CompareModeOptions>({
@@ -747,6 +764,7 @@ export function GeoViewer({
     setAnnotationHighlightId,
   } = useViewerAnnotations({
     viewRef,
+    centerGlobe: globe.centerOn,
     onToggle: () => setMeasureMode('none'),
   })
   const setMeasureModeExclusive = useCallback(
@@ -1047,11 +1065,7 @@ export function GeoViewer({
   const startup = sourceA.loadingLayers
     ? isLensProxyUrl(a.baseUrl)
       ? {
-          steps: [
-            { id: 'server', label: t('startup.server') },
-            { id: 'files', label: t('startup.files') },
-            { id: 'catalogue', label: t('startup.catalogue') },
-          ],
+          steps: lensStartupSteps(t),
           // Capabilities failing = SkinnyWMS still booting / reading GRIBs.
           activeIndex: sourceA.retrying ? 1 : 2,
           hint: t('startup.firstStartHint'),
@@ -1066,7 +1080,7 @@ export function GeoViewer({
     : null
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-2">
+    <div data-geo-viewer className="flex h-full min-h-0 flex-col gap-2">
       {hasB && sourceB.error && (
         <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm">
           <span className="min-w-0 truncate">
@@ -1115,7 +1129,7 @@ export function GeoViewer({
         }
         measureMode={measureMode}
         onMeasureMode={setMeasureModeExclusive}
-        onMeasureClear={() => setMeasureClearNonce((n) => n + 1)}
+        onMeasureClear={() => setMeasurements([])}
         annotateArmed={annotateArmed}
         onAnnotateToggle={toggleAnnotate}
         annotations={annotations}
@@ -1310,6 +1324,11 @@ export function GeoViewer({
               onRegisterFitBbox={onRegisterFitBbox}
               onZoom={zoomGlobe}
               onRegisterCapture={onRegisterCapture}
+              overlays={overlays}
+              measurements={measurements}
+              annotations={annotations}
+              annotationHighlightId={annotationHighlightId}
+              onAnnotationEdit={onAnnotationEdit}
             />
           )}
           {globe.phase === 'globe' ? null : focusSlot === null &&
@@ -1327,7 +1346,9 @@ export function GeoViewer({
               pinnedLegends={pinnedLegendItems}
               onUnpinLegend={unpinLegend}
               measureMode={measureMode}
-              measureClearNonce={measureClearNonce}
+              measurements={measurements}
+              onMeasurementAdd={onMeasurementAdd}
+              onMeasurementRemove={onMeasurementRemove}
               overlays={overlays}
               annotations={annotations}
               annotateArmed={annotateArmed}
@@ -1356,7 +1377,9 @@ export function GeoViewer({
               }
               options={modeOptions}
               measureMode={measureMode}
-              measureClearNonce={measureClearNonce}
+              measurements={measurements}
+              onMeasurementAdd={onMeasurementAdd}
+              onMeasurementRemove={onMeasurementRemove}
               overlays={overlays}
               annotations={annotations}
               annotateArmed={annotateArmed}
@@ -1406,6 +1429,8 @@ export function GeoViewer({
       <GeoTimeSlider
         hasB={hasB}
         soloSlot={focusSlot}
+        // Flicker mode flips A/B on Space (SingleMapView), so it can't play
+        playKey={!(focusSlot === null && mode === 'flicker' && mapSourceB)}
         timeline={displayTimeline}
         failures={trackFailures}
         index={safeStep}

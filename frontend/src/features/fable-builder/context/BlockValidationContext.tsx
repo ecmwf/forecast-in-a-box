@@ -15,6 +15,7 @@
 
 import { createContext, useContext, useMemo } from 'react'
 import type { ReactNode } from 'react'
+import type { SharedOutputPath } from '@/features/fable-builder/utils/run-folder-nudge'
 
 interface BlockValidation {
   /** Field-level errors keyed by config option key; null when none. */
@@ -23,8 +24,10 @@ interface BlockValidation {
   resolvedConfig: Record<string, string | null> | null
   /** Unresolvable glyph names per config option key; null when none. */
   missingGlyphs?: Record<string, ReadonlyArray<string>> | null
-  /** Output paths shared across runs: config key -> one-click fix (null: none). */
-  sharedOutputPaths?: Record<string, string | null> | null
+  /** Output paths shared across runs, by config key; null when none. */
+  sharedOutputPaths?: Record<string, SharedOutputPath> | null
+  /** GRIB paths without a file name, by config key: the fixed value. */
+  missingFileNames?: Record<string, string> | null
 }
 
 const BlockValidationContext = createContext<BlockValidation>({
@@ -32,6 +35,7 @@ const BlockValidationContext = createContext<BlockValidation>({
   resolvedConfig: null,
   missingGlyphs: null,
   sharedOutputPaths: null,
+  missingFileNames: null,
 })
 
 export function BlockValidationProvider({
@@ -39,11 +43,24 @@ export function BlockValidationProvider({
   resolvedConfig,
   missingGlyphs = null,
   sharedOutputPaths = null,
+  missingFileNames = null,
   children,
 }: BlockValidation & { children: ReactNode }) {
   const value = useMemo(
-    () => ({ fieldErrors, resolvedConfig, missingGlyphs, sharedOutputPaths }),
-    [fieldErrors, resolvedConfig, missingGlyphs, sharedOutputPaths],
+    () => ({
+      fieldErrors,
+      resolvedConfig,
+      missingGlyphs,
+      sharedOutputPaths,
+      missingFileNames,
+    }),
+    [
+      fieldErrors,
+      resolvedConfig,
+      missingGlyphs,
+      sharedOutputPaths,
+      missingFileNames,
+    ],
   )
   return (
     <BlockValidationContext.Provider value={value}>
@@ -67,6 +84,13 @@ export function useMissingGlyphs(): Record<
   return useContext(BlockValidationContext).missingGlyphs ?? null
 }
 
-export function useSharedOutputPaths(): Record<string, string | null> | null {
+export function useSharedOutputPaths(): Record<
+  string,
+  SharedOutputPath
+> | null {
   return useContext(BlockValidationContext).sharedOutputPaths ?? null
+}
+
+export function useMissingFileNames(): Record<string, string> | null {
+  return useContext(BlockValidationContext).missingFileNames ?? null
 }

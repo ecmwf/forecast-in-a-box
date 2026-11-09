@@ -11,12 +11,12 @@
 /**
  * Distance / area measurement on a viewer map: an OL Draw interaction on
  * a dedicated vector layer, with a live tooltip showing the geodesic
- * length/area (ol/sphere respects the projection). Finished sketches stay
- * on the map with frozen tooltips until cleared. One instance per map —
- * side-by-side panels measure independently.
+ * length/area (ol/sphere respects the projection). Finished measurements
+ * are caller-owned WGS84 state, reprojected per map.
  */
 
 import { useEffect, useRef } from 'react'
+import Feature from 'ol/Feature'
 import Draw, { createBox } from 'ol/interaction/Draw'
 import DoubleClickZoom from 'ol/interaction/DoubleClickZoom'
 import Overlay from 'ol/Overlay'
@@ -25,15 +25,39 @@ import VectorSource from 'ol/source/Vector'
 import { Fill, Stroke, Style, Text } from 'ol/style'
 import CircleStyle from 'ol/style/Circle'
 import Point from 'ol/geom/Point'
+import SimpleGeometry from 'ol/geom/SimpleGeometry'
 import { getArea, getLength } from 'ol/sphere'
 import { unByKey } from 'ol/Observable'
+import {
+  CALLOUT_LABEL,
+  LABEL_OFFSET_Y,
+  MEASURE_COLORS,
+  MEASURE_DASH,
+  MEASURE_STROKE_WIDTH,
+} from '../vector-styles'
 import type { RefObject } from 'react'
-import type Feature from 'ol/Feature'
 import type OlMap from 'ol/Map'
 import type Geometry from 'ol/geom/Geometry'
 import type { EventsKey } from 'ol/events'
 
 export type MeasureMode = 'none' | 'line' | 'area' | 'box'
+
+/** A finished measurement, projection-independent. */
+export interface Measurement {
+  id: string
+  /** LineString (distance) or Polygon (area) in EPSG:4326. */
+  geometry: Geometry
+  /** Frozen geodesic result, e.g. "12.3 km". */
+  label: string
+  /** Owning source id; null = shared. */
+  sourceId: string | null
+}
+
+let measurementCounter = 0
+export function nextMeasurementId(): string {
+  measurementCounter += 1
+  return `measurement-${measurementCounter}`
+}
 
 /** Geodesic length → "12.3 km" / "845 m". */
 export function formatLength(meters: number): string {
@@ -60,15 +84,15 @@ export function formatArea(squareMeters: number): string {
 }
 
 const MEASURE_STYLE = new Style({
-  fill: new Fill({ color: 'rgba(30, 41, 59, 0.12)' }),
+  fill: new Fill({ color: MEASURE_COLORS.fill }),
   stroke: new Stroke({
-    color: 'rgba(15, 23, 42, 0.9)',
-    width: 2,
-    lineDash: [6, 6],
+    color: MEASURE_COLORS.stroke,
+    width: MEASURE_STROKE_WIDTH,
+    lineDash: [...MEASURE_DASH],
   }),
   image: new CircleStyle({
     radius: 4,
-    fill: new Fill({ color: 'rgba(15, 23, 42, 0.9)' }),
+    fill: new Fill({ color: MEASURE_COLORS.stroke }),
   }),
 })
 
@@ -92,12 +116,12 @@ function measureStyleWithLabel(
       geometry: anchor,
       text: new Text({
         text: label,
-        font: '12px system-ui, sans-serif',
-        offsetY: -12,
-        fill: new Fill({ color: 'rgba(15, 23, 42, 0.95)' }),
-        backgroundFill: new Fill({ color: 'rgba(255, 255, 255, 0.92)' }),
-        backgroundStroke: new Stroke({ color: 'rgba(0, 0, 0, 0.15)' }),
-        padding: [3, 5, 2, 5],
+        font: CALLOUT_LABEL.font,
+        offsetY: LABEL_OFFSET_Y,
+        fill: new Fill({ color: CALLOUT_LABEL.color }),
+        backgroundFill: new Fill({ color: CALLOUT_LABEL.background }),
+        backgroundStroke: new Stroke({ color: CALLOUT_LABEL.border }),
+        padding: [...CALLOUT_LABEL.padding],
       }),
     }),
   ]
@@ -127,24 +151,43 @@ function measureText(geometry: Geometry, projection: string): string {
 export function useMeasure(
   mapRef: RefObject<OlMap | null>,
   mode: MeasureMode,
-  clearNonce: number,
+  /** Measurements to draw; memoize (effect dependency). */
+  measurements: ReadonlyArray<Measurement>,
+  handlers: {
+    /** A finished sketch: WGS84 geometry and its frozen label. */
+    onAdd: (geometry: Geometry, label: string) => void
+    onRemove: (id: string) => void
+  },
   /** Accessible name for each measurement's remove button. */
   removeLabel: string,
-  /** useOlMapBase's recreation counter — re-attaches layer/draw after a
-   *  map rebuild (finished features vanished onto the dead map before). */
+  /** useOlMapBase recreation counter; re-attach after a map rebuild. */
   mapVersion: number,
 ): void {
-  const sourceRef = useRef<VectorSource | null>(null)
-  const overlaysRef = useRef<Array<Overlay>>([])
+  const handlersRef = useRef(handlers)
+  handlersRef.current = handlers
 
-  // Dedicated sketch layer — mounted while measuring or while results
-  // remain on the map.
+  // Finished measurements, reprojected into this map's view projection.
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
-    sourceRef.current ??= new VectorSource()
+    const projection = map.getView().getProjection().getCode()
+    const features = measurements.flatMap((measurement) => {
+      const geometry = measurement.geometry.clone()
+      geometry.transform('EPSG:4326', projection)
+      // Skip geometries that hit a projection singularity.
+      if (
+        !(geometry instanceof SimpleGeometry) ||
+        !geometry.getFlatCoordinates().every(Number.isFinite)
+      ) {
+        return []
+      }
+      const feature = new Feature({ geometry })
+      feature.setId(measurement.id)
+      feature.set('measureLabel', measurement.label)
+      return [feature]
+    })
     const layer = new VectorLayer({
-      source: sourceRef.current,
+      source: new VectorSource({ features }),
       style: (feature) => {
         const label = feature.get('measureLabel') as string | undefined
         const geometry = feature.getGeometry()
@@ -155,13 +198,10 @@ export function useMeasure(
       zIndex: 1500,
     })
     map.addLayer(layer)
-    // × per finished measurement — attached on INSERTION: drawend fires
-    // before Draw adds the feature, so work there can lose it.
-    const source = sourceRef.current
-    const attachRemove = (feature: Feature) => {
-      const label = feature.get('measureLabel') as string | undefined
-      const geometry = feature.getGeometry()
-      if (!label || !geometry) return
+    // A remove button per measurement, just past its label.
+    const removes = features.map((feature) => {
+      const label = feature.get('measureLabel') as string
+      const extent = feature.getGeometry()?.getExtent() ?? [0, 0, 0, 0]
       const button = document.createElement('button')
       button.type = 'button'
       button.className = REMOVE_CLASS
@@ -173,40 +213,28 @@ export function useMeasure(
         positioning: 'center-left',
         offset: [labelWidthPx(label) / 2 + 6, -19],
       })
-      const extent = geometry.getExtent()
       remove.setPosition([
         (extent[0] + extent[2]) / 2,
         Math.max(extent[1], extent[3]),
       ])
-      button.addEventListener('click', () => {
-        source.removeFeature(feature)
-        map.removeOverlay(remove)
-        overlaysRef.current = overlaysRef.current.filter((o) => o !== remove)
-      })
+      button.addEventListener('click', () =>
+        handlersRef.current.onRemove(String(feature.getId())),
+      )
       map.addOverlay(remove)
-      overlaysRef.current.push(remove)
-    }
-    // Features survive a map rebuild in the source — their ×s don't.
-    for (const feature of source.getFeatures()) attachRemove(feature)
-    const addKey = source.on('addfeature', (evt) => {
-      if (evt.feature) attachRemove(evt.feature)
+      return remove
     })
     return () => {
-      unByKey(addKey)
       map.removeLayer(layer)
-      for (const overlay of overlaysRef.current) map.removeOverlay(overlay)
-      overlaysRef.current = []
+      for (const overlay of removes) map.removeOverlay(overlay)
     }
-  }, [mapRef, removeLabel, mapVersion])
+  }, [mapRef, measurements, removeLabel, mapVersion])
 
-  // Draw interaction per mode, with a live tooltip that freezes on finish.
+  // Draw interaction with a live tooltip; finished sketches go to onAdd.
   useEffect(() => {
     const map = mapRef.current
-    const source = sourceRef.current
-    if (!map || !source || mode === 'none') return
+    if (!map || mode === 'none') return
 
     const draw = new Draw({
-      source,
       type:
         mode === 'line' ? 'LineString' : mode === 'box' ? 'Circle' : 'Polygon',
       // Box: two opposite corners; the geometry lands as a Polygon.
@@ -226,6 +254,10 @@ export function useMeasure(
     let tooltip: Overlay | null = null
     let geometryKey: EventsKey | null = null
     const projection = map.getView().getProjection().getCode()
+    const dropTooltip = () => {
+      if (tooltip) map.removeOverlay(tooltip)
+      tooltip = null
+    }
 
     const startKey = draw.on('drawstart', (evt) => {
       const element = document.createElement('div')
@@ -237,7 +269,6 @@ export function useMeasure(
         stopEvent: false,
       })
       map.addOverlay(tooltip)
-      overlaysRef.current.push(tooltip)
       const geometry = evt.feature.getGeometry()
       if (!geometry) return
       geometryKey = geometry.on('change', () => {
@@ -252,17 +283,15 @@ export function useMeasure(
     const endKey = draw.on('drawend', (evt) => {
       if (geometryKey) unByKey(geometryKey)
       geometryKey = null
-      // Freeze the result into the feature (canvas-rendered label) and
-      // drop the live DOM tooltip — exports then include the value.
+      dropTooltip()
       const geometry = evt.feature.getGeometry()
-      if (geometry) {
-        evt.feature.set('measureLabel', measureText(geometry, projection))
-      }
-      if (tooltip) {
-        map.removeOverlay(tooltip)
-        overlaysRef.current = overlaysRef.current.filter((o) => o !== tooltip)
-      }
-      tooltip = null
+      if (!geometry) return
+      // Freeze the result; the canvas label is exported with the map.
+      const label = measureText(geometry, projection)
+      handlersRef.current.onAdd(
+        geometry.clone().transform(projection, 'EPSG:4326'),
+        label,
+      )
     })
 
     return () => {
@@ -272,19 +301,7 @@ export function useMeasure(
       map.removeInteraction(draw)
       dblZoom?.setActive(true)
       // An unfinished sketch's tooltip would otherwise dangle.
-      if (tooltip) {
-        map.removeOverlay(tooltip)
-        overlaysRef.current = overlaysRef.current.filter((o) => o !== tooltip)
-      }
+      dropTooltip()
     }
   }, [mapRef, mode, mapVersion])
-
-  // Clear results.
-  useEffect(() => {
-    if (clearNonce === 0) return
-    const map = mapRef.current
-    sourceRef.current?.clear()
-    for (const overlay of overlaysRef.current) map?.removeOverlay(overlay)
-    overlaysRef.current = []
-  }, [clearNonce, mapRef])
 }

@@ -23,6 +23,14 @@ import VectorLayer from 'ol/layer/Vector'
 import VectorSource from 'ol/source/Vector'
 import { Fill, Stroke, Style, Text } from 'ol/style'
 import CircleStyle from 'ol/style/Circle'
+import {
+  LABEL_OFFSET_Y,
+  OVERLAY_COLORS,
+  OVERLAY_LABEL,
+  OVERLAY_POINT_RADIUS,
+  OVERLAY_POINT_STROKE_WIDTH,
+  OVERLAY_STROKE_WIDTH,
+} from '../vector-styles'
 import type { RefObject } from 'react'
 import type Feature from 'ol/Feature'
 import type Geometry from 'ol/geom/Geometry'
@@ -48,12 +56,15 @@ export interface ContextOverlay {
 }
 
 const OVERLAY_STYLE = new Style({
-  stroke: new Stroke({ color: 'rgba(22, 163, 74, 0.95)', width: 2 }),
-  fill: new Fill({ color: 'rgba(22, 163, 74, 0.08)' }),
+  stroke: new Stroke({
+    color: OVERLAY_COLORS.stroke,
+    width: OVERLAY_STROKE_WIDTH,
+  }),
+  fill: new Fill({ color: OVERLAY_COLORS.fill }),
   image: new CircleStyle({
-    radius: 5,
-    fill: new Fill({ color: 'rgba(22, 163, 74, 0.9)' }),
-    stroke: new Stroke({ color: 'white', width: 1.5 }),
+    radius: OVERLAY_POINT_RADIUS,
+    fill: new Fill({ color: OVERLAY_COLORS.point }),
+    stroke: new Stroke({ color: 'white', width: OVERLAY_POINT_STROKE_WIDTH }),
     // none: markers always draw and never block labels (incl. their own); labels declutter vs each other.
     declutterMode: 'none',
   }),
@@ -121,27 +132,34 @@ function reprojectedSource(
   })
 }
 
+/** A feature's label from the chosen property; null = none. */
+export function overlayLabelText(
+  feature: FeatureLike,
+  labelProperty: string | null,
+): string | null {
+  const raw: unknown = labelProperty ? feature.get(labelProperty) : undefined
+  return raw === undefined || raw === null || raw === '' ? null : String(raw)
+}
+
 /** Base style + a canvas Text label from the chosen property — part of
  *  the map pixels, so exports include it. */
 function overlayStylesWithLabel(
   feature: FeatureLike,
   labelProperty: string | null,
 ): Array<Style> {
-  const raw: unknown = labelProperty ? feature.get(labelProperty) : undefined
-  const text =
-    raw === undefined || raw === null || raw === '' ? null : String(raw)
+  const text = overlayLabelText(feature, labelProperty)
   if (!text) return [OVERLAY_STYLE]
   return [
     OVERLAY_STYLE,
     new Style({
       text: new Text({
         text,
-        font: '11px system-ui, sans-serif',
-        offsetY: -12,
+        font: OVERLAY_LABEL.font,
+        offsetY: LABEL_OFFSET_Y,
         overflow: true,
-        fill: new Fill({ color: 'rgba(15, 23, 42, 0.95)' }),
-        backgroundFill: new Fill({ color: 'rgba(255, 255, 255, 0.85)' }),
-        padding: [2, 4, 1, 4],
+        fill: new Fill({ color: OVERLAY_LABEL.color }),
+        backgroundFill: new Fill({ color: OVERLAY_LABEL.background }),
+        padding: [...OVERLAY_LABEL.padding],
       }),
     }),
   ]
@@ -157,6 +175,25 @@ export interface OverlayHover {
 }
 
 const HOVER_MAX_ROWS = 8
+
+/** The hover card for `feature` with the cursor at (`x`, `y`). */
+export function overlayHoverAt(
+  feature: FeatureLike,
+  x: number,
+  y: number,
+): OverlayHover {
+  const entries = Object.entries(feature.getProperties()).filter(
+    ([key]) => key !== 'geometry',
+  )
+  return {
+    x,
+    y,
+    rows: entries
+      .slice(0, HOVER_MAX_ROWS)
+      .map(([k, v]) => [k, v === null ? '—' : String(v)]),
+    more: Math.max(0, entries.length - HOVER_MAX_ROWS),
+  }
+}
 
 export function useOverlayHover(
   mapRef: RefObject<OlMap | null>,
@@ -180,17 +217,7 @@ export function useOverlayHover(
         setHover((prev) => (prev === null ? prev : null))
         return
       }
-      const entries = Object.entries(feature.getProperties()).filter(
-        ([key]) => key !== 'geometry',
-      )
-      setHover({
-        x: evt.pixel[0],
-        y: evt.pixel[1],
-        rows: entries
-          .slice(0, HOVER_MAX_ROWS)
-          .map(([k, v]) => [k, v === null ? '—' : String(v)]),
-        more: Math.max(0, entries.length - HOVER_MAX_ROWS),
-      })
+      setHover(overlayHoverAt(feature, evt.pixel[0], evt.pixel[1]))
     }
     map.on('pointermove', onMove)
     return () => {

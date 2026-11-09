@@ -15,6 +15,7 @@ import {
   SETTING_PREFIX,
   compareDimValues,
   compareDims,
+  dayNeighbor,
   dimLine,
   dimNeighbor,
   dimValueCounts,
@@ -169,6 +170,27 @@ describe('dimNeighbor', () => {
     const lone = item('lone', [['step', '0']])
     expect(dimNeighbor([lone], lone, 'step', 1, true)).toBeNull()
     expect(dimNeighbor(grid, at('151/0'), 'number', 1)).toBeNull()
+  })
+})
+
+describe('dayNeighbor', () => {
+  const line = [0, 6, 18, 30, 54].map(
+    (step) => [step, item(`s${step}`, [['step', String(step)]])] as const,
+  )
+  const day = (step: number, direction: 1 | -1) =>
+    dayNeighbor(line, step, direction)?.taskId ?? null
+
+  it('jumps to the nearest step at least 24 h away', () => {
+    expect(day(0, 1)).toBe('s30')
+    expect(day(6, 1)).toBe('s30')
+    expect(day(54, -1)).toBe('s30')
+    expect(day(30, -1)).toBe('s6')
+  })
+
+  it('returns null without a step 24 h away or a numeric step', () => {
+    expect(day(54, 1)).toBeNull()
+    expect(day(18, -1)).toBeNull()
+    expect(day(Number.NaN, 1)).toBeNull()
   })
 })
 
