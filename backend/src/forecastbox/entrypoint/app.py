@@ -17,18 +17,16 @@ import time
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
-from starlette.exceptions import HTTPException
 
 import forecastbox.routes
 from forecastbox.domain.admin import get_local_release
 from forecastbox.entrypoint.initializers import build_initializers
+from forecastbox.entrypoint.spa import SPAStaticFiles
 from forecastbox.utility.config import ROUTE_PREFIX, config, validate_runtime
 from forecastbox.utility.fastapi import register_common_exception_handling
 
@@ -112,35 +110,4 @@ async def share_image(request: Request, job_id: str, dataset_id: str) -> HTMLRes
 
 
 frontend = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
-
-
-class SPAStaticFiles(StaticFiles):
-    """Custom StaticFiles class to handle SPA routing.
-
-    - Asset-shaped paths (anything with a file extension or under /assets/)
-      that 404 stay 404, so the browser surfaces a useful "chunk failed
-    - SPA routes (no extension) fall through to index.html.
-    - Cache-Control headers: hashed assets cached forever; index.html uses
-      stale-while-revalidate so deploys propagate without blocking nav.
-    """
-
-    async def get_response(self, path: str, scope: Any) -> Response:
-        try:
-            response = await super().get_response(path, scope)
-        except HTTPException as ex:
-            if ex.status_code == 404:
-                last_segment = path.rsplit("/", 1)[-1]
-                if path.startswith("assets/") or "." in last_segment:
-                    raise  # genuine asset miss -- let the 404 propagate
-                response = FileResponse(os.path.join(frontend, "index.html"))
-            else:
-                raise
-
-        if path.startswith("assets/"):
-            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
-        elif path == "" or path.endswith(".html"):
-            response.headers["Cache-Control"] = "public, max-age=0, stale-while-revalidate=60"
-        return response
-
-
 app.mount("/", SPAStaticFiles(directory=frontend, html=True, follow_symlink=True), name="static")
