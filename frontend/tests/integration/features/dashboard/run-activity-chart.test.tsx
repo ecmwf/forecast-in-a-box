@@ -23,11 +23,17 @@ const MONTHS = [
   { month: 'Aug', count: 6 },
 ]
 
+const formatCount = (count: number) => `${count} runs`
+
 describe('RunActivityChart', () => {
   it('renders an accessible chart with a bar per month', async () => {
     const screen = await renderWithRouter(
       <div style={{ width: 480 }}>
-        <RunActivityChart data={MONTHS} seriesName="Forecasts" />
+        <RunActivityChart
+          data={MONTHS}
+          seriesName="Forecasts"
+          formatCount={formatCount}
+        />
       </div>,
     )
 

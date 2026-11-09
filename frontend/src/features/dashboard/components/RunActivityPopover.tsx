@@ -10,7 +10,7 @@
 
 /** Monthly forecast-activity bar chart shown from the "Total Forecasts" stat card. */
 
-import { Suspense, lazy, useMemo } from 'react'
+import { Suspense, lazy, useCallback, useMemo } from 'react'
 import { format } from 'date-fns'
 import { ArrowRight, TrendingUp } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -38,6 +38,10 @@ export function RunActivityPopover({
   side = 'bottom',
 }: RunActivityPopoverProps) {
   const { t } = useTranslation('dashboard')
+  const formatCount = useCallback(
+    (count: number) => t('welcome.activity.runCount', { count }),
+    [t],
+  )
   const { runs, total: windowTotal, serverTotal } = useJobStatusCounts()
   const { serverTimeToLocal } = useServerTime()
 
@@ -108,6 +112,7 @@ export function RunActivityPopover({
         <RunActivityChart
           data={data}
           seriesName={t('welcome.activity.title')}
+          formatCount={formatCount}
         />
       </Suspense>
     </SummaryPopover>
