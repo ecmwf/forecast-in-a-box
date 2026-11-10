@@ -14,8 +14,10 @@
  * Individual card for getting started options
  */
 
+import { useState } from 'react'
+import { FileUp } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { ReactNode } from 'react'
+import type { DragEvent, ReactNode } from 'react'
 import type { FableBuilderV1 } from '@/api/types/fable.types'
 import { FableMiniFlow } from '@/features/journal/components/FableMiniFlow'
 import { H3, P } from '@/components/base/typography'
@@ -42,7 +44,14 @@ interface GettingStartedCardProps {
   /** When provided, renders a colour mini-flow preview under the description. */
   previewFable?: FableBuilderV1
   onClick?: () => void
+  /** When provided, a file dropped on the card is handed over. */
+  onFileDrop?: (file: File) => void
+  /** Shown over the card while a file is dragged over it. */
+  dropLabel?: string
 }
+
+const isFileDrag = (event: DragEvent) =>
+  event.dataTransfer.types.includes('Files')
 
 export function GettingStartedCard({
   icon,
@@ -58,8 +67,39 @@ export function GettingStartedCard({
   borderColor = 'border-border hover:border-blue-400',
   previewFable,
   onClick,
+  onFileDrop,
+  dropLabel,
 }: GettingStartedCardProps) {
   const { t } = useTranslation('dashboard')
+  const [isDragOver, setIsDragOver] = useState(false)
+  const dropHandlers =
+    onFileDrop && !disabled
+      ? {
+          onDragEnter: (event: DragEvent<HTMLDivElement>) => {
+            if (!isFileDrag(event)) return
+            event.preventDefault()
+            setIsDragOver(true)
+          },
+          onDragOver: (event: DragEvent<HTMLDivElement>) => {
+            if (!isFileDrag(event)) return
+            event.preventDefault()
+            event.dataTransfer.dropEffect = 'copy'
+          },
+          onDragLeave: (event: DragEvent<HTMLDivElement>) => {
+            // Moving onto a child also fires dragleave on the card.
+            if (event.currentTarget.contains(event.relatedTarget as Node))
+              return
+            setIsDragOver(false)
+          },
+          onDrop: (event: DragEvent<HTMLDivElement>) => {
+            if (!isFileDrag(event)) return
+            event.preventDefault()
+            setIsDragOver(false)
+            const file = event.dataTransfer.files.item(0)
+            if (file) onFileDrop(file)
+          },
+        }
+      : {}
   const card = (
     <div
       role="button"
@@ -67,6 +107,7 @@ export function GettingStartedCard({
       data-testid={testId}
       tabIndex={disabled ? -1 : 0}
       onClick={disabled ? undefined : onClick}
+      {...dropHandlers}
       onKeyDown={(e) => {
         if (disabled) return
         if (e.key === 'Enter' || e.key === ' ') {
@@ -83,8 +124,15 @@ export function GettingStartedCard({
           : isRecommended
             ? 'border-2 border-primary/20 bg-muted/50 hover:border-primary'
             : borderColor,
+        isDragOver && 'border-dashed border-primary',
       )}
     >
+      {isDragOver && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 rounded-md bg-card/90 text-sm font-medium text-primary">
+          <FileUp className="h-5 w-5" />
+          {dropLabel}
+        </div>
+      )}
       {isRecommended && (
         <div className="absolute top-4 right-4 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground">
           {t('gettingStarted.recommended')}

@@ -111,6 +111,8 @@ interface FableBuilderPageProps {
   templateName?: string
   /** Explicit blank-canvas intent; unsaved bench work parks on the shelf. */
   fresh?: boolean
+  /** One-shot `?loaded`: a file is on the bench; asks for its missing glyphs, then strips. */
+  loaded?: boolean
   /** One-shot `?tour=` launch; the param is stripped on start. */
   tour?: 'first-run'
 }
@@ -122,6 +124,7 @@ export function FableBuilderPage({
   templatePlugin,
   templateName,
   fresh = false,
+  loaded = false,
   tour,
 }: FableBuilderPageProps) {
   const { t } = useTranslation(['configure', 'common'])
@@ -172,6 +175,17 @@ export function FableBuilderPage({
   const [loadedParams, setLoadedParams] = useState<TemplateParameters | null>(
     null,
   )
+  // A file loaded before arrival gets the same check as "Load workflow".
+  useEffect(() => {
+    if (!loaded) return
+    setLoadedCheckPending(true)
+    void navigate({
+      from: '/configure',
+      to: '/configure',
+      search: (prev) => ({ ...prev, loaded: undefined }),
+      replace: true,
+    })
+  }, [loaded, navigate])
 
   // Auto-persist the workbench to localStorage
   useDraftPersistence()

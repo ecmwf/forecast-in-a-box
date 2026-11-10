@@ -24,6 +24,8 @@ const searchSchema = z.object({
   templateName: z.string().optional(),
   /** Explicit blank-canvas intent; a bench holding unsaved work asks first. */
   fresh: z.boolean().optional(),
+  /** A workflow file was just put on the bench; check it for missing glyphs. */
+  loaded: z.boolean().optional(),
   /** Plain-link tour launch (help surfaces); stripped on start. */
   tour: z.enum(['first-run']).optional().catch(undefined),
 })
@@ -43,6 +45,7 @@ function ConfigurePage() {
     templatePlugin,
     templateName,
     fresh,
+    loaded,
     tour,
   } = Route.useSearch()
   return (
@@ -54,6 +57,7 @@ function ConfigurePage() {
       templatePlugin={templatePlugin}
       templateName={templateName}
       fresh={fresh}
+      loaded={loaded}
       tour={tour}
     />
   )

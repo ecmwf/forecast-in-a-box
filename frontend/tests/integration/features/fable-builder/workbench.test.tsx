@@ -156,7 +156,7 @@ describe('Fable Builder workbench', () => {
     expect(screen.getByTestId('workbench-shelf-banner').query()).toBeNull()
   })
 
-  it('Load workflow drops the name of the workflow it replaces', async () => {
+  it('Load workflow names the bench after the file, not the previous workflow', async () => {
     useFableBuilderStore.getState().setFable(seedDraft().fable, null)
     useFableBuilderStore.setState({ fableName: 'Malawi crop out issue' })
 
@@ -176,8 +176,41 @@ describe('Fable Builder workbench', () => {
     input.files = transfer.files
     input.dispatchEvent(new Event('change', { bubbles: true }))
 
-    await expect.poll(() => useFableBuilderStore.getState().fableName).toBe('')
+    await expect
+      .poll(() => useFableBuilderStore.getState().fableName)
+      .toBe('uk cutout aifs')
     expect(useFableBuilderStore.getState().isDirty).toBe(false)
+  })
+
+  it('a loaded arrival keeps the file and asks for its missing variables', async () => {
+    useFableBuilderStore.getState().setFable(
+      seedDraft({
+        fable: {
+          blocks: {
+            dropped_block: {
+              factory_id: {
+                plugin: { store: 'ecmwf', local: 'ecmwf-base' },
+                factory: 'operationalForecastSource',
+              },
+              configuration_values: { source: '${droppedRegion}' },
+              input_ids: {},
+            },
+          },
+        },
+      }).fable,
+      null,
+    )
+
+    const screen = await renderWithRouter(<FableBuilderPage loaded />)
+
+    await expect.element(screen.getByText('Missing variables')).toBeVisible()
+    expect(Object.keys(useFableBuilderStore.getState().fable.blocks)).toEqual([
+      'dropped_block',
+    ])
+    // One-shot: the flag leaves the URL.
+    expect(mockNavigate).toHaveBeenCalledWith(
+      expect.objectContaining({ to: '/configure', replace: true }),
+    )
   })
 
   it('fresh at mount shelves the banked bench and blanks immediately', async () => {
