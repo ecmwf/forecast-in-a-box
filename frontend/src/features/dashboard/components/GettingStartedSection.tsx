@@ -14,7 +14,6 @@
  * A blank canvas plus the starting points the ECMWF plugin ships as templates.
  */
 
-import { useEffect } from 'react'
 import { ChevronRight, Layers } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate } from '@tanstack/react-router'
@@ -57,29 +56,10 @@ function StarterPanel({
   )
 }
 
-/** Refuses file drops outside the page's own drop targets. */
-function useRefuseStrayFileDrops() {
-  useEffect(() => {
-    const refuse = (event: DragEvent) => {
-      if (event.defaultPrevented) return
-      if (!event.dataTransfer?.types.includes('Files')) return
-      event.preventDefault()
-      event.dataTransfer.dropEffect = 'none'
-    }
-    window.addEventListener('dragover', refuse)
-    window.addEventListener('drop', refuse)
-    return () => {
-      window.removeEventListener('dragover', refuse)
-      window.removeEventListener('drop', refuse)
-    }
-  }, [])
-}
-
 export function GettingStartedSection() {
   const { t } = useTranslation(['dashboard', 'common'])
   const navigate = useNavigate()
   const loadWorkflowFile = useLoadWorkflowFile()
-  useRefuseStrayFileDrops()
   const { starters, hasStarters, templateCount, isLoading, isError, refetch } =
     useStarterTemplates()
   const bookmarkedKeys = useTemplateBookmarksStore((state) => state.keys)

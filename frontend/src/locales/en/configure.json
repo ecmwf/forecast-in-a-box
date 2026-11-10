@@ -30,6 +30,9 @@
     "jinjaReservedReference": "'{{name}}' clashes with a Jinja filter or function and cannot be used as a variable — choose a different name."
   },
   "page": {
+    "dropOpen": "Drop to open this workflow",
+    "dropReplace": "Drop to replace the current workflow",
+    "dropSetAside": "Unsaved changes are set aside",
     "notFoundTitle": "The requested workflow was not found.",
     "loadFailedTitle": "Failed to load workflow. Please try again later.",
     "notFoundDescription": "It may have been deleted or the link is no longer valid.",
@@ -125,6 +128,7 @@
     "emptyDescription": "Pick a block on the canvas to configure it, or start here.",
     "addSource": "Add a source",
     "startFromPreset": "Open a workflow",
+    "dropHint": "or drop a workflow file here",
     "inputConnections": "Input connections",
     "configuration": "Configuration",
     "noConfigOptions": "No configuration options",

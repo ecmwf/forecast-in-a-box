@@ -30,6 +30,9 @@ import type { TemplateParameters } from '@/features/fable-builder/utils/template
 import { SubmitRunDialog } from '@/features/executions/components/SubmitRunDialog'
 import { deriveTemplateParameters } from '@/features/fable-builder/utils/template-parameters'
 import { useAllGlyphs } from '@/features/fable-builder/hooks/useAllGlyphs'
+import { useLoadWorkflowFile } from '@/features/fable-builder/hooks/useLoadWorkflowFile'
+import { useFileDrop } from '@/hooks/useFileDrop'
+import { FileDropOverlay } from '@/components/base/FileDropOverlay'
 import { useURLStateSync } from '@/features/fable-builder/hooks/useURLStateSync'
 import {
   readDraft,
@@ -148,6 +151,7 @@ export function FableBuilderPage({
   )
   const setLocalGlyph = useFableBuilderStore((state) => state.setLocalGlyph)
   const step = useFableBuilderStore((state) => state.step)
+  const isDirty = useFableBuilderStore((state) => state.isDirty)
   const storeFableId = useFableBuilderStore((state) => state.fableId)
   const submitDialogOpen = useFableBuilderStore(
     (state) => state.submitDialogOpen,
@@ -186,6 +190,18 @@ export function FableBuilderPage({
       replace: true,
     })
   }, [loaded, navigate])
+
+  // A workflow file dropped while editing replaces the bench like "Load workflow".
+  const loadWorkflowFile = useLoadWorkflowFile()
+  const fileDrop = useFileDrop(
+    step === 'edit'
+      ? (file) =>
+          void loadWorkflowFile(file).then((ok) => {
+            if (ok) setLoadedCheckPending(true)
+          })
+      : undefined,
+  )
+  const benchHasBlocks = Object.keys(fable.blocks).length > 0
 
   // Auto-persist the workbench to localStorage
   useDraftPersistence()
@@ -588,11 +604,24 @@ export function FableBuilderPage({
 
         <WorkbenchShelfBanner />
 
-        <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
+        <div
+          className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden"
+          data-testid="builder-drop-area"
+          {...fileDrop.dropHandlers}
+        >
           {step === 'edit' ? (
             <EditStep catalogue={catalogue} isDesktop={isDesktop} />
           ) : (
             <ReviewStepComponent catalogue={catalogue} />
+          )}
+          {fileDrop.isDragOver && (
+            <FileDropOverlay
+              label={t(benchHasBlocks ? 'page.dropReplace' : 'page.dropOpen')}
+              detail={
+                benchHasBlocks && isDirty ? t('page.dropSetAside') : undefined
+              }
+              className="z-50 rounded-none"
+            />
           )}
         </div>
       </div>

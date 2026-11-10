@@ -148,15 +148,4 @@ describe('Workflow file drop on Start from scratch', () => {
     expect(mockNavigate).not.toHaveBeenCalled()
     expect(useFableBuilderStore.getState().fable.blocks).toEqual({})
   })
-
-  it('refuses a file dropped beside the card', async () => {
-    await renderSection()
-    const transfer = fileTransfer(JSON.stringify(WORKFLOW))
-
-    const over = fire(document.body, 'dragover', transfer)
-    expect(over.defaultPrevented).toBe(true)
-    expect(transfer.dropEffect).toBe('none')
-    expect(fire(document.body, 'drop', transfer).defaultPrevented).toBe(true)
-    expect(mockNavigate).not.toHaveBeenCalled()
-  })
 })

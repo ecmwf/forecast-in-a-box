@@ -253,6 +253,9 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
               {t('configPanel.startFromPreset')}
             </Button>
           </div>
+          <P className="-mt-2 text-xs text-muted-foreground">
+            {t('configPanel.dropHint')}
+          </P>
         </div>
       </div>
     )

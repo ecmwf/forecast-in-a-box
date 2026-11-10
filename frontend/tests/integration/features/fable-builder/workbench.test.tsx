@@ -85,6 +85,20 @@ function shelfName(): string | undefined {
   return useWorkbenchShelfStore.getState().shelf?.fableName
 }
 
+function droppedFile(content: object, name: string): DataTransfer {
+  const transfer = new DataTransfer()
+  transfer.items.add(
+    new File([JSON.stringify(content)], name, { type: 'application/json' }),
+  )
+  return transfer
+}
+
+function fireDrag(target: Element, type: string, dataTransfer: DataTransfer) {
+  target.dispatchEvent(
+    new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer }),
+  )
+}
+
 /** Mirrors ConfigurePage: the route stays mounted while the search turns fresh. */
 function FreshToggleHarness() {
   const [fresh, setFresh] = useState(false)
@@ -180,6 +194,52 @@ describe('Fable Builder workbench', () => {
       .poll(() => useFableBuilderStore.getState().fableName)
       .toBe('uk cutout aifs')
     expect(useFableBuilderStore.getState().isDirty).toBe(false)
+  })
+
+  it('a file dropped on the builder replaces dirty work, which is set aside', async () => {
+    seedLiveDirtyBench()
+    const screen = await renderWithRouter(<FableBuilderPage />)
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
+    const area = screen.getByTestId('builder-drop-area').element()
+
+    const transfer = droppedFile(
+      { blocks: { dropped_block: seedDraft().fable.blocks.draft_block } },
+      'uk_cutout_aifs_workflow.json',
+    )
+    fireDrag(area, 'dragenter', transfer)
+    await expect
+      .element(screen.getByText('Drop to replace the current workflow'))
+      .toBeVisible()
+    await expect
+      .element(screen.getByText('Unsaved changes are set aside'))
+      .toBeVisible()
+    fireDrag(area, 'drop', transfer)
+
+    await expect
+      .poll(() => Object.keys(useFableBuilderStore.getState().fable.blocks))
+      .toEqual(['dropped_block'])
+    expect(useFableBuilderStore.getState().fableName).toBe('uk cutout aifs')
+    expect(shelfName()).toBe('Drafted work')
+    await expect
+      .element(screen.getByText('Drop to replace the current workflow'))
+      .not.toBeInTheDocument()
+  })
+
+  it('an empty builder offers to open a dropped file and says so in the panel', async () => {
+    const screen = await renderWithRouter(<FableBuilderPage />)
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
+    await expect
+      .element(screen.getByText('or drop a workflow file here'))
+      .toBeVisible()
+
+    fireDrag(
+      screen.getByTestId('builder-drop-area').element(),
+      'dragenter',
+      droppedFile({ blocks: {} }, 'empty_workflow.json'),
+    )
+    await expect
+      .element(screen.getByText('Drop to open this workflow'))
+      .toBeVisible()
   })
 
   it('a loaded arrival keeps the file and asks for its missing variables', async () => {
