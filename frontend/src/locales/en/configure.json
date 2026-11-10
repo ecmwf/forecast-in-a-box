@@ -54,7 +54,7 @@
     "fileTooLargeTitle": "File too large",
     "fileTooLargeDescription": "Workflow files must be smaller than 1 MB.",
     "invalidConfigTitle": "Invalid workflow file",
-    "invalidConfigDescription": "File must contain a valid workflow with a \"blocks\" property.",
+    "invalidConfigDescription": "The file is not a workflow exported from Forecast-in-a-Box.",
     "parseFailed": "Failed to parse workflow file",
     "readFailed": "Failed to read file",
     "readUnknownError": "Unknown read error",

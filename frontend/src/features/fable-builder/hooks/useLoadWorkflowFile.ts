@@ -31,7 +31,9 @@ function toastFileError(t: TFunction<'configure'>, error: unknown): void {
     ],
     invalid: [
       t('header.invalidConfigTitle'),
-      t('header.invalidConfigDescription'),
+      detail
+        ? `${t('header.invalidConfigDescription')} (${detail})`
+        : t('header.invalidConfigDescription'),
     ],
     read: [t('header.readFailed'), detail || t('header.readUnknownError')],
     parse: [t('header.parseFailed'), detail],

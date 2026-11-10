@@ -35,6 +35,13 @@ describe('workflowNameFromFile', () => {
 const jsonFile = (content: string) =>
   new File([content], 'workflow.json', { type: 'application/json' })
 
+const block = (inputs: Record<string, string> = {}) => ({
+  factory_id: { plugin: { store: 'ecmwf', local: 'base' }, factory: 'f' },
+  configuration_values: {},
+  input_ids: inputs,
+})
+const workflow = (blocks: Record<string, unknown>) => JSON.stringify({ blocks })
+
 async function errorCode(file: File): Promise<string | undefined> {
   try {
     await readWorkflowFile(file)
@@ -81,7 +88,67 @@ describe('readWorkflowFile', () => {
     ['null blocks', '{"blocks":null}'],
     ['a block list', '{"blocks":[]}'],
     ['a string', '"blocks"'],
+    // Both crashed the builder before blocks were checked one by one.
+    ['a block that is not an object', '{"blocks":{"a":42}}'],
+    [
+      'a block without factory_id',
+      '{"blocks":{"a":{"configuration_values":{},"input_ids":{}}}}',
+    ],
+    [
+      'a number as a setting',
+      '{"blocks":{"a":{"factory_id":{"plugin":{"store":"s","local":"l"},"factory":"f"},"configuration_values":{"lead_time":72},"input_ids":{}}}}',
+    ],
+    ['local glyphs that are not text', '{"blocks":{},"local_glyphs":{"a":1}}'],
+    // Names a plain object already has would resolve to built-ins.
+    ['a built-in block name', workflow({ constructor: block() })],
+    [
+      '__proto__ as a block name',
+      `{"blocks":{"__proto__":${JSON.stringify(block())}}}`,
+    ],
+    [
+      'an input naming a built-in',
+      workflow({ a: block({ dataset: 'toString' }) }),
+    ],
+    [
+      'an input naming a missing block',
+      workflow({ a: block({ dataset: 'gone' }) }),
+    ],
+    [
+      'a built-in glyph name',
+      JSON.stringify({ blocks: {}, local_glyphs: { valueOf: 'x' } }),
+    ],
   ])('refuses %s', async (_, content) => {
     expect(await errorCode(jsonFile(content))).toBe('invalid')
+  })
+
+  it('accepts inputs naming blocks in the file, or none', async () => {
+    const content = workflow({
+      source: block(),
+      product: block({ dataset: 'source', mask: '' }),
+    })
+    await expect(readWorkflowFile(jsonFile(content))).resolves.toBeTruthy()
+  })
+
+  it('names the input that points nowhere', async () => {
+    await expect(
+      readWorkflowFile(
+        jsonFile(workflow({ a: block({ dataset: 'toString' }) })),
+      ),
+    ).rejects.toThrow(
+      "blocks.a.input_ids.dataset: no block 'toString' in the workflow",
+    )
+  })
+
+  it('names the first problem', async () => {
+    await expect(
+      readWorkflowFile(jsonFile('{"blocks":{"a":42}}')),
+    ).rejects.toThrow(/^blocks\.a: /)
+  })
+
+  it('keeps only the workflow fields', async () => {
+    const fable = await readWorkflowFile(
+      jsonFile('{"blocks":{},"name":"later","environment":null}'),
+    )
+    expect(fable).toEqual({ blocks: {}, environment: null })
   })
 })

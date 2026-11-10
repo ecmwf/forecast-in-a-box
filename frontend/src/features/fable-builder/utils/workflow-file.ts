@@ -10,7 +10,32 @@
 
 /** Reading an exported workflow file (`Export workflow`) back into a builder fable. */
 
+import { z } from 'zod'
 import type { FableBuilderV1 } from '@/api/types/fable.types'
+import { PluginBlockFactoryIdSchema } from '@/api/types/fable.types'
+import { EnvironmentSpecificationSchema } from '@/api/types/job.types'
+import { workflowNameIssue } from '@/features/fable-builder/utils/workflow-names'
+
+/** The export's layout: blocks keyed by instance ID, with sound names. */
+const WorkflowFileSchema = z
+  .object({
+    blocks: z.record(
+      z.string(),
+      z.object({
+        factory_id: PluginBlockFactoryIdSchema,
+        configuration_values: z.record(z.string(), z.string()),
+        input_ids: z.record(z.string(), z.string()),
+      }),
+    ),
+    environment: EnvironmentSpecificationSchema.nullable().optional(),
+    local_glyphs: z.record(z.string(), z.string()).optional(),
+  })
+  .check((ctx) => {
+    const issue = workflowNameIssue(ctx.value)
+    if (issue) {
+      ctx.issues.push({ code: 'custom', input: ctx.value, ...issue })
+    }
+  })
 
 /** Larger files are refused before reading. */
 export const MAX_WORKFLOW_FILE_BYTES = 1024 * 1024
@@ -40,6 +65,14 @@ export function workflowNameFromFile(fileName: string): string {
   )
 }
 
+/** zod drops `__proto__` keys without a word; a file with one is refused. */
+function refuseProtoKeys(key: string, value: unknown): unknown {
+  if (key === '__proto__') {
+    throw new WorkflowFileError('invalid', '__proto__: is a reserved name')
+  }
+  return value
+}
+
 const messageOf = (error: unknown): string =>
   error instanceof Error ? error.message : String(error)
 
@@ -56,20 +89,18 @@ export async function readWorkflowFile(file: File): Promise<FableBuilderV1> {
   }
   let parsed: unknown
   try {
-    parsed = JSON.parse(content)
+    parsed = JSON.parse(content, refuseProtoKeys)
   } catch (error) {
+    if (error instanceof WorkflowFileError) throw error
     throw new WorkflowFileError('parse', messageOf(error))
   }
-  // Blocks keyed by instance ID, as the export writes them.
-  if (
-    !parsed ||
-    typeof parsed !== 'object' ||
-    !('blocks' in parsed) ||
-    !parsed.blocks ||
-    typeof parsed.blocks !== 'object' ||
-    Array.isArray(parsed.blocks)
-  ) {
-    throw new WorkflowFileError('invalid')
+  const result = WorkflowFileSchema.safeParse(parsed)
+  if (!result.success) {
+    const issue = result.error.issues.at(0)
+    throw new WorkflowFileError(
+      'invalid',
+      issue ? `${issue.path.join('.')}: ${issue.message}` : '',
+    )
   }
-  return parsed as FableBuilderV1
+  return result.data
 }
