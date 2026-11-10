@@ -101,10 +101,6 @@ class AnemoiBuilder:
             action = type(action)(nodetree_from_dict({path: _param_id_to_param(array) for path, array in nodetree_arrays(action.nodes)}))
         return action
 
-    def _ensemble_members(self, ensemble: int) -> int | None:
-        """The ensemble member passed to earthkit-workflows-anemoi: the member id for ensemble checkpoints, None (a deterministic run) otherwise."""
-        return ensemble if self.checkpoint.is_ensemble_model else None
-
     def inference(self, lead_time: int, *, extra_environment: list[str] | None = None) -> Inference:
         """Build an Inference action for this checkpoint and lead time, with the appropriate environment for the input source if specified"""
         env = self.checkpoint.get_environment()
