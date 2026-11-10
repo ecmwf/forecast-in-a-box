@@ -4,13 +4,13 @@ This document records what was needed to run the two nested limited-area checkpo
 2.5 km domain -- `aila-nordic-2.0` (FMI) and `bris-nordic-2025.10` (MET Norway) -- end to end in Forecast-in-a-Box, and
 to plot their output.
 
-Status as of 2026-11-06: both checkpoints run from `opendata:ecmwf:highres` and write correct GRIB
+Status as of 2026-11-09: both checkpoints run from `opendata:ecmwf:highres` and write correct GRIB
 output, verified with the `checkpointMatrix` largeE2E scenario (see
 [backend/tests/largeE2E/README.md](../../../backend/tests/largeE2E/README.md)). Plotting works through a
-workaround in the plot runtime. The changes are to the catalog entries of both checkpoints, to one
-patched build of an upstream package they reference, and to the plugin. The anemoi plugins are the
-released versions, and the catalog entries no longer reference GRIB template files. All of this was done
-on an NVIDIA GB10 host (aarch64, 121 GB of memory shared between CPU and GPU).
+workaround in the plot runtime. The changes are to the catalog entries of both checkpoints and to the
+plugin. All the packages they use are released versions, and the catalog entries reference no local
+wheels or GRIB template files. All of this was done on an NVIDIA GB10 host (aarch64, 121 GB of memory
+shared between CPU and GPU).
 
 ## The checkpoints
 
@@ -48,7 +48,7 @@ Changes to the `aila-nordic-2.0` and `bris-nordic-2025.10` entries of the artifa
 |---|---|---|---|
 | Region names match the checkpoint masks | `lam_0` | `source0` -> `lam_0`, including `region_of_interest` | anemoi-inference loads the mask `<region>/cutout_mask` |
 | anemoi-graphs pin | `0.8.5` kept | `anemoi-graphs==0.6.6` dropped | 0.6.6 requires numpy<2, which downgrades the worker environment so that it cannot unpickle task outputs written with numpy 2; the BRIS model does not import anemoi.graphs |
-| Released anemoi plugins, MIR and ecCodes pins, patched earthkit-workflows-anemoi | added | added | see sections 2 and 3 |
+| Released anemoi plugins, MIR and ecCodes pins | added | added | see sections 2 and 3 |
 | `ANEMOI_INFERENCE_NUM_CHUNKS` in `control_options` | 16 -> 64 | 16 | bounds the inference memory peak; only applied since fix (c) in section 2 |
 | `ECCODES_ECKIT_GEO: "0"` in `control_options` | added | added | Lambert output fails to write otherwise, see section 5 |
 | `runner_options.output_templates` and `runner_options.output_modifiers` | MEPS Lambert grid, 949 x 1069 | MEPS Lambert grid, 849 x 969 | GRIB output on the Lambert grid, see section 4 |
@@ -69,33 +69,23 @@ catalog entries:
 Fixes (a) and (b) were regressions from moving the regrid into anemoi-plugins-ecmwf-transform, and were
 first carried as patched wheels (`0.2.0+fiab1`, `0.7.0+fiab1`).
 
-One patched wheel is still needed, `earthkit_workflows_anemoi-0.9.0+fiab4`, referenced by path from both
-catalog entries. It is the 0.9.0 release, the version the backend pins in `uv.lock`, plus:
- - (c) `CascadeRunner` applies the configuration `env` (the catalog `control_options`) to `os.environ`,
-   as `RunConfiguration.load` does; it builds its `RunConfiguration` directly, so the `env` was never
-   applied, for any checkpoint. This also explains why AILA first ran out of memory: its mappers ran
-   unchunked.
- - (d) `CascadeRunner` accepts `output_templates` and `output_modifiers`, passed to the GRIB output as
-   template providers (tried before the default `mir` and `builtin` ones) and GRIB modifiers. The
-   released `CascadeRunner` always builds its output as plain `cascade`, so a catalog entry cannot
-   configure the GRIB encoding.
- - (e) the initial states passed between tasks no longer carry `_input` and `_variables`, which hold
-   the input objects with their filters (such as the regrid preprocessor), as anemoi-inference does for
-   its parallel output.
- - the version constraint the plugin derives for the worker environment drops the local `+fiab4`
-   segment, which `~=` does not accept. This is only needed for the patched wheel itself.
+earthkit-workflows-anemoi is not pinned by the catalog entries: fiab-plugin-ecmwf requires
+`earthkit-workflows-anemoi>=0.10.3`, the backend pins it in `uv.lock`, and the plugin adds
+`earthkit-workflows-anemoi==<version of the backend>` to every worker environment. The fixes these
+checkpoints need were first carried as patched wheels (`0.9.0+fiab4`, `0.10.1+fiab1`) and are released:
 
-The fiab plugin adds `earthkit-workflows-anemoi==<version of the backend>` to every worker environment.
-With the backend on the released 0.9.0, this pin is `==0.9.0`, which the patched wheel satisfies (a local
-version `0.9.0+fiab4` matches `==0.9.0`), and which PyPI satisfies for every other checkpoint. The backend
-venv therefore stays as `uv.lock` installs it.
+| Release | Contains |
+|---|---|
+| `0.10.0` | (c) `CascadeRunner` applies the configuration `env` (the catalog `control_options`) to `os.environ`, as `RunConfiguration.load` does; it builds its `RunConfiguration` directly, so the `env` was never applied, for any checkpoint. This also explains why AILA first ran out of memory: its mappers ran unchunked. |
+| `0.10.2` | (d) `CascadeRunner` accepts `output_templates` and `output_modifiers`, passed to the GRIB output as template providers (tried before the default `mir` and `builtin` ones) and GRIB modifiers. Before, it always built its output as plain `cascade`, so a catalog entry could not configure the GRIB encoding. (e) The initial states passed between tasks no longer carry `_input` and `_variables`, which hold the input objects with their filters (such as the regrid preprocessor), as anemoi-inference does for its parallel output. |
+| `0.10.3` | The initial-condition request of a wave field stays in the wave streams (`wave`, `waef`). 0.10.2 moved every request to `stream=oper` or `enfo`, so checkpoints with wave inputs, such as AIFS Single, found no initial conditions in open data. Not needed by AILA and BRIS. |
 
-Fix (c) is part of earthkit-workflows-anemoi since 0.10.0, and (d) and (e) are proposed upstream on top of
-0.10.1 (`feat/cascade-output-templates-modifiers`). The backend cannot move to 0.10 yet: 0.10.0 changed
-the meaning of an integer `ensemble_members` from a number of members to a single member id, and the fiab
-plugin passes `ensemble_members=1` for a deterministic run. With 0.10, the initial conditions are then
-fetched from the ENS (`type=pf`, `stream=enfo`), and AIFS Single fails, as open data has no ENS wave
-fields. The plugin has to pass `None` for a deterministic run before the backend can use 0.10.
+0.10.0 also changed the meaning of `ensemble_members`: `None` is a deterministic run, from the control
+forecast (`stream=oper`, `type=fc`), and an integer is a single member id, so the former `ensemble_members=1`
+fetches the initial conditions of ENS member 1 (`stream=enfo`, `type=pf`). The plugin passes `None` for
+checkpoints that are not marked as ensemble models (`is_ensemble_model`), and the selected members, or the
+control member 0, for ensemble models. Their GRIB output is then `type=fc`, `stream=oper`, without a
+`number`.
 
 ### 3. Dependency pins
 
@@ -209,6 +199,7 @@ checkpoints against a list of input sources.
 | Plots (2t, msl, tp at steps 6 and 12) | 6 | 6 |
 | Run time, with input data in the earthkit-data cache (2026-10-30) | 4 min 31 s | 3 min 15 s |
 | `checkpointMatrix` total, memory-capped backend (2026-11-06) | 9 min 31 s (input 167 s, model 101 s) | 8 min 34 s (input 145 s, model 47 s) |
+| `checkpointMatrix` total, earthkit-workflows-anemoi 0.10.3 (2026-11-09) | 5 min 32 s (input 167 s, model 100 s) | 4 min 9 s (input 142 s, model 47 s) |
 
 ## Plotting
 
@@ -250,12 +241,7 @@ workaround can be removed.
 
 ## What is left
 
- - The catalog entries reference the patched earthkit-workflows-anemoi wheel by path, so it must be
-   available wherever the backend runs. It can be dropped once fixes (d) and (e) are released and the
-   fiab plugin passes `ensemble_members=None` for deterministic runs, so that the backend can move to
-   earthkit-workflows-anemoi 0.10 (section 2).
  - Upstream reports to file:
-   - earthkit-workflows-anemoi: fixes (d) and (e), committed on `feat/cascade-output-templates-modifiers`,
    - anemoi-plugins-ecmwf-transform: setting `ECCODES_ECKIT_GEO` for the whole process on import,
    - eckit::geo: no Lambert conformal grid, which makes `gridSpec` fail with ecCodes 2.48 and later,
    - earthkit-data: `to_points()` for Lambert grids,
