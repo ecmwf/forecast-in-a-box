@@ -18,6 +18,7 @@ from fiab_core.fable import (
 )
 from fiab_core.types import ClosedEnumType
 
+from fiab_plugin_ecmwf.anemoi.utils import get_available_input_sources
 from fiab_plugin_ecmwf.templates.common import (
     GRIB_OUTPUT_PATH,
     MAP_FORMAT,
@@ -80,10 +81,10 @@ template = BlueprintTemplate(
     example_glyphs={
         "outputRoot": OUTPUT_ROOT,
         "initialConditions": BlueprintTemplateExampleInput(
-            example_value="opendata",
+            example_value="opendata:ecmwf:lowres",
             display_name="Initial Conditions",
             display_description="Source of the initial conditions",
-            type_hint=ClosedEnumType(["mars", "opendata", "polytope"]),
+            type_hint=ClosedEnumType(get_available_input_sources()),
         ),
         "area": map_area("europe"),
         "plotFormat": MAP_FORMAT,

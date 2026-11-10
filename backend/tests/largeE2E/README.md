@@ -85,15 +85,15 @@ names to run only those, eg `just run checkpointMatrix`.
 real input data (and credentials, for polytope) and possibly a large GPU. The checkpoints and their
 input sources are listed in `MODELS` in that file. The variable is a `;`-separated list of entries:
 a checkpoint from `MODELS`, a preset from `PRESETS` (`oper` for every checkpoint in `MODELS`, `demo`
-for `aifs-global-o48` and `BRIS-Europe-2025.10` only), or `<checkpoint>=<source>,<source>` for any
+for `aifs-global-demo` and `bris-europe-demo` only), or `<checkpoint>=<source>,<source>` for any
 checkpoint the backend knows about. A checkpoint is its local id, looked up across the configured
 artifact stores, or `<store>:<local id>` to pick the store:
 
 ```bash
-FIAB_E2E_CHECKPOINTS="aifs-global-o48" just run checkpointMatrix
+FIAB_E2E_CHECKPOINTS="aifs-global-demo" just run checkpointMatrix
 FIAB_E2E_CHECKPOINTS="demo" just run checkpointMatrix
 FIAB_E2E_CHECKPOINTS="oper" just run checkpointMatrix
-FIAB_E2E_CHECKPOINTS="graceful-gazelle-v2=polytope:mars;local:aifs-single-mse-2.0=opendata:ecmwf:highres" just run checkpointMatrix
+FIAB_E2E_CHECKPOINTS="bris-africa-2.0=polytope:mars;local:aifs-single-global-2.0=opendata:ecmwf:highres" just run checkpointMatrix
 ```
 
 Every combination is attempted and the results are summarised at the end; the scenario fails if

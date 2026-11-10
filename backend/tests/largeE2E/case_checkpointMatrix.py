@@ -18,13 +18,13 @@ scenario fails at the end if any of them failed.
 Opt-in: nothing runs unless FIAB_E2E_CHECKPOINTS is set, since the combinations need real input
 data (opendata, polytope credentials, ...) and some checkpoints need a large GPU. The variable is a
 `;`-separated list of entries, each either
- - a checkpoint listed in MODELS, eg `aifs-global-o48`, run against its listed sources,
- - `<checkpoint>=<source>,<source>`, eg `graceful-gazelle-v2=polytope:mars`, to run any checkpoint
+ - a checkpoint listed in MODELS, eg `aifs-global-demo`, run against its listed sources,
+ - `<checkpoint>=<source>,<source>`, eg `bris-africa-2.0=polytope:mars`, to run any checkpoint
    the backend knows about against the given sources,
  - a preset from PRESETS: `oper` for every checkpoint listed in MODELS, `demo` for the small demo
    checkpoints only.
 A checkpoint is given either as its local id, looked up across the backend's artifact stores, or
-as `<store>:<local id>` to pick the store, eg `local:aifs-global-o48`.
+as `<store>:<local id>` to pick the store, eg `local:aifs-global-demo`.
 
 Assumptions (see also README.md):
  - the backend is already running and reachable (see common.base_url()),
@@ -86,18 +86,23 @@ class ModelCase:
 
 # Keyed by the checkpoint's local id, the store it is in is looked up in the backend (see common.resolve_checkpoint)
 MODELS: dict[str, ModelCase] = {
-    "aifs-global-o48": ModelCase(sources=["opendata:ecmwf:lowres"], plot_domain="global"),
-    "BRIS-Europe-2025.10": ModelCase(sources=["opendata:ecmwf:lowres"]),
-    "graceful-gazelle": ModelCase(sources=["opendata:ecmwf:highres"]),
-    "aifs-single-mse-2.0": ModelCase(sources=["opendata:ecmwf:lowres"]),
-    "aila-v2": ModelCase(sources=["opendata:ecmwf:highres"]),
-    "BRIS-2025.10": ModelCase(sources=["opendata:ecmwf:highres"]),
+    "aifs-global-demo": ModelCase(sources=["opendata:ecmwf:lowres"], plot_domain="global"),
+    "bris-europe-demo": ModelCase(sources=["opendata:ecmwf:lowres"]),
+    "bris-africa-1.0": ModelCase(sources=["opendata:ecmwf:highres"]),
+    "aifs-single-global-2.0": ModelCase(sources=["opendata:ecmwf:lowres"]),
+    "aila-nordic-2.0": ModelCase(sources=["opendata:ecmwf:highres"]),
+    "bris-nordic-2025.10": ModelCase(sources=["opendata:ecmwf:highres"]),
+    "aifs-single-global-3.0": ModelCase(sources=["opendata:ecmwf:highres"]),
+    # 24h step, and pressure levels (2, 5, 30, 70 hPa) that are not in open data
+    "aifs-subs-global-0.1": ModelCase(sources=["polytope:mars"], lead_time_hours=48),
+    "bris-nz-2026.11": ModelCase(sources=["opendata:ecmwf:highres"]),
+    "anemoi-alps-2026.11": ModelCase(sources=["opendata:ecmwf:highres"]),
 }
 
 # Named sets of MODELS, usable as FIAB_E2E_CHECKPOINTS entries
 PRESETS: dict[str, list[str]] = {
     "oper": list(MODELS),
-    "demo": ["aifs-global-o48", "BRIS-Europe-2025.10"],
+    "demo": ["aifs-global-demo", "bris-europe-demo"],
 }
 
 
