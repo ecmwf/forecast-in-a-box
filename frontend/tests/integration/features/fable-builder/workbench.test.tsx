@@ -156,6 +156,30 @@ describe('Fable Builder workbench', () => {
     expect(screen.getByTestId('workbench-shelf-banner').query()).toBeNull()
   })
 
+  it('Load workflow drops the name of the workflow it replaces', async () => {
+    useFableBuilderStore.getState().setFable(seedDraft().fable, null)
+    useFableBuilderStore.setState({ fableName: 'Malawi crop out issue' })
+
+    const screen = await renderWithRouter(<FableBuilderPage />)
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
+
+    const transfer = new DataTransfer()
+    transfer.items.add(
+      new File(
+        [JSON.stringify(seedDraft().fable)],
+        'uk_cutout_aifs_2026-11-10T09-26-19_workflow.json',
+        { type: 'application/json' },
+      ),
+    )
+    const input = document.querySelector<HTMLInputElement>('input[type=file]')
+    if (!input) throw new Error('no file input')
+    input.files = transfer.files
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+
+    await expect.poll(() => useFableBuilderStore.getState().fableName).toBe('')
+    expect(useFableBuilderStore.getState().isDirty).toBe(false)
+  })
+
   it('fresh at mount shelves the banked bench and blanks immediately', async () => {
     seedWorkbench()
 

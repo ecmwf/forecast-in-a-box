@@ -189,6 +189,8 @@ export function FableBuilderHeader({
           )
           if (evicted) showToast.warning(t('shelf.evicted'))
           setFable(parsed as FableBuilderV1, null)
+          // The previous workflow's name does not describe the loaded file.
+          useFableBuilderStore.setState({ fableName: '' })
           showToast.success(t('header.configLoaded'))
           if (shelved) showToast.info(t('shelf.setAside'))
           onConfigLoaded?.()
