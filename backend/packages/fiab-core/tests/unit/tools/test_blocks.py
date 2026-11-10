@@ -20,7 +20,7 @@ import pytest
 from fiab_core.fable import BlockConfigurationOption, BlockFactoryId, BlockInstance, ConfigurationOptionId
 from fiab_core.tools.blocks import BlockInstanceConfigurationError, BlockInstanceRich
 from fiab_core.types import WrongType
-from fiab_core.types.definitions import IntType
+from fiab_core.types.definitions import ClosedEnumType, FableType, GridType, IntType, OpenEnumType
 from fiab_core.types.traits import Positive
 
 
@@ -69,3 +69,40 @@ class TestConfigAsIntFullPipeline:
         converted = value_type.validate_convert("5")
         rich = _rich_block(value_type, converted)
         assert rich.config_as_int("amount") == 5
+
+
+def _grid_block(value_type: FableType, value: object) -> BlockInstanceRich:
+    option_id = ConfigurationOptionId("grid")
+    options = {option_id: BlockConfigurationOption(title="Grid", description="A grid", value_type=value_type)}
+    return BlockInstanceRich.from_block(BlockFactoryId("TestFactory"), BlockInstance(configuration_values={option_id: value}), options)
+
+
+class TestConfigAsGrid:
+    """config_as_grid accepts GridType and an open enum of grids, and returns the converted value."""
+
+    GRID_ENUM = OpenEnumType(["auto", "0.25", "O96"], GridType())
+
+    @pytest.mark.parametrize("value_type", [GridType(), GRID_ENUM])
+    @pytest.mark.parametrize(
+        ("text", "expected"),
+        [("auto", None), ("0.25", 0.25), ("0.1", 0.1), ("0.25/0.5", [0.25, 0.5]), ("O96", "O96"), ("n320", "N320")],
+    )
+    def test_returns_the_converted_value(self, value_type: FableType, text: str, expected: object) -> None:
+        converted = value_type.validate_convert(text)
+
+        assert _grid_block(value_type, converted).config_as_grid("grid") == expected
+
+    def test_auto_means_no_grid_change_for_the_open_enum(self) -> None:
+        assert _grid_block(self.GRID_ENUM, self.GRID_ENUM.validate_convert("auto")).config_as_grid("grid") is None
+
+    @pytest.mark.parametrize(
+        "value_type",
+        [OpenEnumType(["a", "b"]), ClosedEnumType(["auto", "0.25"], GridType()), OpenEnumType(["1", "2"], IntType()), IntType()],
+    )
+    def test_rejects_other_types(self, value_type: FableType) -> None:
+        with pytest.raises(BlockInstanceConfigurationError, match="not GridType"):
+            _grid_block(value_type, None).config_as_grid("grid")
+
+    def test_rejects_bool(self) -> None:
+        with pytest.raises(BlockInstanceConfigurationError, match="got bool"):
+            _grid_block(GridType(), True).config_as_grid("grid")

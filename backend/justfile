@@ -2,9 +2,7 @@ default:
     @just --list
 
 val:
-    uv run ty check src/
-    uv run ty check tests/unit
-    uv run ty check tests/integration
+    uv run ty check
     just test
 
 test:

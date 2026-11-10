@@ -200,3 +200,26 @@ export function artifactLabels(
     ]),
   )
 }
+
+export const MATURITY_TAG = 'maturity'
+// Catalogues still send maturity under this key.
+const LEGACY_MATURITY_TAG = 'status'
+
+/** Tag entries with `status` shown as `maturity`; a `maturity` tag wins. */
+export function displayTags(
+  tags: Record<string, string | null>,
+): Array<[string, string | null]> {
+  return Object.entries(tags).flatMap<[string, string | null]>(
+    ([key, value]) => {
+      if (key !== LEGACY_MATURITY_TAG) return [[key, value]]
+      return Object.hasOwn(tags, MATURITY_TAG) ? [] : [[MATURITY_TAG, value]]
+    },
+  )
+}
+
+/** Maturity such as `demo` or `operational`; null without one. */
+export function artifactMaturity(
+  tags: Record<string, string | null>,
+): string | null {
+  return displayTags(tags).find(([key]) => key === MATURITY_TAG)?.[1] ?? null
+}

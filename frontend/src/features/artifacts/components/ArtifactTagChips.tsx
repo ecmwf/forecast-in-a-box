@@ -16,6 +16,7 @@
  */
 
 import { useTranslation } from 'react-i18next'
+import { displayTags } from '@/api/types/artifacts.types'
 import { Badge } from '@/components/ui/badge'
 
 export interface ArtifactTagChipsProps {
@@ -31,7 +32,7 @@ export function ArtifactTagChips({
   className,
 }: ArtifactTagChipsProps) {
   const { t } = useTranslation('artifacts')
-  const entries = Object.entries(tags)
+  const entries = displayTags(tags)
   if (entries.length === 0) return null
 
   const visible = max !== undefined ? entries.slice(0, max) : entries

@@ -11,8 +11,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   isSharedAcrossRuns,
+  lacksFileName,
   namesRunId,
   runScopedPath,
+  withFileName,
   withRunFolder,
 } from '@/features/fable-builder/utils/run-folder-nudge'
 
@@ -91,5 +93,22 @@ describe('withRunFolder', () => {
   it('offers no fix without a slash outside glyphs', () => {
     expect(withRunFolder('${outputRoot}')).toBeNull()
     expect(withRunFolder('out.grib')).toBeNull()
+  })
+})
+
+describe('lacksFileName', () => {
+  it('flags a path ending in a slash', () => {
+    expect(lacksFileName('${outDir}/${runId}__${attemptCount}/')).toBe(true)
+    expect(lacksFileName('/tmp/out/ ')).toBe(true)
+    expect(lacksFileName('/tmp/out/[shortName].grib')).toBe(false)
+    expect(lacksFileName('${outDir}')).toBe(false)
+  })
+})
+
+describe('withFileName', () => {
+  it('appends the default GRIB file name', () => {
+    expect(withFileName('${outDir}/${runId}__${attemptCount}/ ')).toBe(
+      '${outDir}/${runId}__${attemptCount}/[shortName].grib',
+    )
   })
 })

@@ -44,6 +44,7 @@ import { DefineVariableButton } from '@/features/fable-builder/components/shared
 import { useGlyphContext } from '@/features/fable-builder/context/GlyphContext'
 import {
   useFieldErrors,
+  useMissingFileNames,
   useMissingGlyphs,
   useResolvedConfig,
   useSharedOutputPaths,
@@ -114,6 +115,56 @@ export function ResolvedPreview({ preview }: { preview: string }) {
   )
 }
 
+/** Nudge button that writes `fix` into the field; the tooltip shows the path. */
+function PathFixButton({
+  label,
+  tooltip,
+  fix,
+  onApply,
+}: {
+  label: string
+  tooltip: string
+  fix: string
+  onApply: (fix: string) => void
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className={NUDGE_ACTION_CLASS}
+            onClick={() => onApply(fix)}
+          />
+        }
+      >
+        {label}
+      </TooltipTrigger>
+      <TooltipContent
+        side="left"
+        className="max-w-80 flex-col items-start gap-1"
+      >
+        {tooltip}
+        {/* Wraps only after a slash. */}
+        <span className="font-mono">
+          {fix.split('/').map((part, i) => (
+            <Fragment key={i}>
+              {i > 0 && (
+                <>
+                  /<wbr />
+                </>
+              )}
+              {part}
+            </Fragment>
+          ))}
+        </span>
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
 export function GlyphFieldWrapper({
   id,
   configKey,
@@ -157,6 +208,7 @@ export function GlyphFieldWrapper({
 
   const missingGlyphNames = useMissingGlyphs()?.[configKey] ?? null
   const sharedOutputPaths = useSharedOutputPaths()
+  const missingFileNames = useMissingFileNames()
   const valueHasGlyphs = containsGlyphs(value)
 
   // No glyphs / glyph mode disabled → children, error text and preview only.
@@ -233,14 +285,20 @@ export function GlyphFieldWrapper({
     previewHasTimeComponent(resolvedPreview)
   const dateNudgeFixAvailable = dateNudgeVisible && canApplyFloorDay(value)
 
+  // Nudge when a GRIB path names a folder, not a file.
+  const fileNameFix = hasFieldError
+    ? null
+    : (missingFileNames?.[configKey] ?? null)
+
   // Nudge when a sink's output path is shared across runs.
   const runFolderNudgeVisible =
     !hasFieldError &&
     sharedOutputPaths !== null &&
     configKey in sharedOutputPaths
-  const runFolderFix = runFolderNudgeVisible
-    ? sharedOutputPaths[configKey]
-    : null
+  const runFolder = runFolderNudgeVisible ? sharedOutputPaths[configKey] : null
+  const runFolderFix = runFolder?.fix ?? null
+  // GRIB output is the file's folder, not the file.
+  const runFolderIsGrib = runFolder?.scope === 'folder'
 
   function handleApplyFloorDay() {
     const next = applyFloorDay(value)
@@ -346,8 +404,33 @@ export function GlyphFieldWrapper({
         </div>
       )}
 
+      {fileNameFix !== null && (
+        <div className={NUDGE_CLASS} data-testid="file-name-nudge">
+          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+          <Tooltip>
+            <TooltipTrigger
+              render={<span className="min-w-0 flex-1 truncate" />}
+            >
+              {t('field.fileName.missing')}
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-72">
+              {t('field.fileName.details')}
+            </TooltipContent>
+          </Tooltip>
+          <PathFixButton
+            label={t('field.fileName.action')}
+            tooltip={t('field.fileName.actionTooltip')}
+            fix={fileNameFix}
+            onApply={onChange}
+          />
+        </div>
+      )}
+
       {runFolderNudgeVisible && (
-        <div className={NUDGE_CLASS} data-testid="run-folder-nudge">
+        <div
+          className={cn(NUDGE_CLASS, 'flex-wrap gap-y-0.5')}
+          data-testid="run-folder-nudge"
+        >
           <AlertCircle className="h-3.5 w-3.5 shrink-0" />
           <Tooltip>
             <TooltipTrigger
@@ -360,40 +443,18 @@ export function GlyphFieldWrapper({
             </TooltipContent>
           </Tooltip>
           {runFolderFix !== null && (
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className={NUDGE_ACTION_CLASS}
-                    onClick={() => onChange(runFolderFix)}
-                  />
-                }
-              >
-                {t('field.runFolder.action')}
-              </TooltipTrigger>
-              <TooltipContent
-                side="left"
-                className="max-w-80 flex-col items-start gap-1"
-              >
-                {t('field.runFolder.actionTooltip')}
-                {/* Wraps only after a slash. */}
-                <span className="font-mono">
-                  {runFolderFix.split('/').map((part, i) => (
-                    <Fragment key={i}>
-                      {i > 0 && (
-                        <>
-                          /<wbr />
-                        </>
-                      )}
-                      {part}
-                    </Fragment>
-                  ))}
-                </span>
-              </TooltipContent>
-            </Tooltip>
+            <PathFixButton
+              label={t('field.runFolder.action')}
+              tooltip={t('field.runFolder.actionTooltip')}
+              fix={runFolderFix}
+              onApply={onChange}
+            />
+          )}
+          {/* Own row, aligned with the label. */}
+          {runFolderIsGrib && (
+            <p className="basis-full pl-5.5">
+              {t('field.runFolder.gribFolder')}
+            </p>
           )}
         </div>
       )}

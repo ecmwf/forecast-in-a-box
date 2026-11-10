@@ -9,6 +9,7 @@
 
 """Unit tests for FableType and its subclasses."""
 
+import math
 from datetime import date, datetime, timedelta
 
 import pytest
@@ -22,6 +23,7 @@ from fiab_core.types.definitions import (
     FloatType,
     GeoDomainSingleType,
     GeoDomainType,
+    GridType,
     IntType,
     ListType,
     NoneType,
@@ -132,6 +134,12 @@ class TestFloatType:
         assert t.validate_convert("-42.5") == -42.5
         assert t.validate_convert("0.0") == 0.0
         assert t.validate_convert("42") == 42.0
+
+    def test_convert_accepts_non_finite_without_trait(self) -> None:
+        t = FloatType()
+        assert math.isnan(t.validate_convert("nan"))
+        assert t.validate_convert("inf") == math.inf
+        assert t.validate_convert("-inf") == -math.inf
 
     def test_convert_invalid_string_raises_value_error(self) -> None:
         t = FloatType()
@@ -464,6 +472,10 @@ class TestGeoDomainType:
         # west > east is a valid box crossing the antimeridian
         assert GeoDomainType().validate_convert("170,-10,-170,10") == [170, -10, -170, 10]
 
+    def test_numeric_float_resolves(self) -> None:
+        # a float bbox is valid,  we can resolve it to a list of four floats
+        assert GeoDomainType().validate_convert("-10.25,35.5,30,60") == [-10.25, 35.5, 30.0, 60.0]
+
     def test_bbox_south_greater_than_north_raises(self) -> None:
         with pytest.raises(WrongType, match="Cannot convert"):
             GeoDomainType().validate_convert("-10,60,30,35")
@@ -474,8 +486,6 @@ class TestGeoDomainType:
 
     def test_numeric_but_not_integer_bbox_raises(self) -> None:
         # an almost-bbox must fail loudly instead of being resolved as four region names
-        with pytest.raises(WrongType, match="Cannot convert"):
-            GeoDomainType().validate_convert("-10.25,35.5,30,60")
         with pytest.raises(WrongType, match="Cannot convert"):
             GeoDomainType().validate_convert("nan,35,30,60")
         with pytest.raises(WrongType, match="Cannot convert"):
@@ -682,12 +692,20 @@ class TestBoundingBoxWSENType:
         with pytest.raises(WrongType):
             t.validate_convert("")
 
-    def test_convert_non_integer_elements_raises_error(self) -> None:
+    def test_convert_float_elements(self) -> None:
+        t = BoundingBoxWSENType()
+        assert t.validate_convert("-10.5,40.2,30.1,70.9") == [-10.5, 40.2, 30.1, 70.9]
+
+    def test_convert_non_numeric_elements_raises_error(self) -> None:
         t = BoundingBoxWSENType()
         with pytest.raises(WrongType):
-            t.validate_convert("1.5,2,3,4")
-        with pytest.raises(WrongType):
             t.validate_convert("a,b,c,d")
+
+    @pytest.mark.parametrize("value", ["nan,0,10,10", "0,0,inf,10", "-inf,0,10,10", "0,0,10,nan", "0,0,10,inf"])
+    def test_convert_non_finite_elements_raises_error(self, value: str) -> None:
+        t = BoundingBoxWSENType()
+        with pytest.raises(WrongType):
+            t.validate_convert(value)
 
     def test_convert_non_string_raises_type_error(self) -> None:
         t = BoundingBoxWSENType()
@@ -870,3 +888,186 @@ class TestFableTypeParseRemainder:
     def test_extra_content_in_list_raises_error(self) -> None:
         with pytest.raises(NotFableType):
             _parse("list[int garbage]")
+
+
+class TestGridType:
+    """GridType: union over named Gaussian grid (e.g. 'N320'), single positive
+    resolution, and a two-element [west_east, south_north] pair of resolutions."""
+
+    def test_serialize(self) -> None:
+        assert GridType().serialize() == "grid"
+
+    @pytest.mark.parametrize("value", ["N320", "O96", "N1", "O8000"])
+    def test_convert_named_gaussian_grid(self, value: str) -> None:
+        assert GridType().validate_convert(value) == value
+
+    @pytest.mark.parametrize(("value", "expected"), [("n320", "N320"), ("o96", "O96"), ("n1280", "N1280"), ("o48", "O48")])
+    def test_gaussian_grid_name_is_converted_to_upper_case(self, value: str, expected: str) -> None:
+        assert GridType().validate_convert(value) == expected
+
+    @pytest.mark.parametrize("value", ["N0", "O0", "n0", "N8001", "O9000", "O100000"])
+    def test_gaussian_grid_number_out_of_range_raises(self, value: str) -> None:
+        with pytest.raises(WrongType, match="must be from 1 to 8000"):
+            GridType().validate_convert(value)
+
+    @pytest.mark.parametrize("value", ["O096", "N00320", "o01"])
+    def test_gaussian_grid_number_with_leading_zeros_raises(self, value: str) -> None:
+        with pytest.raises(WrongType, match="leading zeros"):
+            GridType().validate_convert(value)
+
+    @pytest.mark.parametrize("value", ["O\u0663\u0662", "N\u00b2"])
+    def test_gaussian_grid_number_with_non_ascii_digits_raises(self, value: str) -> None:
+        with pytest.raises(WrongType):
+            GridType().validate_convert(value)
+
+    @pytest.mark.parametrize("value", ["0.01", 0.01, "0.01/0.01", [0.01, 0.01], "0.25/0.01", 1e-2])
+    def test_finest_resolution_is_accepted(self, value: object) -> None:
+        GridType().validate_convert(value)
+
+    @pytest.mark.parametrize(
+        "value", ["0.0099", "0.001", "0.0001", 0.001, 0.0099, "0.25/0.001", "0.001/0.25", [0.25, 0.001], [0.001, 0.25], "1e-5"]
+    )
+    def test_resolution_finer_than_minimum_raises(self, value: object) -> None:
+        with pytest.raises(WrongType, match="finer than the minimum of 0.01 degrees"):
+            GridType().validate_convert(value)
+
+    def test_value_to_str_is_canonical_and_converts_back(self) -> None:
+        grid_type = GridType()
+        for text, expected in [
+            ("auto", "auto"),
+            ("n320", "N320"),
+            ("0.25", "0.25"),
+            ("1", "1"),
+            ("1.0", "1"),
+            ("0.01", "0.01"),
+            ("0.25/0.5", "0.25/0.5"),
+            ("1/2", "1/2"),
+            ("0.5/1.0", "0.5/1"),
+        ]:
+            converted = grid_type.validate_convert(text)
+            assert GridType.value_to_str(converted) == expected
+            assert grid_type.validate_convert(expected) == converted
+
+    def test_convert_string_single_resolution(self) -> None:
+        assert GridType().validate_convert("0.25") == 0.25
+        assert GridType().validate_convert("1") == 1.0
+
+    def test_convert_string_slash_pair_resolution(self) -> None:
+        assert GridType().validate_convert("0.25/0.5") == [0.25, 0.5]
+        assert GridType().validate_convert("1/2") == [1.0, 2.0]
+
+    def test_convert_list_pair_resolution(self) -> None:
+        assert GridType().validate_convert([0.25, 0.5]) == [0.25, 0.5]
+        assert GridType().validate_convert([1, 2]) == [1, 2]
+
+    def test_convert_numeric_single_resolution(self) -> None:
+        assert GridType().validate_convert(0.25) == 0.25
+        assert GridType().validate_convert(1) == 1
+
+    def test_auto_sentinel_returns_none(self) -> None:
+        assert GridType().validate_convert("auto") is None
+
+    @pytest.mark.parametrize("value", ["X320", "N", "N-1", "Nabc", "grid", "AUTO", "auto,N320"])
+    def test_invalid_named_grid_string_raises(self, value: str) -> None:
+        with pytest.raises(WrongType):
+            GridType().validate_convert(value)
+
+    @pytest.mark.parametrize("value", ["0", "-0.25", "0.25/-0.5", "0.25/x", "abc"])
+    def test_invalid_string_resolution_raises(self, value: str) -> None:
+        with pytest.raises(WrongType):
+            GridType().validate_convert(value)
+
+    @pytest.mark.parametrize("value", [[0.25], [0.25, 0.5, 0.75], [0.25, -0.5], [-0.25, 0.5], [0.25, "x"]])
+    def test_invalid_list_resolution_raises(self, value: list) -> None:
+        with pytest.raises(WrongType):
+            GridType().validate_convert(value)
+
+    @pytest.mark.parametrize("value", [0, -1, -0.25])
+    def test_non_positive_numeric_raises(self, value: float) -> None:
+        with pytest.raises(WrongType):
+            GridType().validate_convert(value)
+
+    @pytest.mark.parametrize("value", ["inf", "-inf", "nan", "infinity", "1e999", "inf/1", "1/inf", "nan/nan", "0.25/nan"])
+    def test_non_finite_string_resolution_raises(self, value: str) -> None:
+        with pytest.raises(WrongType):
+            GridType().validate_convert(value)
+
+    @pytest.mark.parametrize("value", [math.inf, -math.inf, math.nan])
+    def test_non_finite_numeric_raises(self, value: float) -> None:
+        with pytest.raises(WrongType):
+            GridType().validate_convert(value)
+
+    @pytest.mark.parametrize("value", [[math.inf, 1.0], [1.0, math.nan]])
+    def test_non_finite_list_resolution_raises(self, value: list) -> None:
+        with pytest.raises(WrongType):
+            GridType().validate_convert(value)
+
+    @pytest.mark.parametrize("value", ["1/2/3", "0.25/0.5/1", "1//2", "1/", "/1", "/"])
+    def test_wrong_number_of_string_parts_raises(self, value: str) -> None:
+        with pytest.raises(WrongType):
+            GridType().validate_convert(value)
+
+    @pytest.mark.parametrize("value", [True, False, [True, 1.0], [1.0, False]])
+    def test_bool_raises(self, value: object) -> None:
+        with pytest.raises(WrongType):
+            GridType().validate_convert(value)
+
+    def test_string_pair_keeps_west_east_first(self) -> None:
+        assert GridType().validate_convert("0.5/1") == [0.5, 1.0]
+
+    @pytest.mark.parametrize("value", [None, {"grid": "N320"}, (0.25, 0.5)])
+    def test_unsupported_type_raises(self, value: object) -> None:
+        with pytest.raises(WrongType):
+            GridType().validate_convert(value)
+
+    def test_parse_and_round_trip(self) -> None:
+        t = parse("grid")
+        assert isinstance(t, GridType)
+        assert t.validate_convert("N320") == "N320"
+        assert t.validate_convert("0.25/0.5") == [0.25, 0.5]
+        assert t.serialize() == "grid"
+
+
+class TestGridEnum:
+    """enumOpen[grid]: suggestions of grids with free entry allowed."""
+
+    TERM = "enumOpen[grid](auto,0.25,0.5,1,O96,O320,N320)"
+
+    def test_parse_and_serialize_round_trip(self) -> None:
+        t = parse(self.TERM)
+        assert isinstance(t, OpenEnumType)
+        assert isinstance(t.subtype, GridType)
+        assert t.serialize() == self.TERM
+        assert parse(t.serialize()).serialize() == self.TERM
+
+    def test_items_are_converted_by_the_grid_type(self) -> None:
+        t = parse(self.TERM)
+        assert isinstance(t, OpenEnumType)
+        assert t.items == [None, 0.25, 0.5, 1.0, "O96", "O320", "N320"]
+
+    def test_items_with_pairs_and_lower_case_names_serialize_canonically(self) -> None:
+        t = parse("enumOpen[grid](auto,0.5/1.0,n320)")
+        assert t.serialize() == "enumOpen[grid](auto,0.5/1,N320)"
+
+    def test_suggestions_are_converted(self) -> None:
+        t = parse(self.TERM)
+        assert t.validate_convert("auto") is None
+        assert t.validate_convert("0.25") == 0.25
+        assert t.validate_convert("1") == 1.0
+        assert t.validate_convert("O96") == "O96"
+
+    def test_free_entries_are_converted(self) -> None:
+        t = parse(self.TERM)
+        assert t.validate_convert("0.1") == 0.1
+        assert t.validate_convert("0.25/0.5") == [0.25, 0.5]
+        assert t.validate_convert("n1280") == "N1280"
+        assert t.validate_convert("O48") == "O48"
+
+    @pytest.mark.parametrize("value", ["0.001", "O0", "N8001", "abc", "1/2/3", "inf", ""])
+    def test_invalid_free_entries_are_rejected(self, value: str) -> None:
+        with pytest.raises(WrongType):
+            parse(self.TERM).validate_convert(value)
+
+    def test_invalid_item_is_rejected_at_parse_time(self) -> None:
+        with pytest.raises(WrongType):
+            parse("enumOpen[grid](auto,0.001)")

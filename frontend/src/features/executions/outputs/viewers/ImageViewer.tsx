@@ -340,6 +340,7 @@ export default function ImageViewer({
       ref={dialogRef}
       role="dialog"
       aria-modal="true"
+      data-output-viewer
       tabIndex={-1}
       className="fixed inset-0 z-50 flex flex-col bg-black/85 outline-none"
       onClick={(e) => {

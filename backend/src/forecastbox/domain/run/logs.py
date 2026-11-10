@@ -64,7 +64,8 @@ def build_logs_archive(cascade_job_id: str, db_entity_ser: bytes, gw_state: dict
                 try:
                     for f in os.listdir(p):
                         j_pref = f"job_{cascade_job_id}"
-                        if f == "backend.logs.txt" or f.startswith("gateway") or f.startswith(j_pref):
+                        # TODO once lens write log files with the same prefix, remove the `or` here
+                        if f == "backend.logs.txt" or f.startswith("gateway") or f.startswith(j_pref) or f.startswith("lens"):
                             zf.write(f"{p / f}", arcname=f)
                 except Exception as e:
                     zf.writestr("logs_directory.error.txt", f"{f} => {repr(e)}")

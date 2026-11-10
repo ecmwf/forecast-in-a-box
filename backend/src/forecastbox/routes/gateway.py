@@ -14,6 +14,8 @@ Gateway operations routes — /gateway/*. Corresponds to operational functions i
 All routes are purely operational, no ids -- gateway start, status, kill.
 """
 
+from functools import partial
+
 from fastapi import APIRouter, HTTPException
 
 from forecastbox.domain.gateway.exceptions import (
@@ -24,8 +26,8 @@ from forecastbox.domain.gateway.exceptions import (
     GatewayStopInProgress,
 )
 from forecastbox.domain.gateway.service import launch_gateway, status_gateway, submit_stop_gateway
-from forecastbox.utility.concurrency.manager import SubmissionRejected
-from forecastbox.utility.config import ROUTE_PREFIX, UnmanagedGateway, config
+from forecastbox.utility.concurrency.manager import SubmissionRejected, TaskName, execution_manager
+from forecastbox.utility.config import ROUTE_PREFIX, ConcurrentPools, UnmanagedGateway, config
 
 PREFIX = f"{ROUTE_PREFIX}/gateway"
 
@@ -40,7 +42,7 @@ async def start_gateway() -> str:
     if isinstance(config.cascade.gateway, UnmanagedGateway):
         raise HTTPException(400, "This instance does not manage the gateway")
     try:
-        launch_gateway()
+        await execution_manager.awaitable_submit(ConcurrentPools.General, TaskName("gateway.start"), launch_gateway)
     except GatewayAlreadyRunning:
         raise HTTPException(400, "Process already running.")
     return "started"
@@ -52,7 +54,7 @@ async def get_status() -> str:
     if isinstance(config.cascade.gateway, UnmanagedGateway):
         return "not managed"
     try:
-        return status_gateway()
+        return await execution_manager.awaitable_submit(ConcurrentPools.General, TaskName("gateway.status"), status_gateway)
     except GatewayNotStarted:
         return "not started"
     except GatewayExited as e:

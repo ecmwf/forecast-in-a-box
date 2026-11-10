@@ -10,7 +10,8 @@
 
 import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { PointerEvent } from 'react'
+import { dayNeighbor } from '../dims'
+import type { KeyboardEvent, PointerEvent } from 'react'
 import type { OutputItem } from '../types'
 import { cn } from '@/lib/utils'
 
@@ -19,13 +20,20 @@ interface StepTimelineProps {
   points: ReadonlyArray<readonly [step: number, item: OutputItem]>
   current: OutputItem
   onSelect: (item: OutputItem) => void
+  /** Up/down step the outer coordinate, as they do elsewhere in the viewer. */
+  onVertical?: (direction: -1 | 1) => void
 }
 
 /** Max day labels; others keep just a tick. */
 const MAX_DAY_LABELS = 12
 
 /** Steps by lead time with day marks; click or drag to jump. */
-export function StepTimeline({ points, current, onSelect }: StepTimelineProps) {
+export function StepTimeline({
+  points,
+  current,
+  onSelect,
+  onVertical,
+}: StepTimelineProps) {
   const { t } = useTranslation('executions')
   const trackRef = useRef<HTMLDivElement>(null)
   const first = points[0]?.[0] ?? 0
@@ -42,6 +50,22 @@ export function StepTimeline({ points, current, onSelect }: StepTimelineProps) {
     (_, i) => firstDay + i,
   )
   const labelEvery = Math.ceil(days.length / MAX_DAY_LABELS)
+
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.altKey || e.ctrlKey || e.metaKey) return
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      e.preventDefault()
+      onVertical?.(e.key === 'ArrowUp' ? -1 : 1)
+      return
+    }
+    const index = points.findIndex(([, item]) => item.taskId === current.taskId)
+    const target = e.shiftKey
+      ? dayTarget(points, currentStep, e.key)
+      : keyTarget(points, index, e.key)
+    if (target === undefined) return
+    e.preventDefault()
+    if (target && target.taskId !== current.taskId) onSelect(target)
+  }
 
   const jump = (e: PointerEvent<HTMLDivElement>) => {
     const rect = trackRef.current?.getBoundingClientRect()
@@ -67,6 +91,7 @@ export function StepTimeline({ points, current, onSelect }: StepTimelineProps) {
       aria-valuenow={currentStep}
       aria-valuetext={t('outputs.dims.stepValue', { value: currentStep })}
       className="relative h-9 min-w-48 flex-1 cursor-pointer touch-none outline-offset-4 focus-visible:outline-2 focus-visible:outline-white"
+      onKeyDown={onKeyDown}
       onPointerDown={(e) => {
         e.currentTarget.setPointerCapture(e.pointerId)
         jump(e)
@@ -106,4 +131,33 @@ export function StepTimeline({ points, current, onSelect }: StepTimelineProps) {
       />
     </div>
   )
+}
+
+type Points = StepTimelineProps['points']
+
+/** Slider keys; undefined for other keys, null past either end. */
+function keyTarget(
+  points: Points,
+  index: number,
+  key: string,
+): OutputItem | null | undefined {
+  const to: Partial<Record<string, number>> = {
+    ArrowLeft: index - 1,
+    ArrowRight: index + 1,
+    Home: 0,
+    End: points.length - 1,
+  }
+  const at = to[key]
+  return at === undefined ? undefined : (points[at]?.[1] ?? null)
+}
+
+/** Shift+arrows; undefined for other keys. */
+function dayTarget(
+  points: Points,
+  step: number,
+  key: string,
+): OutputItem | null | undefined {
+  if (key === 'ArrowRight') return dayNeighbor(points, step, 1)
+  if (key === 'ArrowLeft') return dayNeighbor(points, step, -1)
+  return undefined
 }

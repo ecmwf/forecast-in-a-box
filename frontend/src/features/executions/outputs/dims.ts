@@ -131,6 +131,19 @@ export function dimNeighbor(
   return next >= 0 && target && target.taskId !== current.taskId ? target : null
 }
 
+/** The nearest step at least 24 h before or after `step`. */
+export function dayNeighbor(
+  line: ReadonlyArray<readonly [step: number, item: OutputItem]>,
+  step: number,
+  direction: 1 | -1,
+): OutputItem | null {
+  const target =
+    direction > 0
+      ? line.find(([s]) => s >= step + 24)
+      : line.filter(([s]) => s <= step - 24).at(-1)
+  return target?.[1] ?? null
+}
+
 /** Block plus all but the innermost coordinate. */
 export function segmentKey(item: OutputItem): string {
   return JSON.stringify([

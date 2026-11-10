@@ -71,6 +71,29 @@ def get_package_versions(pip_source: str, client: httpx.Client) -> Iterator[str]
         url = data.get("next", None)
 
 
+async def get_package_versions_async(pip_source: str, client: httpx.AsyncClient) -> list[str]:
+    """Async counterpart of `get_package_versions`, returning the versions as a list."""
+    versions: list[str] = []
+    url: str | None = f"https://pypi.org/pypi/{pip_source}/json"
+    while url is not None:
+        try:
+            response = await client.get(url)
+        except Exception:
+            logger.exception(f"Failed to reach PyPI for {pip_source!r}")
+            return versions
+        if response.status_code != 200:
+            logger.warning(f"PyPI returned {response.status_code} for {pip_source!r}")
+            return versions
+        try:
+            data = response.json()
+        except Exception:
+            logger.exception(f"Failed to parse PyPI JSON for {pip_source!r}")
+            return versions
+        versions.extend(data.get("releases", {}).keys())
+        url = data.get("next", None)
+    return versions
+
+
 def try_import(module_name: str) -> ModuleType | None:
     """Attempt to import a module by name; return ``None`` on ``ModuleNotFoundError``."""
     try:

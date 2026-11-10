@@ -16,11 +16,11 @@ import httpx
 from cascade.gateway import api, client
 from fastapi import APIRouter, Request
 
-from forecastbox.domain.experiment.scheduling.background import status_scheduler
+from forecastbox.domain.experiment.scheduling.runtime import status_scheduler
 from forecastbox.domain.gateway.service import get_gateway_url
 from forecastbox.domain.plugin.status import status_brief
-from forecastbox.utility.concurrency.manager import ExecutionStatus, execution_manager
-from forecastbox.utility.config import ROUTE_PREFIX, config
+from forecastbox.utility.concurrency.manager import ExecutionStatus, SubmissionRejected, TaskName, execution_manager
+from forecastbox.utility.config import ROUTE_PREFIX, ConcurrentPools, config
 from forecastbox.utility.http_pools import HttpProfile, get_async
 
 PREFIX = f"{ROUTE_PREFIX}/status"
@@ -35,10 +35,20 @@ class StatusResponse:
     api: str
     cascade: str
     ecmwf: str
+    # TODO deprecated field, migrate clients to directly query the managed thread status, then remove this
     scheduler: str
     version: str
     plugins: str
     concurrency: ExecutionStatus
+
+
+def _probe_cascade() -> str:
+    try:
+        client.request_response(api.JobProgressRequest(job_ids=[]), get_gateway_url(), timeout_ms=1000)
+        return "up"
+    except Exception as e:
+        logger.warning(f"Error connecting to Cascade: {repr(e)}")
+        return "down"
 
 
 @router.get("")
@@ -48,10 +58,11 @@ async def get_status(request: Request) -> StatusResponse:
     status: dict[str, str] = {"api": "up", "cascade": "up", "ecmwf": "up", "scheduler": "up", "version": request.app.version}
 
     try:
-        client.request_response(api.JobProgressRequest(job_ids=[]), get_gateway_url(), timeout_ms=1000)
-        status["cascade"] = "up"
-    except Exception as e:
-        logger.warning(f"Error connecting to Cascade: {repr(e)}")
+        status["cascade"] = await execution_manager.awaitable_submit(
+            ConcurrentPools.General, TaskName("status.probe.cascade"), _probe_cascade
+        )
+    except SubmissionRejected as e:
+        logger.warning(f"Cascade probe rejected: {repr(e)}")
         status["cascade"] = "down"
 
     try:

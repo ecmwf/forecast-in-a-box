@@ -30,7 +30,7 @@ import { MapLoadingBar } from '../components/MapLoadingBar'
 import { PinnedLegendsBar } from '../components/PinnedLegendsBar'
 import { useContextOverlays, useOverlayHover } from './overlays'
 import { OverlayHoverCard } from './OverlayHoverCard'
-import { useAnnotationLayer } from './annotations'
+import { annotationVisibleOn, useAnnotationLayer } from './annotations'
 import { CompareSlotTag } from './CompareSlotTag'
 import { LoupeOverlay } from './LoupeOverlay'
 import { PanelCorner, SlotStatusBadges } from './SlotStatusBadges'
@@ -39,7 +39,8 @@ import { NAV_CLEARANCE, navEaseMs, panView, zoomView } from './map-nav'
 import type { PinnedLegendItem } from '../components/PinnedLegendsBar'
 import type { MapAnnotation } from './annotations'
 import type { ContextOverlay } from './overlays'
-import type { MeasureMode } from '../hooks/useMeasure'
+import type { MeasureMode, Measurement } from '../hooks/useMeasure'
+import type Geometry from 'ol/geom/Geometry'
 import type View from 'ol/View'
 import type { SourceSlot } from './layer-pairing'
 import type { CaptureResult, CompareMapSource, FitBboxAction } from './types'
@@ -67,7 +68,9 @@ export function DualMapView({
   basemapId,
   basemapOpacity,
   measureMode,
-  measureClearNonce,
+  measurements,
+  onMeasurementAdd,
+  onMeasurementRemove,
   overlays,
   annotations,
   annotateArmed,
@@ -97,7 +100,13 @@ export function DualMapView({
   basemapId: string
   basemapOpacity: number
   measureMode: MeasureMode
-  measureClearNonce: number
+  measurements: ReadonlyArray<Measurement>
+  onMeasurementAdd: (
+    geometry: Geometry,
+    label: string,
+    sourceId: string | null,
+  ) => void
+  onMeasurementRemove: (id: string) => void
   overlays: ReadonlyArray<ContextOverlay>
   annotations: ReadonlyArray<MapAnnotation>
   annotateArmed: boolean
@@ -184,7 +193,9 @@ export function DualMapView({
           basemapId={basemapId}
           basemapOpacity={basemapOpacity}
           measureMode={measureMode}
-          measureClearNonce={measureClearNonce}
+          measurements={measurements}
+          onMeasurementAdd={onMeasurementAdd}
+          onMeasurementRemove={onMeasurementRemove}
           overlays={overlays}
           annotations={annotations}
           annotateArmed={annotateArmed}
@@ -211,7 +222,9 @@ export function DualMapView({
           basemapId={basemapId}
           basemapOpacity={basemapOpacity}
           measureMode={measureMode}
-          measureClearNonce={measureClearNonce}
+          measurements={measurements}
+          onMeasurementAdd={onMeasurementAdd}
+          onMeasurementRemove={onMeasurementRemove}
           overlays={overlays}
           annotations={annotations}
           annotateArmed={annotateArmed}
@@ -243,7 +256,9 @@ function DualMapPanel({
   basemapId,
   basemapOpacity,
   measureMode,
-  measureClearNonce,
+  measurements,
+  onMeasurementAdd,
+  onMeasurementRemove,
   overlays,
   annotations,
   annotateArmed,
@@ -269,7 +284,13 @@ function DualMapPanel({
   basemapId: string
   basemapOpacity: number
   measureMode: MeasureMode
-  measureClearNonce: number
+  measurements: ReadonlyArray<Measurement>
+  onMeasurementAdd: (
+    geometry: Geometry,
+    label: string,
+    sourceId: string | null,
+  ) => void
+  onMeasurementRemove: (id: string) => void
   overlays: ReadonlyArray<ContextOverlay>
   annotations: ReadonlyArray<MapAnnotation>
   annotateArmed: boolean
@@ -332,13 +353,6 @@ function DualMapPanel({
     mapVersion,
   })
 
-  useMeasure(
-    mapRef,
-    measureMode,
-    measureClearNonce,
-    t('measure.remove'),
-    mapVersion,
-  )
   useTimeStepPrefetch(mapRef, {
     enabled: preload,
     baseUrl: source.baseUrl,
@@ -366,6 +380,22 @@ function DualMapPanel({
       onMove: onAnnotationMove,
     },
     annotationHighlightId,
+    mapVersion,
+  )
+  // Measurements follow the pins' binding rule.
+  const shownMeasurements = useMemo(
+    () => measurements.filter((m) => annotationVisibleOn(m, pinScope)),
+    [measurements, pinScope],
+  )
+  useMeasure(
+    mapRef,
+    measureMode,
+    shownMeasurements,
+    {
+      onAdd: (geometry, label) => onMeasurementAdd(geometry, label, source.id),
+      onRemove: onMeasurementRemove,
+    },
+    t('measure.remove'),
     mapVersion,
   )
 

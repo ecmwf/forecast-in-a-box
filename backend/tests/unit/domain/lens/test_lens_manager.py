@@ -142,9 +142,9 @@ class TestListInstances:
 
 
 class TestStopInstance:
-    def test_raises_key_error_for_unknown_id(self) -> None:
+    def test_raises_no_lens_found_for_unknown_id(self) -> None:
         LensInstanceManager.instances = pmap()
-        with pytest.raises(KeyError):
+        with pytest.raises(NoLensFound):
             stop_instance(LensInstanceId("ghost"))
 
     def test_removes_instance_from_manager(self) -> None:
@@ -244,6 +244,16 @@ class TestStartSkinnyWms:
         # gunicorn's 30 s default kills the worker mid-scan, and every retry rescans
         assert int(cmd[cmd.index("--timeout") + 1]) > 30
         assert cmd[-1] == "skinnywms.wmssvr:application"
+
+    def test_failing_popen_raises_runtime_error_and_cleans_up(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv(BACKEND_LOG_DIRECTORY_ENV, str(tmp_path))
+        ports_before = FreePortsManager.free_ports.copy()
+        LensInstanceManager.instances = pmap()
+        with patch("forecastbox.domain.lens.manager.subprocess.Popen", side_effect=OSError("boom")):
+            with pytest.raises(RuntimeError):
+                start_skinny_wms("/data/run")
+        assert len(LensInstanceManager.instances) == 0
+        assert FreePortsManager.free_ports == ports_before
 
 
 class TestCheckServerReady:

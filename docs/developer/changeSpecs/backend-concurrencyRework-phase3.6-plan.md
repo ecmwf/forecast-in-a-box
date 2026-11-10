@@ -48,12 +48,12 @@ reading them.
   `execution_manager.await_jobs_db(...)`; do not route DB work through the
   pools below.
 - Pools and their intended use:
-  - `ConcurrentPools.Io` (4 workers, 64 pending): network and remote probes,
-    gateway (ZMQ) requests, HTTP to PyPI, disk/SSH I/O that is not artifact
-    download;
+  - `ConcurrentPools.Io` (4 workers, 64 pending): reserved for high-volume
+    network or disk traffic; no route in this phase uses it;
   - `ConcurrentPools.General` (2 workers, 32 pending; raised to 4 workers by
-    step 0 below): short blocking setup
-    such as subprocess/process start and stop, archive creation.
+    step 0 below): short blocking work, including subprocess/process start
+    and stop, archive creation, and regular network requests such as a
+    single gateway (ZMQ) request or an HTTP call to PyPI.
 - Phase 3.1: artifact downloads/refresh run on `ArtifactIo`; the artifact
   state lock is only held for short in-memory swaps.
 - Phase 3.5: `/run/logs` is already migrated (`domain/run/logs.py`).
@@ -81,7 +81,7 @@ notice while implementing.
 | `GET /artifacts/list_models` | short artifact lock, in-memory | `async def`, direct call |
 | `POST /artifacts/model_details` | short artifact lock, in-memory | `async def`, direct call |
 | `POST /artifacts/download_model` | short lock + non-blocking `submit_monitored` | `async def`, direct call |
-| `POST /artifacts/delete_model` | file unlink or `ssh rm` | `async def`, `Io`, `TaskName("artifact.delete")` |
+| `POST /artifacts/delete_model` | file unlink or `ssh rm` | `async def`, `General`, `TaskName("artifact.delete")` |
 | `GET /blueprint/catalogue` | short plugin lock, in-memory | `async def`, direct call |
 | `GET /blueprint/glyphs/functions` | in-memory | `async def`, direct call |
 | `POST /lens/start/skinnyWMS` | path stat, port claim, `subprocess.Popen` | `async def`, `General`, `TaskName("lens.start")` |
@@ -90,10 +90,10 @@ notice while implementing.
 | `GET /lens/list` | same, per instance | `async def`, direct call |
 | `GET /lens/supported` | in-memory | `async def`, direct call |
 
-Artifact deletion goes to `Io`, not `ArtifactIo`: on the one-worker
+Artifact deletion goes to `General`, not `ArtifactIo`: on the one-worker
 `ArtifactIo` pool it would queue behind downloads that may take an hour, and
 it already runs concurrently with downloads today (on AnyIO's threadpool), so
-`Io` does not widen its concurrency. The lens status probes are kept inline
+`General` does not widen its concurrency. The lens status probes are kept inline
 because they only connect to `127.0.0.1` (refused/accepted immediately) and
 the lens proxy already performs the same probe inline on every proxied
 request. This only holds for loopback-bound lenses, hence the TODO added in
@@ -103,13 +103,13 @@ step 3.
 
 | Route / function | Blocking work | Decision |
 | --- | --- | --- |
-| `GET /status` | `client.request_response(JobProgressRequest)` (ZMQ, 1 s timeout) | probe on `Io`, `TaskName("status.probe.cascade")` |
+| `GET /status` | `client.request_response(JobProgressRequest)` (ZMQ, 1 s timeout) | probe on `General`, `TaskName("status.probe.cascade")` |
 | `POST /gateway/start` | `launch_gateway()` (process spawn or SSH tunnel setup) | `General`, `TaskName("gateway.start")` |
-| `GET /gateway/status` | `status_gateway()` (ZMQ probe, possibly `ssh -O check`) | `Io`, `TaskName("gateway.status")` |
-| `POST /run/delete` | `delete_cascade_datasets()` (ZMQ) | `Io`, `TaskName("run.delete.datasets")` |
-| `GET /run/outputContent` | `ResultRetrievalRequest` (ZMQ, payload) + decode | `Io`, `TaskName("run.output.retrieve")` |
-| `GET /run/get`, `GET /run/list` via `service.poll_and_update` | `JobProgressRequest`, textual `ResultRetrievalRequest`s, `get_current_cascade_proc()` (may run `ssh -O check`) | `Io`, task names below |
-| `GET /plugin/versions` | `_source2Versions` (sync HTTP to PyPI) | `Io`, `TaskName("plugin.versions")` |
+| `GET /gateway/status` | `status_gateway()` (ZMQ probe, possibly `ssh -O check`) | `General`, `TaskName("gateway.status")` |
+| `POST /run/delete` | `delete_cascade_datasets()` (ZMQ) | `General`, `TaskName("run.delete.datasets")` |
+| `GET /run/outputContent` | `ResultRetrievalRequest` (ZMQ, payload) + decode | `General`, `TaskName("run.output.retrieve")` |
+| `GET /run/get`, `GET /run/list` via `service.poll_and_update` | `JobProgressRequest`, textual `ResultRetrievalRequest`s, `get_current_cascade_proc()` (may run `ssh -O check`) | `General`, task names below |
+| `GET /plugin/versions` | `_source2Versions` (sync HTTP to PyPI) | `General`, `TaskName("plugin.versions")` |
 
 `/status` already uses the async HTTP client for the ECMWF probe, which is
 fine; only the cascade probe is blocking.
@@ -137,7 +137,7 @@ Update any unit test asserting the default pool sizes.
 
    ```python
    result = await execution_manager.awaitable_submit(
-       ConcurrentPools.Io, TaskName("artifact.delete"), partial(delete_model, composite_id)
+       ConcurrentPools.General, TaskName("artifact.delete"), partial(delete_model, composite_id)
    )
    ```
 
@@ -174,7 +174,7 @@ changes.
 
    The probe is only acceptable inline because it targets `127.0.0.1`
    (refused/accepted immediately, 0.1 s timeout per port). If lenses are ever
-   bound to non-loopback addresses, these probes must move to `Io`.
+   bound to non-loopback addresses, these probes must move to `General`.
 
 `domain/lens/manager.py` (small correctness fixes exposed by this work):
 
@@ -196,7 +196,7 @@ changes.
 1. Extract the cascade probe into a module-level sync helper
    `_probe_cascade() -> str` returning `"up"`/`"down"` (same request, same
    1000 ms timeout, same warning log on failure).
-2. `status["cascade"] = await execution_manager.awaitable_submit(ConcurrentPools.Io, TaskName("status.probe.cascade"), _probe_cascade)`.
+2. `status["cascade"] = await execution_manager.awaitable_submit(ConcurrentPools.General, TaskName("status.probe.cascade"), _probe_cascade)`.
    If the submission itself is rejected, report `"down"` rather than failing
    the whole status endpoint (the status route must stay usable when pools are
    saturated -- catch `SubmissionRejected` locally, log at warning).
@@ -207,7 +207,7 @@ changes.
 
 1. `/start`: `await execution_manager.awaitable_submit(ConcurrentPools.General, TaskName("gateway.start"), launch_gateway)`;
    keep `GatewayAlreadyRunning` -> 400.
-2. `/status`: submit `status_gateway` to `Io` as `gateway.status`; keep the
+2. `/status`: submit `status_gateway` to `General` as `gateway.status`; keep the
    existing exception-to-string mapping.
 3. `/kill` is already non-blocking (it enqueues `gateway.stop` on `General`).
 
@@ -229,17 +229,17 @@ same message texts the route uses today.
 
 `routes/run.py`:
 
-1. `/delete`: `await execution_manager.awaitable_submit(ConcurrentPools.Io, TaskName("run.delete.datasets"), partial(delete_cascade_datasets, run_record.cascade_job_id))`,
+1. `/delete`: `await execution_manager.awaitable_submit(ConcurrentPools.General, TaskName("run.delete.datasets"), partial(delete_cascade_datasets, run_record.cascade_job_id))`,
    keeping the existing `except Exception -> 500`.
 2. `/outputContent`: keep the cached-value fast path and the mime lookup
-   inline; replace the gateway section with an `Io` submission of
+   inline; replace the gateway section with an `General` submission of
    `retrieve_output_bytes` (`run.output.retrieve`), mapping
    `RunOutputRetrievalFailed` to 500 with its message. Remove now unused
    imports (`api`, `client`, `JobId` if unused).
 
 `domain/run/service.py::_poll_and_update_once`: keep the control flow and all
 `await_jobs_db` writes as they are, but move the three blocking calls into
-small module-level sync helpers awaited on `Io`:
+small module-level sync helpers awaited on `General`:
 
 - `_current_cascade_proc_or_none() -> int | str | None` wrapping
   `get_current_cascade_proc()` and its `GatewayExited`/`GatewayNotStarted`
@@ -256,13 +256,13 @@ small module-level sync helpers awaited on `Io`:
   into `outputs_model` and sets `updated_outputs` as today. Submit it only
   when `candidates` is non-empty.
 
-This keeps one `Io` round trip per gateway interaction and leaves the
+This keeps one `General` round trip per gateway interaction and leaves the
 compare-and-swap logic untouched. `/run/list` therefore issues its per-run
-polls sequentially through `Io`, as it did inline before.
+polls sequentially through `General`, as it did inline before.
 
 ### 7. Plugin versions (`routes/plugins.py`)
 
-Submit `partial(_source2Versions, settings.pip_source)` to `Io` as
+Submit `partial(_source2Versions, settings.pip_source)` to `General` as
 `plugin.versions`.
 
 ### 8. Final sweep
@@ -297,7 +297,7 @@ calls are limited to in-memory reads and short lock sections.
    `await`/`async` adjustments where they call converted route functions
    directly.
 2. New focused unit tests:
-   - `/status` reports `cascade: "down"` when the `Io` submission raises
+   - `/status` reports `cascade: "down"` when the `General` submission raises
      `SubmissionRejected` (patch `awaitable_submit` to raise);
    - `stop_instance` raises `NoLensFound` for an unknown id, and the stop route
      maps it to 404;
@@ -322,7 +322,7 @@ calls are limited to in-memory reads and short lock sections.
 - No synchronous `def` route remains.
 - No async route or async service function performs a blocking gateway,
   HTTP, SSH, subprocess, or process-wait call on the event loop; each such
-  section is a named task on `Io` or `General` and visible in pool counters.
+  section is a named task on `General` and visible in pool counters.
 - Lens and gateway process ownership is unchanged; the lens stop/start
   correctness fixes are in place.
 - Route response contracts are unchanged.
@@ -345,7 +345,7 @@ calls are limited to in-memory reads and short lock sections.
 These are informational; none of them requires action in this phase.
 
 1. Gateway polls stay sequential (do not parallelize): `/run/list` polls the
-   gateway once per run on the page, one after another through `Io`. Do not
+   gateway once per run on the page, one after another through `General`. Do not
    change this to concurrent requests (e.g. `asyncio.gather`). The gateway
    itself processes requests sequentially on a single thread, so concurrent
    requests gain nothing and only add pressure; the individual requests are

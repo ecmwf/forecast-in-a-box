@@ -209,3 +209,30 @@ def test_build_infra_spec_unknown_infra_raises_internal_error(monkeypatch: pytes
     monkeypatch.setattr(run_cascade, "_select_cascade_infra", lambda env: "bogus")
     with pytest.raises(CascadeInternalError):
         run_cascade._build_infra_spec(EnvironmentSpecification(), workers_per_host=1, hosts=1)
+
+
+def test_retrieve_output_bytes_raises_on_gateway_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    from types import SimpleNamespace
+
+    from cascade.low.core import DatasetId, TaskId
+
+    from forecastbox.domain.run.exceptions import RunOutputRetrievalFailed
+
+    monkeypatch.setattr(run_cascade, "request_response", lambda *a, **k: SimpleNamespace(error="nope"))
+    monkeypatch.setattr(run_cascade, "get_gateway_url", lambda: "tcp://gw")
+    with pytest.raises(RunOutputRetrievalFailed, match="nope"):
+        run_cascade.retrieve_output_bytes("job", DatasetId(task=TaskId("t"), output="0"))
+
+
+def test_retrieve_output_bytes_raises_on_non_bytes(monkeypatch: pytest.MonkeyPatch) -> None:
+    from types import SimpleNamespace
+
+    from cascade.low.core import DatasetId, TaskId
+
+    from forecastbox.domain.run.exceptions import RunOutputRetrievalFailed
+
+    monkeypatch.setattr(run_cascade, "request_response", lambda *a, **k: SimpleNamespace(error=None))
+    monkeypatch.setattr(run_cascade, "get_gateway_url", lambda: "tcp://gw")
+    monkeypatch.setattr(run_cascade.api, "decoded_result", lambda *a, **k: "str", raising=False)
+    with pytest.raises(RunOutputRetrievalFailed, match="expected bytes"):
+        run_cascade.retrieve_output_bytes("job", DatasetId(task=TaskId("t"), output="0"))

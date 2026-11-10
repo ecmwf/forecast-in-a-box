@@ -394,6 +394,39 @@ describe('Graph Mode - Builder Integration', () => {
     await expect.element(screen.getByLabelText('Base time')).toBeVisible()
   })
 
+  it('opens the block actions on right-click', async () => {
+    const screen = await renderWithRouter(<FableBuilderPage />)
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
+    useFableBuilderStore.getState().setFable(createMultiBlockFable())
+
+    await expect
+      .poll(() => document.querySelector('.react-flow__node [role="button"]'))
+      .not.toBeNull()
+    const node = document.querySelector('.react-flow__node [role="button"]')
+    node?.dispatchEvent(
+      new MouseEvent('contextmenu', {
+        bubbles: true,
+        clientX: 50,
+        clientY: 50,
+      }),
+    )
+
+    const withDownstream = screen.getByRole('menuitem', {
+      name: 'Duplicate with downstream blocks',
+    })
+    await expect.element(withDownstream).toBeVisible()
+    const before = Object.keys(useFableBuilderStore.getState().fable.blocks)
+    // DOM click: unstyled menus can sit under other content in tests.
+    ;(
+      screen
+        .getByRole('menuitem', { name: 'Duplicate', exact: true })
+        .element() as HTMLElement
+    ).click()
+    await expect
+      .poll(() => Object.keys(useFableBuilderStore.getState().fable.blocks))
+      .toHaveLength(before.length + 1)
+  })
+
   it('shows the empty configuration panel when no block is selected', async () => {
     const screen = await renderWithRouter(<FableBuilderPage />)
 

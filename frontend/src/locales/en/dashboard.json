@@ -33,6 +33,8 @@
       "title": "Run activity",
       "summary_one": "{{count}} run in the last 6 months",
       "summary_other": "{{count}} runs in the last 6 months",
+      "runCount_one": "{{count}} run",
+      "runCount_other": "{{count}} runs",
       "windowCapped": "Counted over the {{shown}} most recent runs.",
       "openRuns": "Open runs"
     },

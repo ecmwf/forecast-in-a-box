@@ -23,7 +23,7 @@ Provides parsing, validation, and conversion for a small set of type expressions
   - bboxWSEN (bounding box: exactly four integers, west-south-east-north, obeying constraints)
   - geodomain (bounding box or region/country names; the frontend renders a map/region picker)
 - traits: extra validations mixed into any type via a ``{}`` suffix, e.g. ``int{positive}`` or
-  ``float{nonNegative, divisibleBy(3)}`` (see fiab_core.types.traits)
+  ``float{finite, nonNegative, divisibleBy(3)}`` (see fiab_core.types.traits)
 """
 
 from fiab_core.types.definitions import *

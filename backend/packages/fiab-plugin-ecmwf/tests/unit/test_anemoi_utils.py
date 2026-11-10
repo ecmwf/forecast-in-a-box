@@ -1,4 +1,4 @@
-# (C) Copyright 2026- ECMWF.
+a# (C) Copyright 2026- ECMWF.
 #
 # This software is licensed under the terms of the Apache Licence Version 2.0
 # which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
@@ -16,6 +16,7 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
+from earthkit.workflows.metadata import Requirements
 from fiab_core.artifacts import AnemoiCheckpointConfiguration, CompositeArtifactId
 from fiab_core.types import OpenEnumType
 
@@ -261,5 +262,18 @@ class TestAnemoiBuilderInputSource:
         mocked_get_initial_conditions.assert_called_once()
         kwargs = mocked_get_initial_conditions.call_args.kwargs
         assert kwargs["input"] == {"opendata": {"source": "google", "resol": "0p1"}}
-        assert kwargs["environment"] == ["base-package", *INPUT_SOURCE_EXTRAS["opendata"]]
-        assert OPENDATA_EXTRA in kwargs["environment"]
+        assert "environment" not in kwargs
+        assert kwargs["requirements"] == Requirements(environment=["base-package", *INPUT_SOURCE_EXTRAS["opendata"]])
+        assert OPENDATA_EXTRA in kwargs["requirements"].environment
+
+    def test_inference_passes_environment_as_requirements(self, builder: AnemoiBuilder) -> None:
+        with (
+            patch("fiab_plugin_ecmwf.anemoi.blocks.Inference") as mocked_inference,
+            patch.object(CheckpointArtifact, "get_model_output", return_value=MagicMock()),
+        ):
+            builder.inference(lead_time=24, extra_environment=INPUT_SOURCE_EXTRAS["opendata"])
+
+        mocked_inference.assert_called_once()
+        kwargs = mocked_inference.call_args.kwargs
+        assert "environment" not in kwargs
+        assert kwargs["requirements"] == Requirements(environment=["base-package", *INPUT_SOURCE_EXTRAS["opendata"]])

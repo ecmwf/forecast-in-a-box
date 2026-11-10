@@ -97,6 +97,8 @@ export interface GlobeViewer extends GlobeMode {
   zoomBy: (delta: number) => boolean
   /** Zoom the globe to a ground resolution; false when the flat map should. */
   zoomToResolution: (mpp: number) => boolean
+  /** Ease the globe to a point; false while the flat map is shown. */
+  centerOn: (lon: number, lat: number) => boolean
   /** Ground m/px of the settled globe; null off it. */
   resolution: number | null
 }
@@ -241,6 +243,16 @@ export function useGlobeViewer({
     },
     [camera],
   )
+  const centerOn = useCallback(
+    (lon: number, lat: number) => {
+      if (phaseRef.current !== 'globe') return false
+      camera.set({ ...camera.get(), lon, lat }, 'controls', {
+        easeMs: navEaseMs(),
+      })
+      return true
+    },
+    [camera],
+  )
   // Scale hints need no finer than 1/20 zoom; the measured zoom drifts on every drag frame.
   const zoom = useSyncExternalStore(
     camera.subscribe,
@@ -264,6 +276,7 @@ export function useGlobeViewer({
     pan,
     zoomBy,
     zoomToResolution,
+    centerOn,
     resolution,
   }
 }

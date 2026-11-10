@@ -486,13 +486,25 @@ describe('FieldRenderer Integration', () => {
       await trigger.click()
       const option = screen.getByRole('option', { name: /AIFS ENS CRPS 1\.0/ })
       await expect.element(option).toBeVisible()
-      // Download status replaces the size.
-      await expect.element(option.getByText('Downloaded')).toBeVisible()
-      expect(option.element().textContent).not.toMatch(/\d\s?[KMG]B/)
+      // Maturity, not size or download state.
+      await expect
+        .element(option.getByText('maturity: operational'))
+        .toBeVisible()
+      expect(option.element().textContent).not.toMatch(/Downloaded|\d\s?[KMG]B/)
       // Unknown ids stay selectable under their wire id.
       await expect
         .element(screen.getByRole('option', { name: 'ecmwf:not-in-catalogue' }))
         .toBeVisible()
+    })
+
+    it('keeps the column sizers out of option names', async () => {
+      const screen = await renderWithProviders(
+        <ControlledFieldRenderer valueType="artifact" initialValue="" />,
+      )
+      await screen.getByRole('combobox').click()
+      const demo = screen.getByRole('option', { name: /aifs-single-v0\.2\.1/ })
+      await expect.element(demo).toHaveAccessibleName(/maturity: demo$/)
+      await expect.element(demo).not.toHaveAccessibleName(/operational/)
     })
 
     describe('after a failed download', () => {

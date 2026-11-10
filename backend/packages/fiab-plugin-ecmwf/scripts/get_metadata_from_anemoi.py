@@ -56,15 +56,17 @@ def get_qubes(checkpoint_path: str) -> dict[str, Any]:
     in_qube = _expansion_qube(in_variables, variables_metadata, model_step, 6).remove_by_key("step")
     out_qube = _expansion_qube(out_variables, variables_metadata, model_step, 6).remove_by_key("step")
     out_qube.to_json()
+    paramdb = ParamDB()
 
-    def _shortname_to_param_id(node: Qube) -> None:
-        if node.key == "param":
-            paramdb = ParamDB()
-            new_values = [str(paramdb.shortname_to_param_id(x, context={"class": "ai"}, access="dissemination")) for x in node.values]
-            node.values = QEnum(new_values)
+    mapped_out_qube = Qube.empty()
+    for datacube in out_qube.datacubes():
+        datacube["param"] = [
+            str(paramdb.shortname_to_param_id(x, context={**extra_output_keys, "class": "od", "levtype": datacube.get("levtype")}))
+            for x in datacube["param"]
+        ]
+        mapped_out_qube = mapped_out_qube | Qube.from_datacube(datacube)
 
-    out_qube.walk(_shortname_to_param_id)
-    return {"input_qube": in_qube.to_json(), "output_qube": out_qube.to_json()}
+    return {"input_qube": in_qube.to_json(), "output_qube": mapped_out_qube.to_json()}
 
 
 def get_package_versions(checkpoint_path: str) -> list[str]:

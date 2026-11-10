@@ -22,6 +22,7 @@ import type {
   GlobeEngine,
   GlobeLayerSpec,
 } from '@/features/viewer/globe/engine'
+import type { FeatureCollection } from 'geojson'
 import { GLOBE_ENGINE } from '@/features/viewer/globe/engine-entry'
 import {
   globeFitZoom,
@@ -230,11 +231,13 @@ describe('globe registration', () => {
   /** onLayerLoad outcomes, in order. */
   const loads: Array<boolean> = []
   let basemapFailures = 0
+  const pinClicks: Array<string> = []
 
   beforeEach(async () => {
     requests.length = 0
     loads.length = 0
     basemapFailures = 0
+    pinClicks.length = 0
     const world = await markerPng([-180, -90, 180, 90], 4, WORLD_MARKERS, 8)
     const region = await markerPng(REGION, 10, [REGION_MARKER], 10)
     const solid = await solidPng([-180, -90, 180, 90], 4, SOLID)
@@ -284,6 +287,7 @@ describe('globe registration', () => {
       onLoadingChange: () => {},
       onContextLost: () => {},
       onBasemapFailed: () => basemapFailures++,
+      onPinClick: (id) => pinClicks.push(id),
     })
     engine.setCamera(CAMERA)
     engine.setBasemap({ kind: 'outline', theme: 'light', opacity: 1 })
@@ -1052,6 +1056,91 @@ describe('globe registration', () => {
       Math.round((255 + SOLID[2]) / 2),
     ]
     expect(near(f.at(WIDTH / 2 + 20, HEIGHT / 2), blend, 4)).toBe(true)
+  })
+
+  it('centres a pin on its lon/lat, hides it behind the globe, and reports its click', async () => {
+    const pin: Marker = { lon: -35, lat: 10, rgb: [255, 0, 128] }
+    const empty: FeatureCollection = { type: 'FeatureCollection', features: [] }
+    engine.setVectors({
+      overlays: empty,
+      overlayLabels: [],
+      measurements: empty,
+      measurementLabels: [],
+      // No badge text: a solid disc for the centroid.
+      pins: [
+        {
+          id: 'annotation-9',
+          lon: pin.lon,
+          lat: pin.lat,
+          badge: '',
+          note: 'Here',
+          color: 'rgb(255, 0, 128)',
+          highlighted: false,
+        },
+      ],
+    })
+    await expect.poll(() => frame(engine).centroid(pin.rgb, 12)).not.toBeNull()
+    // A wrong anchor would shift the disc ~11 px.
+    expect(readoutError(engine, pin)).toBeLessThan(0.6)
+
+    const c = frame(engine).centroid(pin.rgb, 12)!
+    const canvas = container.querySelector('[data-testid="globe-canvas"]')!
+    const rect = canvas.getBoundingClientRect()
+    const at = { clientX: rect.left + c.x, clientY: rect.top + c.y }
+    for (const type of ['mousedown', 'mouseup', 'click']) {
+      canvas.dispatchEvent(
+        new MouseEvent(type, { ...at, bubbles: true, button: 0 }),
+      )
+    }
+    expect(pinClicks).toEqual(['annotation-9'])
+
+    engine.setCamera({ ...CAMERA, lon: CAMERA.lon + 180, lat: -CAMERA.lat })
+    await expect.poll(() => frame(engine).centroid(pin.rgb, 12)).toBeNull()
+  })
+
+  it('finds the topmost overlay feature under the pointer, front side only', async () => {
+    const { lon, lat } = CAMERA
+    const empty: FeatureCollection = { type: 'FeatureCollection', features: [] }
+    engine.setVectors({
+      overlays: {
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            geometry: {
+              type: 'Polygon',
+              coordinates: [
+                [
+                  [lon - 20, lat - 15],
+                  [lon + 20, lat - 15],
+                  [lon + 20, lat + 15],
+                  [lon - 20, lat + 15],
+                  [lon - 20, lat - 15],
+                ],
+              ],
+            },
+            properties: { index: 0 },
+          },
+          {
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: [lon, lat] },
+            properties: { index: 1 },
+          },
+        ],
+      },
+      overlayLabels: [],
+      measurements: empty,
+      measurementLabels: [],
+      pins: [],
+    })
+    const centre = [WIDTH / 2, HEIGHT / 2] as const
+    await expect.poll(() => engine.overlayAt(centre)).toBe(1)
+    // ~10 degrees east: inside the box, off the point.
+    expect(engine.overlayAt([centre[0] + 40, centre[1]])).toBe(0)
+    expect(engine.overlayAt([5, 5])).toBeNull()
+
+    engine.setCamera({ ...CAMERA, lon: lon + 180, lat: -lat })
+    await expect.poll(() => engine.overlayAt(centre)).toBeNull()
   })
 
   it('fetches nothing while hidden and loads once live', async () => {

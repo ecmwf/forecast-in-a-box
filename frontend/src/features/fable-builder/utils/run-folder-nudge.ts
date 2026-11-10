@@ -8,7 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
-/** Helpers for the "not a per-run folder" nudge under a sink's path. */
+/** Helpers for the nudges under a sink's output path. */
 
 import type { PluginBlockFactoryId } from '@/api/types/fable.types'
 import { findGlyphSpans } from '@/features/fable-builder/utils/glyph-display'
@@ -16,12 +16,22 @@ import { findGlyphSpans } from '@/features/fable-builder/utils/glyph-display'
 /** Folder the fix inserts, as in the ecmwf plugin's templates. */
 export const RUN_FOLDER = '${runId}__${attemptCount}'
 
+/** GRIB file name the fix appends, as in the ecmwf plugin's templates. */
+export const GRIB_FILE_NAME = '[shortName].grib'
+
 /** Which part of the path must be per run: the GRIB file's folder, or the whole Zarr store. */
 export type RunScope = 'folder' | 'path'
 
 export interface RunScopedPath {
   configKey: string
   scope: RunScope
+}
+
+/** A sink path shared across runs. */
+export interface SharedOutputPath {
+  scope: RunScope
+  /** One-click fix; null when none applies. */
+  fix: string | null
 }
 
 /** ecmwf plugin sinks that write to disk, by factory name. */
@@ -67,4 +77,14 @@ export function withRunFolder(value: string): string | null {
     return `${value.slice(0, i + 1)}${RUN_FOLDER}/${value.slice(i + 1)}`
   }
   return null
+}
+
+/** True when a GRIB path names a folder: nothing after the last `/`. */
+export function lacksFileName(value: string): boolean {
+  return value.trimEnd().endsWith('/')
+}
+
+/** The path with the default GRIB file name appended. */
+export function withFileName(value: string): string {
+  return `${value.trimEnd()}${GRIB_FILE_NAME}`
 }

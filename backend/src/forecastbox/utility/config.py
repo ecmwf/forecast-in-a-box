@@ -59,7 +59,7 @@ class PoolSettings(FiabBaseModel):
 
 def _default_concurrency_pools() -> dict[ConcurrentPools, PoolSettings]:
     return {
-        ConcurrentPools.General: PoolSettings(max_workers=2, max_pending=32),
+        ConcurrentPools.General: PoolSettings(max_workers=4, max_pending=32),
         ConcurrentPools.Io: PoolSettings(max_workers=4, max_pending=64),
         ConcurrentPools.RunSubmission: PoolSettings(max_workers=2, max_pending=32),
         ConcurrentPools.ArtifactIo: PoolSettings(max_workers=1, max_pending=64),

@@ -336,6 +336,29 @@ describe('RunDetailPage Integration', () => {
       await expect.element(screen.getByText(/Generated: 0/)).toBeVisible()
     })
 
+    it('adds no placeholder card when every output is a stored GRIB file', async () => {
+      const running = getExecution('job-running-002')
+      if (!running) throw new Error('missing seed')
+      const marker = {
+        mime_type: 'text/plain; fiab-format=gribdir; fiab-fetchable=1',
+        original_block: 'block_sink_1',
+        is_available: false,
+      }
+      injectMockExecution({
+        ...running,
+        run_id: 'job-grib-only-011',
+        outputs: { 'task-grib-1': marker, 'task-grib-2': marker },
+        completed_block_ids: [],
+        planned_block_ids: ['block_source_1'],
+      })
+      const screen = await renderDetailPage('job-grib-only-011')
+
+      await expect
+        .element(screen.getByText('0 of 2 files written'))
+        .toBeVisible()
+      expect(document.querySelector('[aria-busy="true"]')).toBeNull()
+    })
+
     it('shows no outputs message for submitted job with null outputs', async () => {
       const screen = await renderDetailPage('job-submitted-004')
       await expect
@@ -506,6 +529,58 @@ describe('RunDetailPage Integration', () => {
       await expect
         .element(header('2t · step 12'), { timeout: 3000 })
         .toBeVisible()
+    })
+
+    it('keeps viewer keys working on its focused buttons and timeline', async () => {
+      injectMockExecution(splitPlotExecution)
+      const screen = await renderDetailPage('job-split-007')
+      await expect.element(screen.getByText('msl · step 0')).toBeVisible()
+      await screen.getByRole('button', { name: 'View' }).first().click()
+      const header = (label: string) =>
+        screen.getByText(`map_plot · ${label}`, { exact: true })
+      await expect.element(header('msl · step 0')).toBeVisible()
+
+      await screen.getByRole('button', { name: /^Play through/ }).click()
+      const pause = screen.getByRole('button', { name: 'Pause' })
+      await expect.element(pause).toHaveFocus()
+      await userEvent.keyboard(' ')
+      await expect
+        .element(screen.getByRole('button', { name: /^Play through/ }))
+        .toHaveAttribute('aria-pressed', 'false')
+
+      await userEvent.keyboard('{Home}')
+      await expect.element(header('msl · step 0')).toBeVisible()
+      await userEvent.keyboard('{ArrowRight}')
+      await expect.element(header('msl · step 12')).toBeVisible()
+
+      // Space plays and pauses over another button, without clicking it.
+      const nextParam = screen.getByRole('button', { name: 'Next Parameter' })
+      ;(nextParam.element() as HTMLElement).focus()
+      await userEvent.keyboard(' ')
+      await expect
+        .element(screen.getByRole('button', { name: 'Pause' }))
+        .toBeVisible()
+      await userEvent.keyboard(' ')
+      await expect
+        .element(screen.getByRole('button', { name: /^Play through/ }))
+        .toHaveAttribute('aria-pressed', 'false')
+      await userEvent.keyboard('{Home}')
+      await expect.element(header('msl · step 0')).toBeVisible()
+
+      const timeline = screen.getByRole('slider', { name: 'Forecast steps' })
+      ;(timeline.element() as HTMLElement).focus()
+      await userEvent.keyboard('{ArrowRight}')
+      await expect.element(header('msl · step 12')).toBeVisible()
+      await userEvent.keyboard('{ArrowLeft}')
+      await expect.element(header('msl · step 0')).toBeVisible()
+      await userEvent.keyboard('{ArrowDown}')
+      await expect.element(header('2t · step 0')).toBeVisible()
+      await userEvent.keyboard('{Shift>}{ArrowRight}{/Shift}')
+      await expect.element(header('2t · step 24')).toBeVisible()
+      await userEvent.keyboard('{End}')
+      await expect.element(header('2t · step 36')).toBeVisible()
+      // The timeline handled these keys itself.
+      await expect.element(timeline).toHaveFocus()
     })
   })
 
@@ -790,6 +865,26 @@ describe('RunDetailPage Integration', () => {
       await expect
         .element(screen.getByText('${format}'))
         .not.toBeInTheDocument()
+    })
+
+    it('hides and shows block parameters with a checkbox', async () => {
+      injectMockExecution(resolvedConfigExecution)
+      const screen = await renderDetailPage('job-resolved-009')
+
+      const toggle = screen.getByRole('checkbox', { name: 'Parameters' })
+      await expect.element(toggle).toBeChecked()
+      await expect.element(screen.getByText('grib')).toBeVisible()
+
+      // DOM clicks: unstyled, the box is too small to hit.
+      ;(toggle.element() as HTMLElement).click()
+      await expect.element(toggle).not.toBeChecked()
+      await expect.element(screen.getByText('grib')).not.toBeInTheDocument()
+
+      // The whole pill toggles, not just the box.
+      const pill = screen.getByText('Parameters', { exact: true })
+      ;(pill.element() as HTMLElement).click()
+      await expect.element(toggle).toBeChecked()
+      await expect.element(screen.getByText('grib')).toBeVisible()
     })
 
     it('falls back to stored templates on runs without a recorded resolution', async () => {

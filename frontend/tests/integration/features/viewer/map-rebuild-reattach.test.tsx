@@ -21,10 +21,13 @@ import { render } from 'vitest-browser-react'
 import VectorLayer from 'ol/layer/Vector'
 import Feature from 'ol/Feature'
 import Point from 'ol/geom/Point'
+import LineString from 'ol/geom/LineString'
+import { fromLonLat } from 'ol/proj'
 import type OlMap from 'ol/Map'
 import type { RefObject } from 'react'
 import type { MapAnnotation } from '@/features/viewer/geo/annotations'
 import type { ContextOverlay } from '@/features/viewer/geo/overlays'
+import type { Measurement } from '@/features/viewer/hooks/useMeasure'
 import type View from 'ol/View'
 import {
   createViewerView,
@@ -35,6 +38,7 @@ import { getViewerProjection } from '@/features/viewer/projections'
 import { usePointerReadout } from '@/features/viewer/hooks/usePointerReadout'
 import { useAnnotationLayer } from '@/features/viewer/geo/annotations'
 import { useContextOverlays } from '@/features/viewer/geo/overlays'
+import { useMeasure } from '@/features/viewer/hooks/useMeasure'
 
 const noop = () => {}
 const handlers = { onCreate: noop, onEdit: noop, onMove: noop }
@@ -154,5 +158,82 @@ describe('whenViewRendered', () => {
 
     await render(<Harness resetKey="rendered" overlays={[]} view={view} />)
     await expect.poll(() => rendered, { timeout: 5000 }).toBe(true)
+  })
+})
+
+const MEASUREMENT: Measurement = {
+  id: 'measurement-1',
+  geometry: new LineString([
+    [0, 40],
+    [10, 50],
+  ]),
+  label: '1360 km',
+  sourceId: null,
+}
+const MEASURE_HANDLERS = { onAdd: noop, onRemove: noop }
+
+function MeasureHarness({ resetKey, view }: { resetKey: string; view: View }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const { mapRef, mapVersion } = useOlMapBase(containerRef, {
+    view,
+    resetKey,
+    incLoading: noop,
+    decLoading: noop,
+  })
+  probe.mapRef = mapRef
+  useMeasure(
+    mapRef,
+    'none',
+    MEASUREMENTS,
+    MEASURE_HANDLERS,
+    'Remove',
+    mapVersion,
+  )
+  return (
+    <div
+      ref={containerRef}
+      style={{ width: 300, height: 200, position: 'relative' }}
+    />
+  )
+}
+const MEASUREMENTS = [MEASUREMENT]
+
+const measuredCoordinates = () => {
+  const layer = probe.mapRef?.current
+    ?.getLayers()
+    .getArray()
+    .find((l) => l instanceof VectorLayer && l.getZIndex() === 1500)
+  const geometry = (layer as VectorLayer | undefined)
+    ?.getSource()
+    ?.getFeatures()[0]
+    ?.getGeometry()
+  return geometry instanceof LineString
+    ? geometry.getCoordinates().map((c) => c.map((v) => Math.round(v)))
+    : null
+}
+
+describe('measurements across projections', () => {
+  it('draws WGS84 measurements in each rebuilt map projection', async () => {
+    const screen = await render(
+      <MeasureHarness resetKey="merc" view={createViewerView()} />,
+    )
+    await expect
+      .poll(measuredCoordinates)
+      .toEqual(
+        [fromLonLat([0, 40]), fromLonLat([10, 50])].map((c) =>
+          c.map((v) => Math.round(v)),
+        ),
+      )
+    // A projection switch swaps the View and rebuilds the map.
+    await screen.rerender(
+      <MeasureHarness
+        resetKey="geo"
+        view={createViewerView(getViewerProjection('geo'))}
+      />,
+    )
+    await expect.poll(measuredCoordinates).toEqual([
+      [0, 40],
+      [10, 50],
+    ])
   })
 })

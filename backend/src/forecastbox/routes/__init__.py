@@ -25,5 +25,6 @@ Guidelines:
 * when adding new Domain Entity, make a decision based on context whether its user-managed or backend-managed, then use existing entities and their routes as templates and follow the same patterns
 * we never use path parameters in routes -- to prevent misrouting, long url trimming and normalization, etc
   * the *only* exception is the `routes/admin.py`, where the `{user_id}` in routes is an accepted non-domain convention
+* routes are `async def`; blocking work is submitted to a named `ConcurrentPools` pool via `execution_manager.awaitable_submit` (jobs-DB access via `await_jobs_db`); direct calls are limited to in-memory reads and short lock sections
 * each route module is additionally responsible for converting Exception classes from domain submodules into concrete HttpExceptions + codes
 """

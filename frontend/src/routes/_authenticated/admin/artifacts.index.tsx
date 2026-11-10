@@ -8,7 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
-/** One model catalogue; status is a filter, so items never move. */
+/** One model catalogue; availability is a filter, so items never move. */
 
 import { useMemo, useState } from 'react'
 import { Package, RefreshCw } from 'lucide-react'
@@ -104,7 +104,7 @@ function ArtifactsPage() {
     },
     {
       key: 'status',
-      label: t('table.status'),
+      label: t('table.availability'),
       compare: (a, b) => Number(b.isAvailable) - Number(a.isAvailable),
     },
   ]
@@ -182,7 +182,7 @@ function ArtifactsPage() {
           ]}
           segment={filter}
           onSegmentChange={setFilter}
-          segmentsLabel={t('filters.statusLabel')}
+          segmentsLabel={t('filters.availabilityLabel')}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           searchPlaceholder={t('filters.searchPlaceholder')}
@@ -208,7 +208,7 @@ function ArtifactsPage() {
               className: 'hidden lg:block',
               sortKey: 'size',
             },
-            { label: t('table.status'), sortKey: 'status' },
+            { label: t('table.availability'), sortKey: 'status' },
             { label: t('table.actions'), className: 'text-right' },
           ]}
           isHeld={(a) => !matchesFilter(a, filter)}

@@ -37,6 +37,8 @@ from fiab_core.types import (
     DatetimeType,
     DateType,
     FloatType,
+    GridType,
+    GridValue,
     IntType,
     ListType,
     OpenEnumType,
@@ -200,6 +202,22 @@ class BlockInstanceRich:
         raw_value = self._get_raw_value(option_id)
         # NOTE we ignore types as we trust parser -- but its fragile!
         return GeoDomainWrapper(raw_value)  # ty:ignore[invalid-argument-type]
+
+    def config_as_grid(self, key: str | ConfigurationOptionId) -> GridValue | None:
+        option_id, option = self._get_configuration_option(key)
+        value_type = option.value_type
+        if not (isinstance(value_type, GridType) or (isinstance(value_type, OpenEnumType) and isinstance(value_type.subtype, GridType))):
+            raise BlockInstanceConfigurationError(
+                f"Configuration option {option_id!r} has type {option.value_type.serialize()!r}, not GridType"
+            )
+        raw_value = self._get_raw_value(option_id)
+        if isinstance(raw_value, (str, list, int, float)) and not isinstance(raw_value, bool):
+            return cast(GridValue, raw_value)
+        if raw_value is None:
+            return None
+        raise BlockInstanceConfigurationError(
+            f"Configuration option {option_id!r} expected str, list[int | float], int, float or None, got {type(raw_value).__name__}"
+        )
 
 
 class QubedBlockBuilder(abc.ABC):

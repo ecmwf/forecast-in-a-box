@@ -14,6 +14,8 @@ import {
   MlModelOverviewSchema,
   artifactIdToWire,
   artifactLabels,
+  artifactMaturity,
+  displayTags,
   toArtifactInfo,
 } from '@/api/types/artifacts.types'
 
@@ -98,5 +100,31 @@ describe('artifactLabels', () => {
     expect(labels.get('ecmwf:crps_w_flash_attn')).toBe(
       'AIFS ENS CRPS 1.0 · crps_w_flash_attn',
     )
+  })
+})
+
+describe('displayTags', () => {
+  it('shows status as maturity in place', () => {
+    expect(displayTags({ resolution: 'n320', status: 'demo' })).toEqual([
+      ['resolution', 'n320'],
+      ['maturity', 'demo'],
+    ])
+  })
+
+  it('prefers a maturity tag over status', () => {
+    expect(displayTags({ status: 'demo', maturity: 'operational' })).toEqual([
+      ['maturity', 'operational'],
+    ])
+  })
+})
+
+describe('artifactMaturity', () => {
+  it('reads maturity from either key', () => {
+    expect(artifactMaturity({ status: 'demo' })).toBe('demo')
+    expect(artifactMaturity({ maturity: 'operational' })).toBe('operational')
+  })
+
+  it('is null without a maturity tag', () => {
+    expect(artifactMaturity({ resolution: 'n320' })).toBeNull()
   })
 })

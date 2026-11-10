@@ -78,6 +78,7 @@ def check_server_ready(host: str = "127.0.0.1", port: int = 8000, timeout: float
 
     Returns True if the port is open and accepting connections, False otherwise.
     """
+    # TODO add warning if lens not local, we are blocking async loop
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.settimeout(timeout)
         try:
@@ -131,6 +132,7 @@ def start_skinny_wms(local_path: str) -> LensInstanceId:
         LensInstanceManager.instances = LensInstanceManager.instances.set(instance_id, instance)
 
     failed: str | None = None
+    process: subprocess.Popen[bytes] | None = None
     try:
         cmd = [
             "uv",
@@ -166,7 +168,7 @@ def start_skinny_wms(local_path: str) -> LensInstanceId:
         stdout_path = os.path.join(log_directory, f"lens.{instance_id}.stdout.txt")
         stderr_path = os.path.join(log_directory, f"lens.{instance_id}.stderr.txt")
         with open(stdout_path, "ab") as stdout_file, open(stderr_path, "ab") as stderr_file:
-            process: subprocess.Popen[bytes] = subprocess.Popen(
+            process = subprocess.Popen(
                 cmd,
                 env=env,
                 start_new_session=True,
@@ -179,14 +181,17 @@ def start_skinny_wms(local_path: str) -> LensInstanceId:
 
     with timed_acquire(LensInstanceManager.lock, timeout_acquire) as acquired:
         if not acquired:
-            shutdown_popen(process)
+            if process is not None:
+                shutdown_popen(process)
             FreePortsManager.release_port(port)
             raise TimeoutError("Failed to acquire lens manager lock for update")
         if instance_id not in LensInstanceManager.instances:
-            shutdown_popen(process)
+            if process is not None:
+                shutdown_popen(process)
             FreePortsManager.release_port(port)
             raise RuntimeError(f"Lens instance {instance_id} was removed during startup")
-        if failed is not None:
+        if failed is not None or process is None:
+            LensInstanceManager.instances = LensInstanceManager.instances.remove(instance_id)
             FreePortsManager.release_port(port)
             raise RuntimeError(f"Lens instance {instance_id} failed to start with {failed}")
         updated = LensInstance(
@@ -217,7 +222,7 @@ def list_instances() -> list[tuple[LensInstanceId, LensInstanceDetail]]:
 def stop_instance(instance_id: LensInstanceId) -> None:
     """Stop and remove a lens instance, releasing its ports.
 
-    Raises KeyError if the instance is not found.
+    Raises NoLensFound if the instance is not found.
     The port is always released in a finally block to prevent leaks.
     """
     instance: LensInstance | None = None
@@ -226,7 +231,7 @@ def stop_instance(instance_id: LensInstanceId) -> None:
             if not acquired:
                 raise TimeoutError("Failed to acquire lens manager lock")
             if instance_id not in LensInstanceManager.instances:
-                raise KeyError(instance_id)
+                raise NoLensFound(instance_id)
             instance = LensInstanceManager.instances[instance_id]
             LensInstanceManager.instances = LensInstanceManager.instances.remove(instance_id)
         if instance.process is not None:
@@ -243,7 +248,7 @@ def shutdown_all_lens_instances() -> None:
     for instance_id in list(instances.keys()):
         try:
             stop_instance(instance_id)
-        except KeyError:
+        except NoLensFound:
             pass  # already removed
         except Exception as e:
             logger.warning(f"Failed to stop lens instance {instance_id} during shutdown: {repr(e)}")
