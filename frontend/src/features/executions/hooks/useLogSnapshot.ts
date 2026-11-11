@@ -115,15 +115,22 @@ export function useLogSnapshot(runId: string) {
   const loadsRef = useRef(0)
   const snapshotRef = useRef<LogSnapshot | null>(null)
 
-  useEffect(
-    () => () => {
+  // Aborted on unmount: cancels the download and refuses new workers.
+  const lifeRef = useRef<AbortController | null>(null)
+  useEffect(() => {
+    const life = new AbortController()
+    lifeRef.current = life
+    return () => {
+      life.abort()
       clientRef.current?.terminate()
       clientRef.current = null
-    },
-    [],
-  )
+    }
+  }, [])
 
   const call = useCallback<LogCall>((request) => {
+    if (lifeRef.current?.signal.aborted) {
+      return Promise.reject(new Error('Log viewer closed'))
+    }
     // A failed worker is replaced, e.g. on Retry.
     if (clientRef.current?.failed) clientRef.current = null
     clientRef.current ??= createWorkerClient()
@@ -139,7 +146,9 @@ export function useLogSnapshot(runId: string) {
     setError(null)
     const run = async (): Promise<LogSnapshot | null> => {
       try {
-        const blob = await downloadJobLogs(runId)
+        const blob = await downloadJobLogs(runId, {
+          signal: lifeRef.current?.signal,
+        })
         const fetchedAt = Date.now()
         const summary = await call({
           type: 'load',

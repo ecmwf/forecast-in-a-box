@@ -160,7 +160,10 @@ export function buildOutputZipUrl(runId: string, datasetId: string): string {
   return new URL(url, window.location.href).href
 }
 
-export async function downloadJobLogs(runId: string): Promise<Blob> {
+export async function downloadJobLogs(
+  runId: string,
+  { signal }: { signal?: AbortSignal } = {},
+): Promise<Blob> {
   const url = buildUrl(API_ENDPOINTS.job.logs, {
     run_id: runId,
   })
@@ -168,6 +171,7 @@ export async function downloadJobLogs(runId: string): Promise<Blob> {
   const response = await fetch(url, {
     credentials: 'include',
     headers: buildHeaders(),
+    signal,
   })
 
   if (!response.ok) {
