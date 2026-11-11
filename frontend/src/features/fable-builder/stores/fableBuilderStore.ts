@@ -173,6 +173,8 @@ interface FableBuilderState {
   removeBlock: (instanceId: BlockInstanceId) => void
   removeBlockCascade: (instanceId: BlockInstanceId) => void
   duplicateBlock: (instanceId: BlockInstanceId) => BlockInstanceId
+  /** Swaps the block in place; its id, and so its wiring, stays. */
+  replaceBlock: (instanceId: BlockInstanceId, instance: BlockInstance) => void
   duplicateBlockWithChildren: (
     instanceId: BlockInstanceId,
   ) => Record<BlockInstanceId, BlockInstanceId>
@@ -475,6 +477,24 @@ export const useFableBuilderStore = create<FableBuilderState>()(
               validationState: null,
               blockConfigurationRestrictions: remainingRestrictions,
             })
+          },
+
+          replaceBlock: (instanceId, instance) => {
+            pushHistory()
+            set((state) => ({
+              fable: {
+                ...state.fable,
+                blocks: { ...state.fable.blocks, [instanceId]: instance },
+              },
+              isDirty: true,
+              validationState: null,
+              blockConfigurationRestrictions:
+                replaceBlockConfigurationRestrictions(
+                  state.blockConfigurationRestrictions,
+                  instanceId,
+                  undefined,
+                ),
+            }))
           },
 
           duplicateBlock: (instanceId) => {

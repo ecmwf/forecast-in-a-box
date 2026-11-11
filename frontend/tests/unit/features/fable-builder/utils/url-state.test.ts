@@ -10,6 +10,7 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import type { FableBuilderV1 } from '@/api/types/fable.types'
+import { serializeFable } from '@/api/types/fable.types'
 import {
   decodeFableFromURL,
   encodeFableToURL,
@@ -68,5 +69,37 @@ describe('fable URL state round-trip', () => {
 
   it('returns null for undecodable input', () => {
     expect(decodeFableFromURL('not-a-valid-encoded-state')).toBeNull()
+  })
+})
+
+describe('crafted links', () => {
+  const block = (inputs: Record<string, string> = {}) => ({
+    factory_id: { plugin: { store: 'ecmwf', local: 'core' }, factory: 'mars' },
+    configuration_values: {},
+    input_ids: inputs,
+  })
+  // Own `__proto__` keys, as a parsed link would carry them.
+  const link = (json: string) =>
+    encodeStateToURL(serializeFable(JSON.parse(json) as FableBuilderV1))
+
+  it.each([
+    ['an input naming a built-in', { a: block({ data: 'toString' }) }],
+    ['an input naming a missing block', { a: block({ data: 'gone' }) }],
+    ['a built-in block name', { constructor: block() }],
+  ])('ignores a link with %s', (_, blocks) => {
+    expect(decodeFableFromURL(encodeFableToURL({ blocks }))).toBeNull()
+  })
+
+  it('ignores a link with a __proto__ block or a built-in glyph name', () => {
+    expect(
+      decodeFableFromURL(
+        link(`{"blocks":{"__proto__":${JSON.stringify(block())}}}`),
+      ),
+    ).toBeNull()
+    expect(
+      decodeFableFromURL(
+        encodeFableToURL({ blocks: {}, local_glyphs: { valueOf: 'x' } }),
+      ),
+    ).toBeNull()
   })
 })

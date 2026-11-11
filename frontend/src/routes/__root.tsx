@@ -19,6 +19,7 @@ import {
   useEnvironment,
 } from '@/hooks/useConfig'
 import { useLanguageSync } from '@/hooks/useLanguageSync'
+import { useRefuseStrayFileDrops } from '@/hooks/useFileDrop'
 import { createLogger } from '@/lib/logger'
 
 const CommandPalette = lazy(() =>
@@ -37,6 +38,9 @@ function RootComponent() {
 
   // Sync language between configStore and i18next
   useLanguageSync()
+
+  // A file dropped beside a drop target must not open in the tab.
+  useRefuseStrayFileDrops()
 
   // Log configuration in debug mode
   useEffect(() => {

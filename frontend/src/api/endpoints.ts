@@ -174,14 +174,6 @@ export const API_ENDPOINTS = {
   },
 
   /**
-   * Gateway endpoints
-   */
-  gateway: {
-    /** GET - Stream gateway logs (SSE) */
-    logs: `${API_PREFIX}/gateway/logs`,
-  },
-
-  /**
    * Lens (inspection-tool launcher) endpoints. Lenses run on dynamic ports
    * and are addressed via a server-side instance id.
    */

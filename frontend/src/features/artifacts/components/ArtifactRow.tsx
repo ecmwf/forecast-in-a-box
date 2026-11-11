@@ -11,12 +11,12 @@
 import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
 import { ArtifactActions } from './ArtifactActions'
-import { ArtifactCompatibilityBadge } from './ArtifactCompatibilityBadge'
 import { ArtifactIdLine } from './ArtifactIdLine'
-import { ArtifactStatusBadge } from './ArtifactStatusBadge'
+import { ArtifactStatusText } from './ArtifactStatusText'
 import { ArtifactTagChips } from './ArtifactTagChips'
 import type { ArtifactItemHandlers } from './ArtifactActions'
 import type { ArtifactInfo } from '@/api/types/artifacts.types'
+import { artifactMaturity, nonMaturityTags } from '@/api/types/artifacts.types'
 import { useDownloadProgress } from '@/api/hooks/useArtifacts'
 import { H4 } from '@/components/base/typography'
 import { CatalogueRow } from '@/components/common/catalogue/CatalogueView'
@@ -41,6 +41,8 @@ export function ArtifactRow({
     : isDeleting
       ? t('actions.deleting')
       : undefined
+  // Maturity has its own column.
+  const otherTags = nonMaturityTags(artifact.tags)
 
   return (
     <CatalogueRow>
@@ -64,25 +66,19 @@ export function ArtifactRow({
           showStore={showStore}
           className="mt-0.5"
         />
-        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-          {artifact.platforms.map((platform) => (
-            <span
-              key={platform}
-              className="inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground"
-            >
-              {platform}
-            </span>
-          ))}
-          <ArtifactTagChips
-            tags={artifact.tags}
-            max={2}
-            className="px-1.5 text-xs"
-          />
-          <ArtifactCompatibilityBadge
-            artifact={artifact}
-            className="px-1.5 text-xs"
-          />
-        </div>
+        {Object.keys(otherTags).length > 0 && (
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <ArtifactTagChips
+              tags={otherTags}
+              max={2}
+              className="px-1.5 text-xs"
+            />
+          </div>
+        )}
+      </div>
+
+      <div className="hidden text-sm text-muted-foreground capitalize md:block">
+        {artifactMaturity(artifact.tags)}
       </div>
 
       <div className="hidden text-sm text-muted-foreground tabular-nums lg:block">
@@ -90,8 +86,8 @@ export function ArtifactRow({
       </div>
 
       <div>
-        <ArtifactStatusBadge
-          isAvailable={artifact.isAvailable}
+        <ArtifactStatusText
+          artifact={artifact}
           busyLabel={busyLabel}
           downloadError={error}
         />

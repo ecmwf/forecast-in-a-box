@@ -25,6 +25,7 @@
  * - list[enumClosed[str]('a','b')] → multi-select restricted to the listed items
  * - list[enum[str]('a','b')] → multi-select with suggestions, accept any string
  * - geodomain → geographic-area picker (presets / countries / draw a box)
+ * - grid / enumOpen[grid](...) -> grid picker with validated free entry
  * - artifact / enum[artifact](…) → artifact catalogue picker
  * - param → string input; list[param] → tag input labelled via `lookup`
  * - optional[T] → same widget as T, with optional=true flag (legacy — the
@@ -39,6 +40,7 @@
  */
 
 import { parseFableType } from './fable-type'
+import { DEFAULT_GRID_SUGGESTIONS } from './fields/grid'
 import type { FableType } from './fable-type'
 import { getAppTimeZone, todayInZone } from '@/lib/datetime'
 
@@ -75,6 +77,13 @@ export type ParsedValueType =
       optional?: boolean
     }
   | { type: 'geodomain'; optional?: boolean }
+  | {
+      type: 'grid'
+      /** Suggested grids; `closed` means no free entry. */
+      options: Array<string>
+      closed: boolean
+      optional?: boolean
+    }
   | {
       type: 'artifact'
       /** Wire ids to choose from; absent means the whole catalogue. */
@@ -150,9 +159,19 @@ function flatten(t: FableType, raw: string): ParsedValueType {
       return { type: 'date' }
     case 'geodomain':
       return { type: 'geodomain' }
+    case 'grid':
+      return {
+        type: 'grid',
+        options: [...DEFAULT_GRID_SUGGESTIONS],
+        closed: false,
+      }
     case 'enum':
       if (t.subtype.kind === 'artifact') {
         return { type: 'artifact', options: t.items.map(String) }
+      }
+      // Not a select: EnumField has no free entry and ignores `closed`.
+      if (t.subtype.kind === 'grid') {
+        return { type: 'grid', options: t.items.map(String), closed: t.closed }
       }
       if (isSelectEnum(t)) {
         return {
@@ -210,6 +229,8 @@ export function getDefaultValueForType(parsedType: ParsedValueType): string {
       return ''
     case 'geodomain':
       return ''
+    case 'grid':
+      return parsedType.options[0] ?? ''
     case 'artifact':
       return parsedType.options?.[0] ?? ''
     case 'unknown':
