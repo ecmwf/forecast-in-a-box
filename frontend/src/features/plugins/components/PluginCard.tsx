@@ -10,6 +10,7 @@
 
 import { formatDistanceToNow } from 'date-fns'
 import { useTranslation } from 'react-i18next'
+import { Link } from '@tanstack/react-router'
 import { CapabilityBadges } from './CapabilityBadges'
 import { PluginActions, usePluginBusyLabel } from './PluginActions'
 import { PluginDiagnostics } from './PluginDiagnostics'
@@ -19,7 +20,7 @@ import { PluginVersionText } from './PluginVersionText'
 import type { PluginItemHandlers } from './PluginActions'
 import type { PluginOperation } from '@/api/hooks/usePlugins'
 import type { PluginInfo } from '@/api/types/plugins.types'
-import { pluginDisplayVersion } from '@/api/types/plugins.types'
+import { encodePluginId, pluginDisplayVersion } from '@/api/types/plugins.types'
 import {
   CatalogueFact,
   CatalogueFacts,
@@ -52,7 +53,15 @@ export function PluginCard({
         <div className="flex min-w-0 gap-3">
           <PluginIcon plugin={plugin} />
           <div className="min-w-0">
-            <h3 className="truncate text-base font-semibold">{plugin.name}</h3>
+            <h3 className="truncate text-base font-semibold">
+              <Link
+                to="/admin/plugins/$pluginId"
+                params={{ pluginId: encodePluginId(plugin.id) }}
+                className="hover:underline"
+              >
+                {plugin.name}
+              </Link>
+            </h3>
             <P className="mt-0.5 truncate text-muted-foreground">
               {plugin.author}
             </P>

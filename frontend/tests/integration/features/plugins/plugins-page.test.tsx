@@ -77,6 +77,21 @@ describe('Plugins page', () => {
     useUiStore.getState().setPluginsSort({ key: 'name', dir: 'asc' })
   })
 
+  it.each(['table', 'card'] as const)(
+    'links each plugin name to its detail page (%s view)',
+    async (mode) => {
+      useUiStore.getState().setPluginsViewMode(mode)
+      worker.use(
+        http.get(API_ENDPOINTS.plugin.list, () => diagnosticPlugin([])),
+      )
+      const screen = await renderPage()
+
+      await expect
+        .element(screen.getByRole('link', { name: 'Diag Test' }))
+        .toHaveAttribute('href', '/admin/plugins/ecmwf--diag-test')
+    },
+  )
+
   it('lists installed and available plugins together, with status counts', async () => {
     const screen = await renderPage()
 

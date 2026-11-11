@@ -10,6 +10,7 @@
 
 import { formatDistanceToNowStrict } from 'date-fns'
 import { useTranslation } from 'react-i18next'
+import { Link } from '@tanstack/react-router'
 import { PluginActions, usePluginBusyLabel } from './PluginActions'
 import { PluginIcon } from './PluginIcon'
 import { PluginStatusText } from './PluginStatusText'
@@ -17,7 +18,7 @@ import { PluginVersionText } from './PluginVersionText'
 import type { PluginItemHandlers } from './PluginActions'
 import type { PluginOperation } from '@/api/hooks/usePlugins'
 import type { PluginInfo } from '@/api/types/plugins.types'
-import { pluginDisplayVersion } from '@/api/types/plugins.types'
+import { encodePluginId, pluginDisplayVersion } from '@/api/types/plugins.types'
 import { H4, P } from '@/components/base/typography'
 import { CatalogueRow } from '@/components/common/catalogue/CatalogueView'
 
@@ -43,7 +44,15 @@ export function PluginRow({ plugin, operation, ...handlers }: PluginRowProps) {
       <div className="flex min-w-0 items-start gap-3">
         <PluginIcon plugin={plugin} size="sm" />
         <div className="min-w-0">
-          <H4 className="truncate text-sm font-semibold">{plugin.name}</H4>
+          <H4 className="truncate text-sm font-semibold">
+            <Link
+              to="/admin/plugins/$pluginId"
+              params={{ pluginId: encodePluginId(plugin.id) }}
+              className="hover:underline"
+            >
+              {plugin.name}
+            </Link>
+          </H4>
           <P className="mt-0.5 truncate text-muted-foreground">
             {t('row.byline', {
               author: plugin.author,
