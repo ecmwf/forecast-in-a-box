@@ -23,6 +23,7 @@ import {
   Copy,
   Download,
   RotateCcw,
+  ScrollText,
   Settings,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -39,6 +40,8 @@ const log = createLogger('RunErrorBanner')
 interface RunErrorBannerProps {
   error: string
   jobId: string
+  /** Opens the Logs tab at the failure. */
+  onShowInLogs: () => void
   onRestart: () => void
   onEditConfig: () => void
   canEditConfig: boolean
@@ -51,6 +54,7 @@ const COLLAPSE_CHARS = 600
 export function RunErrorBanner({
   error,
   jobId,
+  onShowInLogs,
   onRestart,
   onEditConfig,
   canEditConfig,
@@ -133,6 +137,10 @@ export function RunErrorBanner({
           </Button>
         )}
         <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={onShowInLogs}>
+            <ScrollText className="mr-1.5 h-4 w-4" />
+            {t('actions.showInLogs')}
+          </Button>
           <Button variant="outline" size="sm" onClick={handleDownloadLogs}>
             <Download className="mr-1.5 h-4 w-4" />
             {t('actions.downloadLogs')}

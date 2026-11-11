@@ -41,6 +41,7 @@ import { resetJobsState, setMockGribDir } from '@tests/../mocks/data/job.data'
 import type { JobStatus, RunOutputs } from '@/api/types/job.types'
 import type { LensInstanceDetailResponse } from '@/api/types/lens.types'
 import { StoredOutputsCard } from '@/features/executions/components/StoredOutputsCard'
+import { useExecutionHoverStore } from '@/features/executions/stores/executionHoverStore'
 import { lensOwner } from '@/features/visualise/lens-owners'
 import { showToast } from '@/lib/toast'
 import i18n from '@/lib/i18n'
@@ -114,6 +115,7 @@ async function renderCard(
 beforeEach(() => {
   resetJobsState()
   resetLensState()
+  useExecutionHoverStore.getState().resetExecutionSelection()
 })
 
 afterEach(() => {
@@ -143,6 +145,38 @@ describe('StoredOutputsCard', () => {
     expect(
       screen.getByText('Folder shared with other runs').elements(),
     ).toHaveLength(0)
+  })
+
+  it('rings the selected sink and fades the others while a block is selected', async () => {
+    const { screen } = await renderCard({
+      ...outputsWithMarkers,
+      'task-out-grib-b': {
+        mime_type: GRIB_DIR_MIME,
+        original_block: 'block_sink_2',
+        is_available: true,
+      },
+    })
+    const row = (title: string) =>
+      screen.getByText(title).element().closest('li')
+    await expect.element(screen.getByText('block_sink_2')).toBeVisible()
+    for (const title of ['block_sink_1', 'block_sink_2']) {
+      expect(row(title)?.className).not.toContain('opacity-40')
+      expect(row(title)?.className).not.toContain('ring-2')
+    }
+
+    useExecutionHoverStore.getState().setSelectedBlockId('block_sink_2')
+    await expect
+      .poll(() => row('block_sink_1')?.className)
+      .toContain('opacity-40')
+    expect(row('block_sink_1')?.className).not.toContain('ring-2')
+    expect(row('block_sink_2')?.className).toContain('ring-2')
+    expect(row('block_sink_2')?.className).not.toContain('opacity-40')
+
+    useExecutionHoverStore.getState().setSelectedBlockId(null)
+    await expect
+      .poll(() => row('block_sink_1')?.className)
+      .not.toContain('opacity-40')
+    expect(row('block_sink_2')?.className).not.toContain('ring-2')
   })
 
   it('lists markers whose mime also carries fiab-fetchable', async () => {

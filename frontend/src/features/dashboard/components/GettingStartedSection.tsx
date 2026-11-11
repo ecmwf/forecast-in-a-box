@@ -31,6 +31,7 @@ import { H2, P } from '@/components/base/typography'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { TOUR, tourAttr } from '@/features/tutorials/anchors'
+import { useLoadWorkflowFile } from '@/features/fable-builder/hooks/useLoadWorkflowFile'
 import {
   templateBookmarkKey,
   useTemplateBookmarksStore,
@@ -58,6 +59,7 @@ function StarterPanel({
 export function GettingStartedSection() {
   const { t } = useTranslation(['dashboard', 'common'])
   const navigate = useNavigate()
+  const loadWorkflowFile = useLoadWorkflowFile()
   const { starters, hasStarters, templateCount, isLoading, isError, refetch } =
     useStarterTemplates()
   const bookmarkedKeys = useTemplateBookmarksStore((state) => state.keys)
@@ -107,6 +109,13 @@ export function GettingStartedSection() {
           onClick={() =>
             navigate({ to: '/configure', search: { fresh: true } })
           }
+          onFileDrop={(file) =>
+            void loadWorkflowFile(file).then((ok) => {
+              if (ok)
+                void navigate({ to: '/configure', search: { loaded: true } })
+            })
+          }
+          dropLabel={t('gettingStarted.startFromScratch.drop')}
         />
 
         {isLoading && (

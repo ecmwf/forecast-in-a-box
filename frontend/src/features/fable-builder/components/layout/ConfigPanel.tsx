@@ -65,6 +65,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Reveal } from '@/components/common/Reveal'
 import { GlyphReferencePanel } from '@/features/fable-builder/components/shared/GlyphReferencePanel'
+import { BlockConfigProvider } from '@/features/fable-builder/context/BlockConfigContext'
 import { BlockValidationProvider } from '@/features/fable-builder/context/BlockValidationContext'
 import { mapBlockErrorsToFields } from '@/features/fable-builder/utils/map-block-errors-to-fields'
 import { TOUR, tourAttr } from '@/features/tutorials/anchors'
@@ -252,6 +253,9 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
               {t('configPanel.startFromPreset')}
             </Button>
           </div>
+          <P className="-mt-2 text-xs text-muted-foreground">
+            {t('configPanel.dropHint')}
+          </P>
         </div>
       </div>
     )
@@ -294,6 +298,12 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
     mappedErrors.invalidGlyphNames,
   )
   const configOptions = Object.entries(factory.configuration_options)
+  const configValueTypes = Object.fromEntries(
+    configOptions.map(([key, option]) => [
+      key,
+      configRestrictions[key] ?? option.value_type,
+    ]),
+  )
   const inputs = factory.inputs
 
   return (
@@ -388,21 +398,26 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
                 <div className="text-sm font-medium">
                   {t('configPanel.configuration')}
                 </div>
-                <div className="space-y-4">
-                  {configOptions.map(([key, option]) => (
-                    <FieldRenderer
-                      key={key}
-                      id={`config-${key}`}
-                      configKey={key}
-                      valueType={configRestrictions[key] ?? option.value_type}
-                      value={selectedBlock.configuration_values[key] || ''}
-                      onChange={(value) => handleConfigChange(key, value)}
-                      label={option.title || key}
-                      description={option.description}
-                      inputClassName="h-9"
-                    />
-                  ))}
-                </div>
+                <BlockConfigProvider
+                  values={selectedBlock.configuration_values}
+                  valueTypes={configValueTypes}
+                >
+                  <div className="space-y-4">
+                    {configOptions.map(([key, option]) => (
+                      <FieldRenderer
+                        key={key}
+                        id={`config-${key}`}
+                        configKey={key}
+                        valueType={configValueTypes[key]}
+                        value={selectedBlock.configuration_values[key] || ''}
+                        onChange={(value) => handleConfigChange(key, value)}
+                        label={option.title || key}
+                        description={option.description}
+                        inputClassName="h-9"
+                      />
+                    ))}
+                  </div>
+                </BlockConfigProvider>
                 {/* mt-10 reserves clearance for the last field's absolute
                     preview/nudge/error stack so they don't overlap the
                     reference panel. */}

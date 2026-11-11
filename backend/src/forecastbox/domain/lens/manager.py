@@ -35,6 +35,7 @@ from forecastbox.entrypoint.bootstrap.config import BACKEND_LOG_DIRECTORY_ENV
 from forecastbox.utility.concurrency.ports import FreePortsManager, NoFreePortsException
 from forecastbox.utility.concurrency.shutdown import shutdown_popen
 from forecastbox.utility.concurrency.synchronization import timed_acquire
+from forecastbox.utility.config import config
 from forecastbox.utility.pydantic import FiabBaseModel
 from forecastbox.utility.time import default_tz_fallback
 
@@ -45,8 +46,10 @@ LensName = Literal["skinnyWMS"]
 LensStatus = Literal["starting", "running", "terminated", "failed"]
 
 timeout_acquire = 1
-# gunicorn worker timeout, seconds, as the proxy's read timeout; the first request scans the data folder
+# gunicorn worker timeout, seconds, as the proxy's read timeout
 timeout_lens_worker = 120
+# Indexes the data folder at import, once in the preloading master
+lens_wsgi_app = "forecastbox.domain.lens.skinnywms_app:application"
 
 
 class LensInstanceDetail(FiabBaseModel):
@@ -66,6 +69,8 @@ class LensInstance:
     lens_params: dict[str, Any]
     lens_name: LensName
     ports: set[int]
+    # Ports seen accepting connections; set once, while the process lives
+    bound: bool = False
 
 
 class LensInstanceManager:
@@ -96,8 +101,10 @@ def _compute_status(instance: LensInstance) -> LensInstanceDetail:
             status = "starting"
         elif instance.process.poll() is not None:
             status = "terminated" if instance.process.returncode == 0 else "failed"
-        elif all(check_server_ready(port=port) for port in instance.ports):
+        elif instance.bound or all(check_server_ready(port=port) for port in instance.ports):
             # process alive and its port(s) are bound -- guvicorn/gunicorn finished starting
+            # Probe once: a busy lens's queue holds each probe connection
+            instance.bound = True
             status = "running"
         else:
             # process alive but not yet listening -- still starting up
@@ -142,7 +149,14 @@ def start_skinny_wms(local_path: str) -> LensInstanceId:
             f"127.0.0.1:{port}",
             "--timeout",
             str(timeout_lens_worker),
-            "skinnywms.wmssvr:application",
+            # Replacement workers fork from the indexed master: no rescan
+            "--preload",
+            # Replacing the worker frees the memory Magics leaks per rendered image
+            "--max-requests",
+            str(config.backend.lens.worker_max_requests),
+            "--max-requests-jitter",
+            str(config.backend.lens.worker_max_requests_jitter),
+            lens_wsgi_app,
         ]
         env = {
             **os.environ,
@@ -163,6 +177,8 @@ def start_skinny_wms(local_path: str) -> LensInstanceId:
             # use the backend-wide default tz
             "TZ": default_tz_fallback(),
             "MAGICS_STYLE_PATH": sys.prefix + "/share/magics/styles/dccms",
+            # macOS kills forked workers drawing text after the preloaded master
+            **({"OBJC_DISABLE_INITIALIZE_FORK_SAFETY": "YES"} if sys.platform == "darwin" else {}),
         }
         log_directory = os.environ[BACKEND_LOG_DIRECTORY_ENV]
         stdout_path = os.path.join(log_directory, f"lens.{instance_id}.stdout.txt")
