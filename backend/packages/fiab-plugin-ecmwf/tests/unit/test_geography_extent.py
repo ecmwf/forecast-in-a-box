@@ -14,7 +14,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from fiab_plugin_ecmwf.geography.extent import LatLonBox, box_from_preset, boxes_from_geometry, union_boxes
+from fiab_plugin_ecmwf.geography.extent import LatLonBox, box_from_preset, boxes_from_geometry, pad_box, union_boxes
 
 GERMANY: LatLonBox = (54.98, 5.99, 47.30, 15.02)
 FRANCE: LatLonBox = (51.15, -4.59, 41.38, 9.56)
@@ -111,6 +111,51 @@ class TestUnionBoxes:
     def test_empty_input_is_rejected(self) -> None:
         with pytest.raises(ValueError, match="no boxes"):
             union_boxes([])
+
+
+class TestPadBox:
+    def test_widens_every_side(self) -> None:
+        assert pad_box(GERMANY, 1.0, 2.0) == pytest.approx((55.98, 3.99, 46.30, 17.02))
+
+    def test_zero_padding_leaves_the_box_unchanged(self) -> None:
+        assert pad_box(GERMANY, 0.0, 0.0) == pytest.approx(GERMANY)
+
+    def test_latitudes_are_limited_to_the_poles(self) -> None:
+        north, _, south, _ = pad_box((89.6, 0.0, -89.6, 10.0), 1.0, 1.0)
+
+        assert (north, south) == (90.0, -90.0)
+
+    def test_box_across_the_180_line_keeps_east_beyond_180(self) -> None:
+        assert pad_box((-10.0, 175.0, -22.0, 190.0), 0.0, 1.5) == pytest.approx((-10.0, 173.5, -22.0, 191.5))
+
+    def test_padding_over_the_180_line_moves_west_into_range(self) -> None:
+        north, west, south, east = pad_box((10.0, -179.0, 0.0, -170.0), 0.0, 2.0)
+
+        assert (north, south) == (10.0, 0.0)
+        assert west == pytest.approx(179.0)
+        assert east == pytest.approx(360.0 - 168.0)
+
+    def test_box_given_with_west_greater_than_east(self) -> None:
+        assert pad_box((10.0, 170.0, -10.0, -170.0), 0.0, 1.0) == pytest.approx((10.0, 169.0, -10.0, 191.0))
+
+    def test_west_is_in_the_half_open_range_from_minus_180(self) -> None:
+        for box in [(1.0, 0.0, 0.0, 10.0), (1.0, 190.0, 0.0, 200.0), (1.0, -180.0, 0.0, -170.0), (1.0, 350.0, 0.0, 359.0)]:
+            _, west, _, east = pad_box(box, 0.0, 3.0)
+            assert -180.0 <= west < 180.0
+            assert east >= west
+
+    def test_padded_width_of_the_whole_circle_gives_minus_180_to_180(self) -> None:
+        assert pad_box((50.0, -170.0, 40.0, 170.0), 0.5, 10.0) == (50.5, -180.0, 39.5, 180.0)
+
+    def test_padded_width_beyond_the_circle_gives_minus_180_to_180(self) -> None:
+        assert pad_box((50.0, -170.0, 40.0, 170.0), 0.0, 30.0) == (50.0, -180.0, 40.0, 180.0)
+
+    def test_full_circle_box_stays_full(self) -> None:
+        assert pad_box((50.0, -180.0, 40.0, 180.0), 0.0, 1.0) == (50.0, -180.0, 40.0, 180.0)
+
+    def test_negative_padding_is_rejected(self) -> None:
+        with pytest.raises(ValueError, match="negative"):
+            pad_box(GERMANY, -1.0, 0.0)
 
 
 class TestBoxFromPreset:
