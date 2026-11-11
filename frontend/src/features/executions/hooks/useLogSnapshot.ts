@@ -27,6 +27,8 @@ export type LogCall = <T extends LogWorkerRequest>(
 interface LogWorkerClient {
   call: LogCall
   terminate: () => void
+  /** Rejects every call once set. */
+  readonly failed: boolean
 }
 
 function createWorkerClient(): LogWorkerClient {
@@ -40,6 +42,7 @@ function createWorkerClient(): LogWorkerClient {
             .value as LogWorkerResults[(typeof request)['type']],
         ),
       terminate: () => {},
+      failed: false,
     }
   }
   const worker = new Worker(
@@ -51,6 +54,7 @@ function createWorkerClient(): LogWorkerClient {
     { resolve: (value: unknown) => void; reject: (error: Error) => void }
   >()
   let nextId = 0
+  let failure: Error | null = null
   worker.onmessage = (event: MessageEvent<LogWorkerReply>) => {
     const reply = event.data
     const waiter = pending.get(reply.id)
@@ -59,15 +63,23 @@ function createWorkerClient(): LogWorkerClient {
     if (reply.ok) waiter.resolve(reply.value)
     else waiter.reject(new Error(reply.error))
   }
+  // E.g. its script failed to load: it answers nothing more.
   worker.onerror = (event) => {
-    for (const waiter of pending.values()) {
-      waiter.reject(new Error(event.message || 'Log worker failed'))
-    }
+    failure = new Error(event.message || 'Log worker failed')
+    worker.terminate()
+    for (const waiter of pending.values()) waiter.reject(failure)
     pending.clear()
   }
   return {
+    get failed() {
+      return failure !== null
+    },
     call: (request) =>
       new Promise((resolve, reject) => {
+        if (failure) {
+          reject(failure)
+          return
+        }
         const id = nextId++
         pending.set(id, {
           resolve: resolve as (value: unknown) => void,
@@ -112,6 +124,8 @@ export function useLogSnapshot(runId: string) {
   )
 
   const call = useCallback<LogCall>((request) => {
+    // A failed worker is replaced, e.g. on Retry.
+    if (clientRef.current?.failed) clientRef.current = null
     clientRef.current ??= createWorkerClient()
     return clientRef.current.call(request)
   }, [])

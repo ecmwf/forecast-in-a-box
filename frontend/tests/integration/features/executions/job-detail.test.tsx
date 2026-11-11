@@ -1060,6 +1060,45 @@ describe('RunDetailPage Integration', () => {
       }
     })
 
+    it('starts a new log worker on Retry after one failed to start', async () => {
+      const RealWorker = Worker
+      let created = 0
+      // The first worker fails to load, as after an upgrade.
+      function FlakyWorker(url: URL, options?: WorkerOptions) {
+        created++
+        if (created > 1) return new RealWorker(url, options)
+        const broken = {
+          onmessage: null,
+          onerror: null as ((event: ErrorEvent) => void) | null,
+          postMessage: () =>
+            setTimeout(() =>
+              broken.onerror?.(
+                new ErrorEvent('error', { message: 'Worker script missing' }),
+              ),
+            ),
+          terminate: () => {},
+        }
+        return broken
+      }
+      vi.stubGlobal('Worker', FlakyWorker)
+      try {
+        const screen = await renderDetailPage('job-completed-001')
+        await screen.getByRole('tab', { name: 'Logs' }).click()
+        await screen.getByRole('button', { name: 'View here' }).click()
+        await expect
+          .element(screen.getByText('Worker script missing'))
+          .toBeVisible()
+
+        await screen.getByRole('button', { name: 'Retry' }).click()
+        await expect
+          .element(screen.getByText(/^Snapshot from .+ ago\.$/))
+          .toBeVisible()
+        expect(created).toBe(2)
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    })
+
     it('opens the run file with the most errors', async () => {
       const screen = await openLogs('job-completed-001')
 
