@@ -94,6 +94,13 @@ class DispatcherSettings(FiabBaseModel):
     queue_capacity: int = Field(default=1024, gt=0)
 
 
+class LensSettings(FiabBaseModel):
+    worker_max_requests: int = Field(default=10, ge=0)
+    """Requests a lens worker serves before gunicorn replaces it; 0 never replaces it."""
+    worker_max_requests_jitter: int = Field(default=3, ge=0)
+    """Upper bound of the random extra requests gunicorn adds to worker_max_requests per worker."""
+
+
 class DatabaseSettings(FiabBaseModel):
     sqlite_userdb_path: str = str(fiab_home / "user.db")
     """Location of the sqlite file for user auth+info"""
@@ -300,6 +307,7 @@ class BackendSettings(FiabBaseModel):
     entrypoint.main.launch_all module is used"""
     concurrency: ConcurrencySettings = Field(default_factory=ConcurrencySettings)
     dispatcher: DispatcherSettings = Field(default_factory=DispatcherSettings)
+    lens: LensSettings = Field(default_factory=LensSettings)
 
     def local_url(self) -> str:
         return f"http://localhost:{self.uvicorn_port}"

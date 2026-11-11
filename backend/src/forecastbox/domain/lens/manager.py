@@ -35,6 +35,7 @@ from forecastbox.entrypoint.bootstrap.config import BACKEND_LOG_DIRECTORY_ENV
 from forecastbox.utility.concurrency.ports import FreePortsManager, NoFreePortsException
 from forecastbox.utility.concurrency.shutdown import shutdown_popen
 from forecastbox.utility.concurrency.synchronization import timed_acquire
+from forecastbox.utility.config import config
 from forecastbox.utility.pydantic import FiabBaseModel
 from forecastbox.utility.time import default_tz_fallback
 
@@ -47,9 +48,6 @@ LensStatus = Literal["starting", "running", "terminated", "failed"]
 timeout_acquire = 1
 # gunicorn worker timeout, seconds, as the proxy's read timeout
 timeout_lens_worker = 120
-# Requests before gunicorn swaps the worker; Magics leaks each rendered image
-lens_worker_max_requests = 10
-lens_worker_max_requests_jitter = 3
 # Indexes the data folder at import, once in the preloading master
 lens_wsgi_app = "forecastbox.domain.lens.skinnywms_app:application"
 
@@ -153,10 +151,11 @@ def start_skinny_wms(local_path: str) -> LensInstanceId:
             str(timeout_lens_worker),
             # Replacement workers fork from the indexed master: no rescan
             "--preload",
+            # Replacing the worker frees the memory Magics leaks per rendered image
             "--max-requests",
-            str(lens_worker_max_requests),
+            str(config.backend.lens.worker_max_requests),
             "--max-requests-jitter",
-            str(lens_worker_max_requests_jitter),
+            str(config.backend.lens.worker_max_requests_jitter),
             lens_wsgi_app,
         ]
         env = {

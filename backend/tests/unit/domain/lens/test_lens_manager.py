@@ -33,6 +33,7 @@ from forecastbox.domain.lens.manager import (
 )
 from forecastbox.entrypoint.bootstrap.config import BACKEND_LOG_DIRECTORY_ENV
 from forecastbox.utility.concurrency.ports import FreePortsManager, NoFreePortsException
+from forecastbox.utility.config import LensSettings, config
 
 
 @pytest.fixture(autouse=True)
@@ -263,9 +264,18 @@ class TestStartSkinnyWms:
         # The master indexes the data folder once; workers fork from it
         assert "--preload" in cmd
         assert cmd[-1] == "forecastbox.domain.lens.skinnywms_app:application"
-        # Magics leaks every rendered image: the worker must not live forever
+        # Magics leaks every rendered image: by default the worker must not live forever
         assert 0 < int(cmd[cmd.index("--max-requests") + 1]) <= 50
         assert int(cmd[cmd.index("--max-requests-jitter") + 1]) > 0
+
+    def test_recycles_the_worker_as_configured(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv(BACKEND_LOG_DIRECTORY_ENV, str(tmp_path))
+        monkeypatch.setattr(config.backend, "lens", LensSettings(worker_max_requests=0, worker_max_requests_jitter=0))
+        with patch("forecastbox.domain.lens.manager.subprocess.Popen") as mock_popen:
+            start_skinny_wms("/data/run")
+        cmd = mock_popen.call_args.args[0]
+        assert cmd[cmd.index("--max-requests") + 1] == "0"
+        assert cmd[cmd.index("--max-requests-jitter") + 1] == "0"
 
     @pytest.mark.parametrize(("platform", "expected"), [("darwin", "YES"), ("linux", None)])
     def test_lifts_the_macos_fork_check_for_preloaded_workers(
