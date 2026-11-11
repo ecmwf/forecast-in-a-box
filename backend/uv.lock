@@ -1224,6 +1224,18 @@ wheels = [
 ]
 
 [[package]]
+name = "ecmwf-opendata"
+version = "0.3.35"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "multiurl" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/5b/0b/6325a31d6538283549affe7b39d45e1ddfdd3359aa3e5e8713081cf6ea8d/ecmwf_opendata-0.3.35.tar.gz", hash = "sha256:690439816a455745aa107e7dd207eee4a2eb01d6f88bb0be11917286dedbe449", size = 37372, upload-time = "2026-10-16T10:19:46.622Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7b/44/09d6faa835f595c5b15f57a63296173cff12f853ed2a01f5f7dbc461bff9/ecmwf_opendata-0.3.35-py3-none-any.whl", hash = "sha256:8bf1505db3dd4d98e007c4206bd76aa40c32aa2ac72b4a9af739335c9aa5342b", size = 26453, upload-time = "2026-10-16T10:19:45.546Z" },
+]
+
+[[package]]
 name = "ecmwflibs"
 version = "0.7.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1420,6 +1432,7 @@ runtime = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "ecmwf-opendata" },
     { name = "pymetkit" },
     { name = "pytest-lazy-fixtures" },
     { name = "ty" },
@@ -1440,6 +1453,7 @@ provides-extras = ["runtime"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "ecmwf-opendata" },
     { name = "pymetkit" },
     { name = "pytest-lazy-fixtures" },
     { name = "ty", specifier = "==0.0.2" },
