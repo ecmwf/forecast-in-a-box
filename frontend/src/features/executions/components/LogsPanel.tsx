@@ -9,7 +9,6 @@
  */
 
 import {
-  Fragment,
   useDeferredValue,
   useEffect,
   useLayoutEffect,
@@ -28,12 +27,22 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { ReactElement } from 'react'
+import type { TFunction } from 'i18next'
 import type { JobStatus } from '@/api/types/job.types'
 import type {
+  LogViewRow,
+  LogViewportHandle,
+} from '@/features/executions/components/LogViewport'
+import type {
+  FileContent,
+  LogFileMeta,
+  ViewResult,
+} from '@/features/executions/utils/log-snapshot'
+import type {
+  EntryCounts,
   LogFileGroup,
   LogLevel,
-  LogLine,
-  ParsedLogFile,
+  RunWindow,
 } from '@/features/executions/utils/run-logs'
 import { isTerminalStatus } from '@/api/types/job.types'
 import { formatBytes } from '@/api/types/artifacts.types'
@@ -44,11 +53,8 @@ import { Checkbox } from '@/components/ui/checkbox'
 import {
   CodeBlock,
   CodeBlockActions,
-  CodeBlockContent,
   CodeBlockCopyButton,
-  CodeBlockFooter,
   CodeBlockHeader,
-  CodeBlockLine,
   CodeBlockTitle,
 } from '@/components/ui/code-block'
 import { Input } from '@/components/ui/input'
@@ -68,16 +74,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useRunLogArchive } from '@/features/executions/hooks/useRunLogArchive'
+import { LogViewport } from '@/features/executions/components/LogViewport'
+import { useLogSnapshot } from '@/features/executions/hooks/useLogSnapshot'
 import {
-  countEntries,
   defaultLogFile,
   formatLogTime,
-  inWindow,
-  locateFailure,
+  indexOfLine,
+  lineLevel,
+  lineText,
   logFileGroup,
-  meetsLevel,
-  parseLogFile,
   runWindow,
   serverClockOffset,
 } from '@/features/executions/utils/run-logs'
@@ -97,28 +102,17 @@ interface LogsPanelProps {
   /** Bounds of the "During run" filter. */
   createdAt: string
   updatedAt: string
-  /** Opens this failure once fresh logs arrive. */
+  /** Takes a fresh snapshot and opens this failure. */
   focus?: LogFocus | null
 }
 
-/** Lines rendered before "Show all". */
-const RENDER_LIMIT = 2000
 /** Lines per file in "All files". */
 const SECTION_LIMIT = 200
-/** Slack for "scrolled to the end". */
-const FOLLOW_SLACK_PX = 24
 
 const ALL_LEVELS = 'all'
 type LevelFilter = LogLevel | typeof ALL_LEVELS
 
 const ALL_FILES = 'all-files'
-
-const LEVEL_CLASS: Record<LogLevel, string> = {
-  debug: 'text-muted-foreground',
-  info: '',
-  warning: 'text-amber-700 dark:text-amber-400',
-  error: 'text-destructive',
-}
 
 const GROUPS: Array<LogFileGroup> = ['run', 'server', 'details']
 
@@ -127,9 +121,17 @@ interface JumpTarget {
   line: number
 }
 
-interface Section {
-  parsed: ParsedLogFile
-  matches: Array<LogLine>
+/** Where to scroll once the next view arrives. */
+type PendingScroll = 'top' | 'end' | JumpTarget | null
+
+/** The view on screen; it lags the controls by one worker reply. */
+interface Pane {
+  snapshotAt: number
+  file: string | null
+  /** The filter text the result was made for. */
+  query: string
+  result: ViewResult
+  content: FileContent | null
 }
 
 export function LogsPanel({
@@ -140,170 +142,199 @@ export function LogsPanel({
   focus,
 }: LogsPanelProps) {
   const { t } = useTranslation('executions')
-  const archive = useRunLogArchive(jobId)
+  const logs = useLogSnapshot(jobId)
+  const { snapshot, call, load: loadSnapshot } = logs
   const [selected, setSelected] = useState<string | null>(null)
   const [level, setLevel] = useState<LevelFilter>(ALL_LEVELS)
   const [filter, setFilter] = useState('')
   const [wrap, setWrap] = useState(true)
-  const [showAll, setShowAll] = useState(false)
   const [jumpTo, setJumpTo] = useState<JumpTarget | null>(null)
   const [duringRun, setDuringRun] = useState(true)
-  const contentRef = useRef<HTMLPreElement>(null)
-  const followRef = useRef(true)
+  const [pane, setPane] = useState<Pane | null>(null)
+  const paneRef = useRef<Pane | null>(null)
+  const viewportRef = useRef<LogViewportHandle>(null)
+  const pendingScrollRef = useRef<PendingScroll>('end')
 
-  const parsed = useMemo(
-    () => (archive.data?.files ?? []).map(parseLogFile),
-    [archive.data],
-  )
+  const files = useMemo(() => snapshot?.files ?? [], [snapshot])
   const allFiles = selected === ALL_FILES
   const current = allFiles
     ? undefined
-    : (parsed.find((p) => p.file.name === selected) ?? defaultLogFile(parsed))
+    : (files.find((f) => f.name === selected) ?? defaultLogFile(files))
+  const viewFile = allFiles ? null : (current?.name ?? null)
 
   const isRunning = !isTerminalStatus(status)
-  const fetchedAt = archive.data?.fetchedAt
-  const span = useMemo(() => {
-    const offset =
-      fetchedAt === undefined ? null : serverClockOffset(parsed, fetchedAt)
+  const span = useMemo<RunWindow | null>(() => {
+    if (!snapshot) return null
+    const offset = serverClockOffset(snapshot.files, snapshot.fetchedAt)
     return offset === null
       ? null
       : runWindow(createdAt, isRunning ? null : updatedAt, offset)
-  }, [parsed, fetchedAt, createdAt, updatedAt, isRunning])
-
+  }, [snapshot, createdAt, updatedAt, isRunning])
   // "During run": server-wide lines within the run's time.
   const scope = duringRun ? span : null
-  const scopedByFile = useMemo(
-    () =>
-      new Map(
-        parsed.map((p) => {
-          if (!scope || p.file.group !== 'server') {
-            return [p.file.name, { lines: p.lines, counts: p.counts }]
-          }
-          const lines = p.lines.filter((line) => inWindow(line, scope))
-          return [p.file.name, { lines, counts: countEntries(lines) }]
-        }),
-      ),
-    [parsed, scope],
-  )
-  const linesOf = (p: ParsedLogFile) =>
-    scopedByFile.get(p.file.name)?.lines ?? p.lines
-  const countsOf = (p: ParsedLogFile) =>
-    scopedByFile.get(p.file.name)?.counts ?? p.counts
-
   const query = useDeferredValue(filter.trim().toLowerCase())
   const minLevel = level === ALL_LEVELS ? null : level
-  const matchesByFile = useMemo(() => {
-    const keep = (line: LogLine) =>
-      meetsLevel(line, minLevel) &&
-      (!query || line.text.toLowerCase().includes(query))
-    return new Map(
-      parsed.map((p) => [
-        p.file.name,
-        (scopedByFile.get(p.file.name)?.lines ?? p.lines).filter(keep),
-      ]),
-    )
-  }, [parsed, scopedByFile, minLevel, query])
-  const matchesOf = (p: ParsedLogFile) => matchesByFile.get(p.file.name) ?? []
-  const scopesCurrent =
-    scope !== null && (allFiles || current?.file.group === 'server')
 
-  // "All files" skips the run-detail JSON.
-  const logFiles = parsed.filter((p) => p.file.group !== 'details')
-  const sections: Array<Section> = allFiles
-    ? logFiles
-        .map((p) => ({ parsed: p, matches: matchesOf(p) }))
-        .filter((section) => section.matches.length > 0)
-    : []
-
-  const visible = current ? matchesOf(current) : []
-  const capped = !showAll && visible.length > RENDER_LIMIT
-  const rendered = capped ? visible.slice(-RENDER_LIMIT) : visible
-  const firstError = visible.find((line) => line.level === 'error')
-  const firstErrorSection = sections.find((s) =>
-    s.matches.some((line) => line.level === 'error'),
-  )
-  const sectionLines = sections.reduce((n, s) => n + s.matches.length, 0)
-
-  // New file or filter: tail; "All files": top.
-  const view = allFiles ? ALL_FILES : current?.file.name
-  useLayoutEffect(() => {
-    const el = contentRef.current
-    if (el) el.scrollTop = allFiles ? 0 : el.scrollHeight
-  }, [view, allFiles, level, query])
-
-  // A refresh follows the tail if the view was at the end.
-  useLayoutEffect(() => {
-    const el = contentRef.current
-    if (el && followRef.current) el.scrollTop = el.scrollHeight
-  }, [archive.data])
-
-  // Runs after the tail effect; scrolls the box, not the page.
   useEffect(() => {
-    const el = contentRef.current
-    if (jumpTo === null || !el) return
-    const target = el.querySelector<HTMLElement>(`[data-line="${jumpTo.line}"]`)
-    if (!target) return
-    const top =
-      target.getBoundingClientRect().top -
-      el.getBoundingClientRect().top +
-      el.scrollTop
-    el.scrollTop = top - (el.clientHeight - target.offsetHeight) / 2
-  }, [jumpTo])
+    paneRef.current = pane
+  }, [pane])
 
-  const resetView = () => {
-    setShowAll(false)
-    setJumpTo(null)
-  }
+  // Asks the worker for the view; the file's lines only when it changes.
+  useEffect(() => {
+    if (!snapshot || (!allFiles && viewFile === null)) return
+    const before = paneRef.current
+    const sameFile =
+      before?.snapshotAt === snapshot.fetchedAt && before.file === viewFile
+    const reuse = sameFile ? before.content : null
+    let cancelled = false
+    void call({
+      type: 'view',
+      request: {
+        file: viewFile,
+        query,
+        minLevel,
+        window: scope,
+        content: viewFile !== null && reuse === null,
+        sectionLimit: SECTION_LIMIT,
+      },
+    }).then((result) => {
+      if (cancelled) return
+      setPane({
+        snapshotAt: snapshot.fetchedAt,
+        file: viewFile,
+        query,
+        result,
+        content: result.content ?? reuse,
+      })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [snapshot, allFiles, viewFile, query, minLevel, scope, call])
+
+  const shownFile =
+    pane && pane.file !== null
+      ? files.find((f) => f.name === pane.file)
+      : undefined
+  const rows = useMemo(
+    () => buildRows(pane, shownFile, jumpTo, files, t),
+    [pane, shownFile, jumpTo, files, t],
+  )
+
+  // Applies the pending scroll once its view is on screen.
+  useLayoutEffect(() => {
+    const viewport = viewportRef.current
+    const pending = pendingScrollRef.current
+    if (!pane || !viewport || pending === null) return
+    if (pending === 'top' || pending === 'end') {
+      if (pending === 'top') viewport.scrollToRow(0, 'start')
+      else viewport.scrollToRow(rows.count - 1, 'end')
+      pendingScrollRef.current = null
+      return
+    }
+    if (pane.file !== pending.file) return
+    const index = rows.indexOfLine(pending.line)
+    if (index !== -1) {
+      viewport.scrollToRow(index, 'center')
+      pendingScrollRef.current = null
+    } else if (duringRun && shownFile?.group === 'server') {
+      // Outside the run's time: show the whole file.
+      setDuringRun(false)
+    } else pendingScrollRef.current = null
+  }, [pane, rows, duringRun, shownFile])
+
   const openFile = (name: string) => {
     setSelected(name)
-    resetView()
+    setJumpTo(null)
+    pendingScrollRef.current = name === ALL_FILES ? 'top' : 'end'
   }
   // Opens the line in its file, filters cleared.
   const openAt = (name: string, line: number) => {
-    const target = parsed.find((p) => p.file.name === name)
-    const scoped = target ? linesOf(target) : []
-    const inScope = scoped.some((l) => l.number === line)
-    const shown = inScope ? scoped : (target?.lines ?? [])
-    const index = shown.findIndex((l) => l.number === line)
-    if (!inScope) setDuringRun(false)
     setSelected(name)
     setFilter('')
     setLevel(ALL_LEVELS)
-    setShowAll(index >= 0 && index < shown.length - RENDER_LIMIT)
     setJumpTo({ file: name, line })
+    pendingScrollRef.current = { file: name, line }
+  }
+  const resetScroll = () => {
+    setJumpTo(null)
+    pendingScrollRef.current = allFiles ? 'top' : 'end'
   }
 
-  // Applied once, when logs newer than the request arrive.
-  const [appliedFocus, setAppliedFocus] = useState<number | null>(null)
-  if (
-    focus &&
-    appliedFocus !== focus.at &&
-    !archive.isFetching &&
-    archive.dataUpdatedAt >= focus.at
-  ) {
-    setAppliedFocus(focus.at)
-    const target = locateFailure(parsed, focus.message)
-    if (target?.line !== undefined) openAt(target.file, target.line)
-    else if (target) openFile(target.file)
+  const refresh = () => {
+    // A refresh follows the tail if the view was at the end.
+    if (viewportRef.current && !viewportRef.current.isAtEnd()) {
+      pendingScrollRef.current = null
+    } else if (!jumpTo) pendingScrollRef.current = allFiles ? 'top' : 'end'
+    void loadSnapshot()
   }
 
-  const skipped = archive.data?.skipped ?? []
-  const hasRunFiles =
-    parsed.some((p) => p.file.group === 'run') ||
-    skipped.some((f) => logFileGroup(f.name) === 'run')
-  const collectError = parsed.find(
-    (p) => p.file.name === 'logs_directory.error.txt',
-  )
+  // Loads on first show; a focus request loads its own.
+  const startedRef = useRef(false)
+  useEffect(() => {
+    if (startedRef.current || focus) return
+    startedRef.current = true
+    void loadSnapshot()
+  }, [focus, loadSnapshot])
+
+  // Each request: a fresh snapshot, then the failure.
+  const appliedFocusRef = useRef<number | null>(null)
+  useEffect(() => {
+    if (!focus || appliedFocusRef.current === focus.at) return
+    appliedFocusRef.current = focus.at
+    void loadSnapshot().then(async (fresh) => {
+      if (!fresh) return
+      const target = await call({ type: 'locate', message: focus.message })
+      if (!target) return
+      setSelected(target.file)
+      if (target.line === undefined) {
+        setJumpTo(null)
+        pendingScrollRef.current = 'end'
+        return
+      }
+      setFilter('')
+      setLevel(ALL_LEVELS)
+      setJumpTo({ file: target.file, line: target.line })
+      pendingScrollRef.current = { file: target.file, line: target.line }
+    })
+  }, [focus, loadSnapshot, call])
+
+  if (!snapshot) {
+    return logs.error ? (
+      <div className="flex flex-col items-center gap-3 rounded-lg border py-12 text-center">
+        <P className="font-medium">{t('logs.loadFailed')}</P>
+        <P className="text-sm text-muted-foreground">{logs.error.message}</P>
+        <Button variant="outline" onClick={() => void loadSnapshot()}>
+          {t('logs.retry')}
+        </Button>
+      </div>
+    ) : (
+      <div className="flex items-center justify-center gap-3 rounded-lg border py-12 text-sm text-muted-foreground">
+        <LoadingSpinner size="sm" />
+        {t('logs.loading')}
+      </div>
+    )
+  }
+
+  const perFile = pane?.result.perFile
+  const countsOf = (f: LogFileMeta): EntryCounts =>
+    perFile?.[f.name]?.counts ?? f.counts
+  const matchesOf = (f: LogFileMeta) => perFile?.[f.name]?.matches ?? 0
+  const logFiles = files.filter((f) => f.group !== 'details')
   const totals = logFiles.reduce(
-    (sum, p) => ({
-      warning: sum.warning + countsOf(p).warning,
-      error: sum.error + countsOf(p).error,
+    (sum, f) => ({
+      warning: sum.warning + countsOf(f).warning,
+      error: sum.error + countsOf(f).error,
     }),
     { warning: 0, error: 0 },
   )
+  const tooLarge = [...snapshot.skipped, ...snapshot.unread]
+  const hasRunFiles =
+    files.some((f) => f.group === 'run') ||
+    tooLarge.some((f) => logFileGroup(f.name) === 'run')
 
   const scopeEnabled =
-    span !== null && (allFiles || current?.file.group === 'server')
+    span !== null && (allFiles || current?.group === 'server')
   const scopeHint =
     span === null
       ? t('logs.duringRunNoTimes')
@@ -315,10 +346,13 @@ export function LogsPanel({
               from: formatLogTime(span.from),
               to: formatLogTime(span.to),
             })
+  const scopesShown =
+    scope !== null && (pane?.file === null || shownFile?.group === 'server')
+  const shownScoped = shownFile ? perFile?.[shownFile.name]?.scoped : undefined
 
   const fileItems = [
     { value: ALL_FILES, label: t('logs.allFiles') },
-    ...parsed.map((p) => ({ value: p.file.name, label: p.file.label })),
+    ...files.map((f) => ({ value: f.name, label: f.label })),
   ]
   const levelItems: Array<{ value: LevelFilter; label: string }> = [
     { value: ALL_LEVELS, label: t('logs.levelAll') },
@@ -326,25 +360,19 @@ export function LogsPanel({
     { value: 'warning', label: t('logs.levelWarning') },
     { value: 'error', label: t('logs.levelError') },
   ]
-  const copyValue = allFiles
-    ? sections
-        .flatMap((s) =>
-          s.matches.map(
-            (line) => `${s.parsed.file.label}:${line.number}:${line.text}`,
-          ),
-        )
-        .join('\n')
-    : visible.map((line) => line.text).join('\n')
+  const sections = pane?.result.sections ?? []
+  const sectionLines = sections.reduce((n, s) => n + s.matches, 0)
+  const firstError = pane?.result.firstError
 
   return (
     <TooltipProvider delay={120}>
       <div className="flex flex-col gap-3 min-[1280px]:h-full">
         <div className="flex flex-wrap items-center gap-2">
           <Select
-            value={allFiles ? ALL_FILES : (current?.file.name ?? null)}
+            value={allFiles ? ALL_FILES : (current?.name ?? null)}
             onValueChange={(name) => openFile(name ?? ALL_FILES)}
             items={fileItems}
-            disabled={parsed.length === 0}
+            disabled={files.length === 0}
           >
             <SelectTrigger className="min-w-56" aria-label={t('logs.file')}>
               <SelectValue placeholder={t('logs.file')} />
@@ -354,10 +382,7 @@ export function LogsPanel({
                 <span className="truncate">{t('logs.allFiles')}</span>
                 {query ? (
                   <MatchCount
-                    count={logFiles.reduce(
-                      (n, p) => n + matchesOf(p).length,
-                      0,
-                    )}
+                    count={logFiles.reduce((n, f) => n + matchesOf(f), 0)}
                   />
                 ) : (
                   <FileCounts counts={totals} />
@@ -365,31 +390,30 @@ export function LogsPanel({
               </SelectItem>
               <SelectSeparator />
               {GROUPS.map((group) => {
-                const inGroup = parsed.filter((p) => p.file.group === group)
+                const inGroup = files.filter((f) => f.group === group)
                 if (inGroup.length === 0) return null
                 return (
                   <SelectGroup key={group}>
                     <SelectLabel>{t(`logs.group.${group}`)}</SelectLabel>
-                    {inGroup.map((p) => {
-                      const matches = matchesOf(p).length
-                      return (
-                        <SelectItem key={p.file.name} value={p.file.name}>
-                          <span
-                            className={cn(
-                              'truncate',
-                              query && matches === 0 && 'text-muted-foreground',
-                            )}
-                          >
-                            {p.file.label}
-                          </span>
-                          {query ? (
-                            <MatchCount count={matches} />
-                          ) : (
-                            <FileCounts counts={countsOf(p)} />
+                    {inGroup.map((f) => (
+                      <SelectItem key={f.name} value={f.name}>
+                        <span
+                          className={cn(
+                            'truncate',
+                            query &&
+                              matchesOf(f) === 0 &&
+                              'text-muted-foreground',
                           )}
-                        </SelectItem>
-                      )
-                    })}
+                        >
+                          {f.label}
+                        </span>
+                        {query ? (
+                          <MatchCount count={matchesOf(f)} />
+                        ) : (
+                          <FileCounts counts={countsOf(f)} />
+                        )}
+                      </SelectItem>
+                    ))}
                   </SelectGroup>
                 )
               })}
@@ -399,7 +423,7 @@ export function LogsPanel({
             value={level}
             onValueChange={(value) => {
               setLevel(value ?? ALL_LEVELS)
-              resetView()
+              resetScroll()
             }}
             items={levelItems}
           >
@@ -428,7 +452,7 @@ export function LogsPanel({
                 disabled={!scopeEnabled}
                 onCheckedChange={(checked) => {
                   setDuringRun(checked)
-                  resetView()
+                  resetScroll()
                 }}
                 // Neutral tick: no primary fill.
                 className="data-checked:border-input data-checked:bg-transparent data-checked:text-foreground dark:data-checked:bg-input/30"
@@ -443,7 +467,7 @@ export function LogsPanel({
               value={filter}
               onChange={(e) => {
                 setFilter(e.target.value)
-                resetView()
+                resetScroll()
               }}
               className="pl-8"
             />
@@ -453,11 +477,11 @@ export function LogsPanel({
               variant="outline"
               size="icon"
               aria-label={t('logs.refresh')}
-              onClick={() => void archive.refetch()}
-              disabled={archive.isFetching}
+              onClick={refresh}
+              disabled={logs.isLoading}
             >
               <RefreshCw
-                className={cn('h-4 w-4', archive.isFetching && 'animate-spin')}
+                className={cn('h-4 w-4', logs.isLoading && 'animate-spin')}
               />
             </Button>
           </IconTip>
@@ -466,59 +490,44 @@ export function LogsPanel({
               variant="outline"
               size="icon"
               aria-label={t('actions.downloadLogs')}
-              disabled={!archive.data}
-              onClick={() =>
-                archive.data &&
-                downloadBlob(archive.data.blob, `logs-${jobId}.zip`)
-              }
+              onClick={() => downloadBlob(snapshot.blob, `logs-${jobId}.zip`)}
             >
               <Download className="h-4 w-4" />
             </Button>
           </IconTip>
         </div>
 
-        {isRunning && archive.data && (
+        {isRunning && (
           <P className="text-sm text-muted-foreground">
             {t('logs.fetchedAt', {
-              time: new Date(archive.data.fetchedAt).toLocaleTimeString(),
+              time: new Date(snapshot.fetchedAt).toLocaleTimeString(),
             })}
           </P>
         )}
-        {collectError ? (
+        {snapshot.collectError !== null ? (
           <Notice>
-            {t('logs.collectError', { detail: collectError.text })}
+            {t('logs.collectError', { detail: snapshot.collectError })}
           </Notice>
         ) : (
-          archive.data &&
-          parsed.length > 0 &&
+          files.length > 0 &&
           !hasRunFiles && <Notice>{t('logs.noRunFiles')}</Notice>
         )}
-        {skipped.length > 0 && (
+        {tooLarge.length > 0 && (
           <Notice>
             {t('logs.skippedLarge', {
-              files: skipped
+              files: tooLarge
                 .map((f) => `${f.label} (${formatBytes(f.bytes)})`)
                 .join(', '),
             })}
           </Notice>
         )}
+        {logs.error && (
+          <Notice>
+            {t('logs.refreshFailed', { detail: logs.error.message })}
+          </Notice>
+        )}
 
-        {archive.isPending ? (
-          <div className="flex items-center justify-center gap-3 rounded-lg border py-12 text-sm text-muted-foreground">
-            <LoadingSpinner size="sm" />
-            {t('logs.loading')}
-          </div>
-        ) : archive.isError ? (
-          <div className="flex flex-col items-center gap-3 rounded-lg border py-12 text-center">
-            <P className="font-medium">{t('logs.loadFailed')}</P>
-            <P className="text-sm text-muted-foreground">
-              {archive.error.message}
-            </P>
-            <Button variant="outline" onClick={() => void archive.refetch()}>
-              {t('logs.retry')}
-            </Button>
-          </div>
-        ) : parsed.length === 0 || (!allFiles && !current) ? (
+        {files.length === 0 || (!allFiles && !current) ? (
           <div className="rounded-lg border py-12 text-center text-sm text-muted-foreground">
             {t('logs.noFiles')}
           </div>
@@ -526,50 +535,43 @@ export function LogsPanel({
           <CodeBlock className="bg-card min-[1280px]:min-h-0 min-[1280px]:flex-1">
             <CodeBlockHeader>
               <CodeBlockTitle>
-                {allFiles ? <Files /> : <FileText />}
-                {allFiles ? t('logs.allFiles') : current?.file.label}
+                {pane?.file === null ? <Files /> : <FileText />}
+                {pane?.file === null
+                  ? t('logs.allFiles')
+                  : (shownFile?.label ?? current?.label)}
                 <span className="ms-2 font-normal text-muted-foreground">
-                  {allFiles
+                  {pane?.file === null
                     ? t('logs.allMeta', {
                         count: sectionLines,
                         lines: sectionLines.toLocaleString(),
                         files: t('logs.fileCount', { count: sections.length }),
                       })
-                    : current &&
-                      (scopesCurrent
-                        ? t('logs.fileMetaScoped', {
-                            size: formatBytes(current.file.bytes.length),
-                            shown: linesOf(current).length.toLocaleString(),
-                            lines: current.lines.length.toLocaleString(),
-                          })
-                        : t('logs.fileMeta', {
-                            size: formatBytes(current.file.bytes.length),
-                            count: current.lines.length,
-                            lines: current.lines.length.toLocaleString(),
-                          }))}
+                    : shownFile && (
+                        <FileMeta
+                          file={shownFile}
+                          scoped={scopesShown ? shownScoped : undefined}
+                        />
+                      )}
                 </span>
               </CodeBlockTitle>
               <CodeBlockActions>
-                {(allFiles ? firstErrorSection : firstError) && (
+                {firstError?.line !== undefined && (
                   <Button
                     variant="ghost"
                     size="xs"
                     onClick={() => {
-                      if (firstErrorSection) {
-                        const line = firstErrorSection.matches.find(
-                          (l) => l.level === 'error',
-                        )
-                        if (line)
-                          openAt(
-                            firstErrorSection.parsed.file.name,
-                            line.number,
-                          )
-                      } else if (current && firstError) {
-                        if (!rendered.includes(firstError)) setShowAll(true)
-                        setJumpTo({
-                          file: current.file.name,
-                          line: firstError.number,
-                        })
+                      if (firstError.line === undefined) return
+                      if (pane?.file === null) {
+                        openAt(firstError.file, firstError.line)
+                        return
+                      }
+                      setJumpTo({
+                        file: firstError.file,
+                        line: firstError.line,
+                      })
+                      pendingScrollRef.current = {
+                        file: firstError.file,
+                        line: firstError.line,
                       }
                     }}
                   >
@@ -595,140 +597,70 @@ export function LogsPanel({
                     size="icon-xs"
                     aria-label={t('logs.downloadFile')}
                     // Disabled, not hidden, so the actions don't shift.
-                    disabled={!current}
-                    onClick={() =>
-                      current &&
-                      downloadBlob(
-                        new Blob([current.file.bytes.slice()]),
-                        current.file.name,
-                      )
-                    }
+                    disabled={!shownFile}
+                    onClick={() => {
+                      if (!shownFile) return
+                      void call({ type: 'fileBytes', name: shownFile.name })
+                        .then((bytes) =>
+                          downloadBlob(new Blob([bytes]), shownFile.name),
+                        )
+                        .catch(() => showToast.error(t('logs.downloadFailed')))
+                    }}
                   >
                     <Download />
                   </Button>
                 </IconTip>
                 <CodeBlockCopyButton
-                  value={copyValue}
+                  value={() => rows.copyText()}
                   copyLabel={t('logs.copyLines')}
                   copiedLabel={t('logs.copied')}
                   onCopyError={() => showToast.error(t('logs.copyFailed'))}
                 />
               </CodeBlockActions>
             </CodeBlockHeader>
-            <CodeBlockContent
-              ref={contentRef}
-              wrap={wrap}
-              lineNumbers
-              onScroll={(e) => {
-                const el = e.currentTarget
-                followRef.current =
-                  el.scrollHeight - el.scrollTop - el.clientHeight <
-                  FOLLOW_SLACK_PX
-              }}
-              className="max-h-[60dvh] scroll-fade-y min-[1280px]:max-h-none min-[1280px]:flex-1"
-            >
-              {(allFiles ? sections.length : rendered.length) === 0 ? (
-                <CodeBlockLine className="text-muted-foreground">
-                  {current &&
-                  scopesCurrent &&
-                  linesOf(current).length === 0 &&
-                  current.lines.length > 0
-                    ? t('logs.noRunTimeLines')
-                    : t('logs.noMatches')}
-                </CodeBlockLine>
-              ) : allFiles ? (
-                sections.map(({ parsed: p, matches }) => (
-                  <Fragment key={p.file.name}>
-                    <span
-                      data-slot="log-section"
-                      className="col-span-2 -mx-4 mt-3 flex items-center gap-2 border-t px-4 pt-3 pb-1 font-sans text-xs select-none first:mt-0 first:border-t-0 first:pt-0"
-                    >
-                      <span className="font-medium text-foreground">
-                        {p.file.label}
-                      </span>
-                      <span className="text-muted-foreground">
-                        {matches.length > SECTION_LIMIT
-                          ? t('logs.sectionCapped', {
-                              shown: SECTION_LIMIT.toLocaleString(),
-                              total: matches.length.toLocaleString(),
-                            })
-                          : t('logs.lineCount', {
-                              count: matches.length,
-                              lines: matches.length.toLocaleString(),
-                            })}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        className="-my-1 ms-auto"
-                        aria-label={t('logs.openFile', { file: p.file.label })}
-                        onClick={() => openFile(p.file.name)}
-                      >
-                        {t('logs.open')}
-                      </Button>
-                    </span>
-                    {matches.slice(-SECTION_LIMIT).map((line) => (
-                      <CodeBlockLine
-                        key={line.number}
-                        data-file={p.file.name}
-                        data-line={line.number}
-                        style={{ counterSet: `line ${line.number}` }}
-                        className={cn(
-                          'cursor-pointer hover:bg-muted/60',
-                          line.level && LEVEL_CLASS[line.level],
-                        )}
-                        onClick={() => {
-                          // Ignore text selection.
-                          if (window.getSelection()?.toString()) return
-                          openAt(p.file.name, line.number)
-                        }}
-                      >
-                        {line.text}
-                      </CodeBlockLine>
-                    ))}
-                  </Fragment>
-                ))
-              ) : (
-                rendered.map((line) => (
-                  <CodeBlockLine
-                    key={line.number}
-                    data-line={line.number}
-                    variant={
-                      jumpTo?.file === current?.file.name &&
-                      jumpTo?.line === line.number
-                        ? 'highlighted'
-                        : 'default'
-                    }
-                    // Filtered lines keep their file line numbers.
-                    style={{ counterSet: `line ${line.number}` }}
-                    className={line.level ? LEVEL_CLASS[line.level] : undefined}
+            {pane === null ? (
+              <div className="flex items-center justify-center gap-3 py-12 text-sm text-muted-foreground">
+                <LoadingSpinner size="sm" />
+                {t('logs.loading')}
+              </div>
+            ) : rows.count === 0 ? (
+              <P className="px-4 py-4 font-mono text-muted-foreground">
+                {shownFile &&
+                scopesShown &&
+                shownScoped === 0 &&
+                shownFile.totalLines > 0
+                  ? t('logs.noRunTimeLines')
+                  : t('logs.noMatches')}
+              </P>
+            ) : (
+              <LogViewport
+                handleRef={viewportRef}
+                count={rows.count}
+                row={rows.row}
+                wrap={wrap}
+                numberDigits={rows.numberDigits}
+                hasSections={pane.file === null}
+                highlight={pane.query}
+                layoutKey={pane}
+                onLineClick={openAt}
+                sectionAction={(name, label) => (
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    className="-my-1 ms-auto"
+                    aria-label={t('logs.openFile', { file: label })}
+                    onClick={() => openFile(name)}
                   >
-                    {line.text}
-                  </CodeBlockLine>
-                ))
-              )}
-            </CodeBlockContent>
-            {allFiles && sections.length > 0 && (
-              <CodeBlockFooter className="justify-center">
-                <span className="text-xs">{t('logs.allHint')}</span>
-              </CodeBlockFooter>
+                    {t('logs.open')}
+                  </Button>
+                )}
+                className="max-h-[60dvh] min-[1280px]:max-h-none min-[1280px]:flex-1"
+              />
             )}
-            {capped && (
-              <CodeBlockFooter className="justify-center">
-                <span className="text-xs">
-                  {t('logs.showingLast', {
-                    shown: RENDER_LIMIT.toLocaleString(),
-                    total: visible.length.toLocaleString(),
-                  })}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  onClick={() => setShowAll(true)}
-                >
-                  {t('logs.showAll')}
-                </Button>
-              </CodeBlockFooter>
+            {pane?.file === null && sections.length > 0 && (
+              <div className="flex justify-center border-t px-4 py-2 text-xs text-muted-foreground">
+                {t('logs.allHint')}
+              </div>
             )}
           </CodeBlock>
         )}
@@ -737,7 +669,141 @@ export function LogsPanel({
   )
 }
 
-function FileCounts({ counts }: { counts: ParsedLogFile['counts'] }) {
+interface Rows {
+  count: number
+  row: (index: number) => LogViewRow
+  /** Row of a file line number, or -1. */
+  indexOfLine: (line: number) => number
+  numberDigits: number
+  copyText: () => string
+}
+
+const NO_ROWS: Rows = {
+  count: 0,
+  row: () => ({ kind: 'note', text: '' }),
+  indexOfLine: () => -1,
+  numberDigits: 1,
+  copyText: () => '',
+}
+
+/** The viewer's rows: one file with its notes, or every file's last matches. */
+function buildRows(
+  pane: Pane | null,
+  file: LogFileMeta | undefined,
+  jumpTo: JumpTarget | null,
+  files: ReadonlyArray<LogFileMeta>,
+  t: TFunction<'executions'>,
+): Rows {
+  if (!pane) return NO_ROWS
+
+  if (pane.file === null) {
+    const rows: Array<LogViewRow> = []
+    const lines: Array<string> = []
+    let digits = 1
+    for (const section of pane.result.sections ?? []) {
+      const meta = files.find((f) => f.name === section.name)
+      const label = meta?.label ?? section.name
+      digits = Math.max(digits, String(meta?.totalLines ?? 0).length)
+      rows.push({
+        kind: 'section',
+        file: section.name,
+        first: rows.length === 0,
+        label,
+        caption:
+          section.matches > section.rows.length
+            ? t('logs.sectionCapped', {
+                shown: section.rows.length.toLocaleString(),
+                total: section.matches.toLocaleString(),
+              })
+            : t('logs.lineCount', {
+                count: section.matches,
+                lines: section.matches.toLocaleString(),
+              }),
+      })
+      for (const line of section.rows) {
+        rows.push({ kind: 'line', ...line, file: section.name })
+        lines.push(`${label}:${line.number}:${line.text}`)
+      }
+    }
+    return {
+      count: rows.length,
+      row: (index) => rows[index],
+      indexOfLine: () => -1,
+      numberDigits: digits,
+      copyText: () => lines.join('\n'),
+    }
+  }
+
+  const content = pane.content
+  const indices = pane.result.indices
+  if (!content || !indices || !file) return NO_ROWS
+  // Older lines than the budget reads: a note at the top.
+  const cut = file.firstNumber > 1 ? 1 : 0
+  const lineAt = (position: number): LogViewRow => {
+    const i = indices[position]
+    const number = content.firstNumber + i
+    return {
+      kind: 'line',
+      number,
+      text: lineText(content, i),
+      level: lineLevel(content, i),
+      highlighted: jumpTo?.file === file.name && jumpTo.line === number,
+    }
+  }
+  return {
+    count: indices.length + cut,
+    row: (index) => {
+      if (cut && index === 0) {
+        return {
+          kind: 'note',
+          text: t('logs.olderLines', {
+            count: file.firstNumber - 1,
+            lines: (file.firstNumber - 1).toLocaleString(),
+          }),
+        }
+      }
+      return lineAt(index - cut)
+    },
+    indexOfLine: (line) => {
+      const position = indexOfLine(content, indices, line)
+      if (position === -1) return -1
+      return position + cut
+    },
+    numberDigits: String(file.totalLines).length,
+    copyText: () => Array.from(indices, (i) => lineText(content, i)).join('\n'),
+  }
+}
+
+function FileMeta({
+  file,
+  scoped,
+}: {
+  file: LogFileMeta
+  /** Lines within the run's time, when that applies. */
+  scoped: number | undefined
+}) {
+  const { t } = useTranslation('executions')
+  const size =
+    file.readBytes < file.bytes
+      ? t('logs.sizeTail', {
+          size: formatBytes(file.bytes),
+          read: formatBytes(file.readBytes),
+        })
+      : formatBytes(file.bytes)
+  return scoped === undefined
+    ? t('logs.fileMeta', {
+        size,
+        count: file.totalLines,
+        lines: file.totalLines.toLocaleString(),
+      })
+    : t('logs.fileMetaScoped', {
+        size,
+        shown: scoped.toLocaleString(),
+        lines: file.totalLines.toLocaleString(),
+      })
+}
+
+function FileCounts({ counts }: { counts: EntryCounts }) {
   const { t } = useTranslation('executions')
   if (counts.error > 0) {
     return (

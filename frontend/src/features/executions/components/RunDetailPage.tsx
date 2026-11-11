@@ -32,7 +32,6 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
-import { useQueryClient } from '@tanstack/react-query'
 import { RunCanvas } from './RunCanvas'
 import { CompilationForceGraph } from './CompilationForceGraph'
 import { CompilationPanel } from './CompilationPanel'
@@ -58,7 +57,6 @@ import { showToast } from '@/lib/toast'
 import { ApiClientError } from '@/api/client'
 import { useBlockCatalogue, useFableRetrieve } from '@/api/hooks/useFable'
 import {
-  jobKeys,
   useDeleteJob,
   useJobStatus,
   useRestartJob,
@@ -125,7 +123,6 @@ export function RunDetailPage() {
   const [activeTab, setActiveTab] = useState('outputs')
   const [logFocus, setLogFocus] = useState<LogFocus | null>(null)
   const tabsRef = useRef<HTMLDivElement>(null)
-  const queryClient = useQueryClient()
   const [metadataOpen, setMetadataOpen] = useState(false)
   const [toolbarSlot, setToolbarSlot] = useState<HTMLDivElement | null>(null)
   const handleToolbarRef = useCallback((node: HTMLDivElement | null) => {
@@ -235,10 +232,9 @@ export function RunDetailPage() {
     )
   }
 
-  // Refetch: the cached archive may predate the failure.
+  // The logs tab takes a fresh snapshot for it.
   const handleShowInLogs = (message: string) => {
     setLogFocus({ message, at: Date.now() })
-    void queryClient.invalidateQueries({ queryKey: jobKeys.logs(jobId) })
     setActiveTab('logs')
     const tabs = tabsRef.current
     if (tabs && tabs.getBoundingClientRect().top > window.innerHeight / 2) {
@@ -463,6 +459,7 @@ export function RunDetailPage() {
                 </TabsContent>
                 <TabsContent value="logs" className={WIDE_TAB_CONTENT}>
                   <LogsPanel
+                    key={jobId}
                     jobId={jobId}
                     status={jobData.status}
                     createdAt={jobData.created_at}

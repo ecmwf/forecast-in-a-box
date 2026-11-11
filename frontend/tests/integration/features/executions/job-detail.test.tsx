@@ -1021,6 +1021,9 @@ describe('RunDetailPage Integration', () => {
 
       const match = screen.getByText(/attempt 1 of 500/)
       await expect.element(match).toBeVisible()
+      const marks = () =>
+        [...document.querySelectorAll('mark')].map((m) => m.textContent)
+      expect(marks()).toEqual(['503'])
       expect(
         document.querySelectorAll('[data-slot="log-section"]'),
       ).toHaveLength(1)
@@ -1032,6 +1035,7 @@ describe('RunDetailPage Integration', () => {
       await expect
         .element(screen.getByPlaceholder('Filter lines...'))
         .toHaveValue('')
+      await expect.poll(marks).toEqual([])
       await expect
         .element(screen.getByText(/starting _get_initial_conditions/))
         .toBeVisible()

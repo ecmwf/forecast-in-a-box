@@ -403,8 +403,11 @@
     "copyLines": "Copy shown lines",
     "copied": "Copied",
     "copyFailed": "Couldn't copy the lines",
-    "showingLast": "Showing the last {{shown}} of {{total}} lines",
-    "showAll": "Show all"
+    "downloadFailed": "Couldn't download the logs",
+    "refreshFailed": "Couldn't refresh the logs: {{detail}}",
+    "olderLines_one": "{{lines}} older line is only in the download",
+    "olderLines_other": "{{lines}} older lines are only in the download",
+    "sizeTail": "{{size}}, last {{read}} read here"
   },
   "errors": {
     "executionFailed": "Run failed",
