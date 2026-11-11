@@ -61,7 +61,7 @@ const anonymousAuth: AuthContextValue = {
   signOut: () => Promise.resolve(),
 }
 
-function renderDetailPage(jobId: string, search = '') {
+async function renderDetailPage(jobId: string, search = '') {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false, gcTime: 0, staleTime: 0 },
@@ -98,13 +98,14 @@ function renderDetailPage(jobId: string, search = '') {
     }),
   })
 
-  return render(
+  const screen = await render(
     <QueryClientProvider client={queryClient}>
       <I18nextProvider i18n={i18n}>
         <RouterProvider router={router} />
       </I18nextProvider>
     </QueryClientProvider>,
   )
+  return Object.assign(screen, { router })
 }
 
 describe('RunDetailPage Integration', () => {
@@ -1027,6 +1028,32 @@ describe('RunDetailPage Integration', () => {
               ?.getAttribute('data-variant'),
           )
           .toBe('highlighted')
+        expect(counter.fetches).toBe(1)
+      } finally {
+        counter.stop()
+      }
+    })
+
+    it('keeps a Show in logs request to its own run', async () => {
+      const counter = countLogFetches()
+      try {
+        const screen = await renderDetailPage('job-errored-003')
+        await screen.getByRole('button', { name: 'Show in logs' }).click()
+        await expect
+          .element(screen.getByLabelText('Log file'))
+          .toMatchTextContent('host_0.worker_w0')
+
+        // Same page, another run: its Logs tab waits for View here.
+        await screen.router.navigate({
+          to: '/execute/$jobId',
+          params: { jobId: 'job-completed-001' },
+        })
+        await expect
+          .element(screen.getByText('job-completed-001'))
+          .toBeVisible()
+        await expect
+          .element(screen.getByRole('button', { name: 'View here' }))
+          .toBeVisible()
         expect(counter.fetches).toBe(1)
       } finally {
         counter.stop()

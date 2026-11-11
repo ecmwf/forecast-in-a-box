@@ -121,7 +121,10 @@ export function RunDetailPage() {
   const { jobId } = useParams({ from: '/_authenticated/execute/$jobId' })
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('outputs')
-  const [logFocus, setLogFocus] = useState<LogFocus | null>(null)
+  // The page outlives a switch to another run; the request names its run.
+  const [logFocus, setLogFocus] = useState<
+    (LogFocus & { jobId: string }) | null
+  >(null)
   const tabsRef = useRef<HTMLDivElement>(null)
   const [metadataOpen, setMetadataOpen] = useState(false)
   const [toolbarSlot, setToolbarSlot] = useState<HTMLDivElement | null>(null)
@@ -234,7 +237,7 @@ export function RunDetailPage() {
 
   // The logs tab takes a fresh snapshot for it.
   const handleShowInLogs = (message: string) => {
-    setLogFocus({ message, at: Date.now() })
+    setLogFocus({ jobId, message, at: Date.now() })
     setActiveTab('logs')
     const tabs = tabsRef.current
     if (tabs && tabs.getBoundingClientRect().top > window.innerHeight / 2) {
@@ -469,7 +472,7 @@ export function RunDetailPage() {
                     status={jobData.status}
                     createdAt={jobData.created_at}
                     updatedAt={jobData.updated_at}
-                    focus={logFocus}
+                    focus={logFocus?.jobId === jobId ? logFocus : null}
                   />
                 </TabsContent>
                 <TabsContent value="compilation" className={WIDE_TAB_CONTENT}>
