@@ -98,8 +98,9 @@ function CodeBlockCopyButton({
   copiedLabel = 'Copied',
   onCopyError,
   ...props
-}: React.ComponentProps<typeof Button> & {
-  value: string
+}: Omit<React.ComponentProps<typeof Button>, 'value'> & {
+  /** The text, or a function that builds it on click. */
+  value: string | (() => string)
   copyLabel?: string
   copiedLabel?: string
   /** Called when copying fails. */
@@ -134,7 +135,8 @@ function CodeBlockCopyButton({
               onClick={(event) => {
                 onClick?.(event)
                 // Works on plain HTTP too.
-                void copyToClipboard(value).then((ok) =>
+                const text = typeof value === 'function' ? value() : value
+                void copyToClipboard(text).then((ok) =>
                   ok ? setCopied(true) : onCopyError?.(),
                 )
               }}
