@@ -106,7 +106,7 @@ export const mockCatalogue: BlockFactoryCatalogue = {
           grid: {
             title: 'Grid',
             description:
-              "Regrid data to:\n- a resolution in degrees such as '0.25'\n- a west-east/south-north pair such as '0.25/0.5'\n- a Gaussian grid such as 'N320' or 'O96'\n- auto: no regridding",
+              "Regrid data to:\n- a resolution in degrees such as '0.25'\n- a west-east/south-north pair such as '0.25/0.5'\n- a Gaussian grid such as 'O96', 'N320' or 'F80'\n- auto: no regridding",
             value_type: serializeValueType(
               openEnum(
                 ['auto', '0.25', '0.5', '1', 'O96', 'O320', 'N320'],
