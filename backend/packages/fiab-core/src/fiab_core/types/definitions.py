@@ -416,11 +416,11 @@ GridValue = str | int | float | list[int | float]
 """A converted grid: a Gaussian grid name, a single resolution in degrees, or a [west_east, south_north] pair of resolutions."""
 
 
-MIN_GRID_RESOLUTION = 0.01
+MIN_GRID_RESOLUTION = 0.1
 """The finest lat/lon increment in degrees, inclusive."""
 
 MIN_GAUSSIAN_NUMBER = 1
-MAX_GAUSSIAN_NUMBER = 8000
+MAX_GAUSSIAN_NUMBER = 1280
 """The inclusive range of the number of a Gaussian grid name, such as 320 in 'N320'."""
 
 _GAUSSIAN_NAME = re.compile(r"([NnOo])([0-9]+)")
@@ -439,9 +439,9 @@ def _check_resolution(resolution: Any, value: Any) -> None:
 
 
 class GridType(FableType):
-    """Grid type. A union of a named Gaussian grid ('N320' or 'O96', in any case, with a number from 1 to 8000), a single resolution
+    """Grid type. A union of a named Gaussian grid ('N320' or 'O96', in any case, with a number from 1 to 1280), a single resolution
     in degrees, and a pair of resolutions in degrees written 'west_east/south_north', the order used by MARS and MIR. A resolution
-    is at least 0.01 degrees. The string 'auto' converts to None, and a Gaussian grid name converts to its upper case form."""
+    is at least 0.1 degrees. The string 'auto' converts to None, and a Gaussian grid name converts to its upper case form."""
 
     def _validate_gaussian_grid(self, value: str, match: re.Match[str]) -> str:
         digits = match.group(2)
