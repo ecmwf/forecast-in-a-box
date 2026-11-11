@@ -35,6 +35,7 @@ import {
 import {
   replaceBlockInstance,
   replacementCandidates,
+  sameBlockInstance,
 } from '@/features/fable-builder/utils/replace-block'
 import { Button } from '@/components/ui/button'
 import {
@@ -138,7 +139,14 @@ function useReplacements(
         : undefined,
       {
         label: t('header.undo'),
-        onClick: () => undoReplace(instanceId, block, instance, swapped),
+        onClick: () => {
+          if (!undoReplace(instanceId, block, instance, swapped)) {
+            showToast.info(
+              t('blockActions.undoStale'),
+              t('blockActions.undoStaleHint'),
+            )
+          }
+        },
       },
     )
   }
@@ -146,27 +154,29 @@ function useReplacements(
   return { candidates, replace }
 }
 
-/** Reverts a replace: a plain undo while nothing changed since, else puts the old block back. */
+/** Reverts a replace: a plain undo while nothing changed since, else the old block while the new one is untouched; false if neither. */
 function undoReplace(
   instanceId: BlockInstanceId,
   original: BlockInstance,
   replacement: BlockInstance,
   swapped: FableBuilderV1,
-): void {
+): boolean {
   const state = useFableBuilderStore.getState()
   if (state.fable === swapped) {
     state.undo()
-    return
+    return true
   }
-  // Only while the block is still the one swapped in.
-  const current = state.fable.blocks[instanceId] as BlockInstance | undefined
-  if (
-    current &&
-    factoryIdToKey(current.factory_id) ===
-      factoryIdToKey(replacement.factory_id)
-  ) {
-    state.replaceBlock(instanceId, original)
-  }
+  const { blocks } = state.fable
+  const current = blocks[instanceId] as BlockInstance | undefined
+  // The replacement is untouched and the old inputs still exist.
+  const restorable =
+    current !== undefined &&
+    sameBlockInstance(current, replacement) &&
+    Object.values(original.input_ids).every(
+      (parent) => parent === '' || Object.hasOwn(blocks, parent),
+    )
+  if (restorable) state.replaceBlock(instanceId, original)
+  return restorable
 }
 
 /** The candidates, or one disabled line saying why there are none. */

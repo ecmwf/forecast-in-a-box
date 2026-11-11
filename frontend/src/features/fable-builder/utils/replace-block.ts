@@ -122,6 +122,26 @@ export interface Replacement {
   dropped: Array<string>
 }
 
+function sameValues(
+  a: Record<string, string>,
+  b: Record<string, string>,
+): boolean {
+  const keys = Object.keys(a)
+  return (
+    keys.length === Object.keys(b).length &&
+    keys.every((key) => Object.hasOwn(b, key) && a[key] === b[key])
+  )
+}
+
+/** True if both have the same factory, settings and inputs. */
+export function sameBlockInstance(a: BlockInstance, b: BlockInstance): boolean {
+  return (
+    factoryIdToKey(a.factory_id) === factoryIdToKey(b.factory_id) &&
+    sameValues(a.configuration_values, b.configuration_values) &&
+    sameValues(a.input_ids, b.input_ids)
+  )
+}
+
 /** Keeps the wiring and the options that still fit. */
 export function replaceBlockInstance(
   block: BlockInstance,

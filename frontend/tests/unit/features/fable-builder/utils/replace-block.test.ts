@@ -20,6 +20,7 @@ import type {
 import {
   replaceBlockInstance,
   replacementCandidates,
+  sameBlockInstance,
 } from '@/features/fable-builder/utils/replace-block'
 
 const id = (factory: string): PluginBlockFactoryId => ({
@@ -208,5 +209,36 @@ describe('replaceBlockInstance', () => {
       factories.quantiles,
     )
     expect(instance.configuration_values.operator).toBe('max')
+  })
+})
+
+describe('sameBlockInstance', () => {
+  const block = {
+    factory_id: id('threshold'),
+    configuration_values: { value: '1', unit: '' },
+    input_ids: { dataset: 'src' },
+  }
+
+  it('compares factory, settings and inputs by value', () => {
+    expect(sameBlockInstance(block, structuredClone(block))).toBe(true)
+    expect(
+      sameBlockInstance(block, {
+        ...block,
+        factory_id: id('ensembleStatistics'),
+      }),
+    ).toBe(false)
+    expect(
+      sameBlockInstance(block, {
+        ...block,
+        configuration_values: { value: '2', unit: '' },
+      }),
+    ).toBe(false)
+    expect(
+      sameBlockInstance(block, {
+        ...block,
+        configuration_values: { value: '1' },
+      }),
+    ).toBe(false)
+    expect(sameBlockInstance(block, { ...block, input_ids: {} })).toBe(false)
   })
 })

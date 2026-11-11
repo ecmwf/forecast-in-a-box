@@ -110,7 +110,9 @@
     "noReplacement": "No other block fits here",
     "replaced": "Replaced {{from}} with {{to}}",
     "keptOptions_one": "Kept {{kept}} of {{count}} option",
-    "keptOptions_other": "Kept {{kept}} of {{count}} options"
+    "keptOptions_other": "Kept {{kept}} of {{count}} options",
+    "undoStale": "Can't undo the replace: the block has changed since.",
+    "undoStaleHint": "Use Undo in the header instead."
   },
   "layout": {
     "hideBlockPalette": "Hide block palette",

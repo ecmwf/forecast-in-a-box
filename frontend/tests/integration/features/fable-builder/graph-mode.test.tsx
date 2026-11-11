@@ -504,6 +504,47 @@ describe('Graph Mode - Builder Integration', () => {
     expect(blocks.sink1.configuration_values.path).toBe('/tmp/other.zarr')
   })
 
+  it('still undoes the replace after an unrelated block is removed', async () => {
+    const { action } = await replaceProduct()
+    useFableBuilderStore.getState().removeBlock('sink1')
+
+    action.onClick()
+    expect(productFactory()).toBe('ensembleStatistics')
+  })
+
+  describe('leaves a replacement that changed since', () => {
+    async function undoStale(change: () => void) {
+      const { action } = await replaceProduct()
+      const info = vi.spyOn(showToast, 'info')
+      onTestFinished(() => info.mockRestore())
+      const replacement = productFactory()
+      change()
+
+      action.onClick()
+      expect(productFactory()).toBe(replacement)
+      expect(info).toHaveBeenCalledWith(
+        "Can't undo the replace: the block has changed since.",
+        'Use Undo in the header instead.',
+      )
+    }
+
+    it('in its settings', async () => {
+      await undoStale(() =>
+        useFableBuilderStore
+          .getState()
+          .updateBlockConfig('product1', 'note', 'edited'),
+      )
+    })
+
+    it('in its inputs, without wiring the deleted source back', async () => {
+      await undoStale(() =>
+        useFableBuilderStore.getState().removeBlock('source1'),
+      )
+      const { blocks } = useFableBuilderStore.getState().fable
+      expect(Object.values(blocks.product1.input_ids)).not.toContain('source1')
+    })
+  })
+
   it('shows the empty configuration panel when no block is selected', async () => {
     const screen = await renderWithRouter(<FableBuilderPage />)
 
