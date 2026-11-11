@@ -40,6 +40,9 @@ describe('parseGrid', () => {
       '0.25/0.5',
       'n320',
       'O1280',
+      'O8000',
+      'F80',
+      'f320',
       'O96',
       'auto',
       '1',
@@ -56,13 +59,18 @@ describe('parseGrid', () => {
     expect(errorCode('0.099')).toBe('tooFine')
     expect(errorCode('0.25/0.01')).toBe('tooFine')
     expect(errorCode('1/2/3')).toBe('tooManyParts')
-    expect(errorCode('N0')).toBe('gaussianRange')
-    expect(errorCode('O0')).toBe('gaussianRange')
-    expect(errorCode('O1281')).toBe('gaussianRange')
-    expect(errorCode('N1281')).toBe('gaussianRange')
+    expect(errorCode('N0')).toBe('gaussianNumber')
+    expect(errorCode('O0')).toBe('gaussianNumber')
+    expect(errorCode('N1')).toBe('gaussianNumber')
+    expect(errorCode('O100')).toBe('gaussianNumber')
+    expect(errorCode('F90')).toBe('gaussianNumber')
+    expect(errorCode('O1281')).toBe('gaussianNumber')
+    expect(errorCode('N1281')).toBe('gaussianNumber')
+    expect(errorCode('O8001')).toBe('gaussianNumber')
     expect(errorCode('O096')).toBe('leadingZeros')
+    expect(errorCode('o01')).toBe('leadingZeros')
     expect(errorCode('AUTO')).toBe('notGrid')
-    expect(errorCode('F80')).toBe('notGrid')
+    expect(errorCode('X80')).toBe('notGrid')
     expect(errorCode('inf')).toBe('notPositive')
     expect(errorCode('nan')).toBe('notPositive')
     expect(errorCode('-1')).toBe('notPositive')
@@ -84,6 +92,7 @@ describe('parseGrid', () => {
       pair: true,
     })
     expect(spec('n320')).toEqual({ kind: 'gaussian', family: 'N', number: 320 })
+    expect(spec('f80')).toEqual({ kind: 'gaussian', family: 'F', number: 80 })
   })
 })
 
@@ -91,6 +100,7 @@ describe('canonicalGrid', () => {
   it('upper-cases names and shortens decimals like GridType.value_to_str', () => {
     expect(canonicalGrid('n320')).toBe('N320')
     expect(canonicalGrid('o96')).toBe('O96')
+    expect(canonicalGrid('f80')).toBe('F80')
     expect(canonicalGrid('0.250')).toBe('0.25')
     expect(canonicalGrid('1.0')).toBe('1')
     expect(canonicalGrid('1e-1')).toBe('0.1')
@@ -103,6 +113,7 @@ describe('canonicalGrid', () => {
     expect(isSameGrid('n320', 'N320')).toBe(true)
     expect(isSameGrid('0.250', '0.25')).toBe(true)
     expect(isSameGrid('O320', 'N320')).toBe(false)
+    expect(isSameGrid('F320', 'N320')).toBe(false)
   })
 })
 
@@ -120,6 +131,7 @@ describe('gridPoints / gridSpacingKm', () => {
       approx: false,
     })
     expect(gridPoints(spec('N320'))).toEqual({ count: 542_080, approx: false })
+    expect(gridPoints(spec('F80'))).toEqual({ count: 51_200, approx: false })
     expect(gridPoints(spec('N640'))?.approx).toBe(true)
     expect(gridPoints(spec('auto'))).toBeNull()
   })
@@ -160,6 +172,14 @@ describe('groupGridOptions', () => {
     expect(
       groupGridOptions(['N320'], 'n320', null).flatMap((group) => group.items),
     ).toEqual(['N320'])
+  })
+
+  it('puts regular Gaussian grids last', () => {
+    expect(groupGridOptions(['F80', 'N320', 'O96'], '', null)).toEqual([
+      { value: 'octahedral', items: ['O96'] },
+      { value: 'reduced', items: ['N320'] },
+      { value: 'regular', items: ['F80'] },
+    ])
   })
 
   it('leaves out entries that are not grids', () => {

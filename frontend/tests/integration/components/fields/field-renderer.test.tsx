@@ -456,9 +456,13 @@ describe('FieldRenderer Integration', () => {
         <ControlledFieldRenderer valueType={gridType} initialValue="auto" />,
       )
       await screen.getByText('Keep input grid').click()
-      await screen.getByPlaceholder(/type a grid/).fill('N0')
+      await screen.getByPlaceholder(/type a grid/).fill('O100')
       await expect
-        .element(screen.getByText('Gaussian grid numbers run from 1 to 8000.'))
+        .element(
+          screen.getByText(
+            /Gaussian grid number must be one of 32, .*, 8000\./,
+          ),
+        )
         .toBeVisible()
     })
   })

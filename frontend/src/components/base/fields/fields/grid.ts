@@ -15,9 +15,11 @@ export const AUTO_GRID = 'auto'
 /** The finest lat/lon increment in degrees, inclusive. */
 export const MIN_GRID_RESOLUTION = 0.1
 
-/** The inclusive range of a Gaussian grid number, such as 320 in `N320`. */
-export const MIN_GAUSSIAN_NUMBER = 1
-export const MAX_GAUSSIAN_NUMBER = 1280
+/** The numbers a Gaussian grid may have, such as 320 in `N320`. */
+export const GAUSSIAN_NUMBERS: ReadonlyArray<number> = [
+  32, 48, 64, 80, 96, 128, 160, 200, 256, 320, 400, 512, 640, 800, 1024, 1280,
+  8000,
+]
 
 /** Global grids above this many points are flagged as large. */
 export const LARGE_GRID_POINTS = 5_000_000
@@ -33,23 +35,26 @@ export const DEFAULT_GRID_SUGGESTIONS: ReadonlyArray<string> = [
   'N320',
 ]
 
+/** Reduced (N), regular (F) or octahedral (O). */
+export type GaussianFamily = 'N' | 'F' | 'O'
+
 export type GridSpec =
   | { kind: 'auto' }
   | { kind: 'latlon'; dx: number; dy: number; pair: boolean }
-  | { kind: 'gaussian'; family: 'N' | 'O'; number: number }
+  | { kind: 'gaussian'; family: GaussianFamily; number: number }
 
 export type GridError =
   | { code: 'notGrid' }
   | { code: 'tooManyParts' }
   | { code: 'notPositive'; resolution: string }
   | { code: 'tooFine'; resolution: string }
-  | { code: 'gaussianRange' }
+  | { code: 'gaussianNumber' }
   | { code: 'leadingZeros' }
 
 export type GridParseResult =
   { ok: true; spec: GridSpec } | { ok: false; error: GridError }
 
-const GAUSSIAN = /^([NnOo])(\d+)$/
+const GAUSSIAN = /^([NnFfOo])(\d+)$/
 const DECIMAL = /^[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$/
 const NON_FINITE = /^[+-]?(inf|infinity|nan)$/i
 
@@ -62,13 +67,13 @@ export function parseGrid(raw: string): GridParseResult {
   if (gaussian) {
     const digits = gaussian[2]
     const number = Number(digits)
-    if (number < MIN_GAUSSIAN_NUMBER || number > MAX_GAUSSIAN_NUMBER) {
-      return { ok: false, error: { code: 'gaussianRange' } }
-    }
     if (digits !== String(number)) {
       return { ok: false, error: { code: 'leadingZeros' } }
     }
-    const family = gaussian[1].toUpperCase() === 'N' ? 'N' : 'O'
+    if (!GAUSSIAN_NUMBERS.includes(number)) {
+      return { ok: false, error: { code: 'gaussianNumber' } }
+    }
+    const family = gaussian[1].toUpperCase() as GaussianFamily
     return { ok: true, spec: { kind: 'gaussian', family, number } }
   }
 
@@ -142,6 +147,7 @@ export function gridPoints(
     case 'gaussian': {
       const n = spec.number
       if (spec.family === 'O') return { count: 4 * n * (n + 9), approx: false }
+      if (spec.family === 'F') return { count: 8 * n * n, approx: false }
       const known = REDUCED_GAUSSIAN_POINTS.get(n)
       return known !== undefined
         ? { count: known, approx: false }
@@ -173,7 +179,7 @@ export function gridSpacingKm(spec: GridSpec): number | null {
 }
 
 export type GridGroupKey =
-  'custom' | 'keep' | 'latlon' | 'octahedral' | 'reduced'
+  'custom' | 'keep' | 'latlon' | 'octahedral' | 'reduced' | 'regular'
 
 export interface GridGroup {
   value: GridGroupKey
@@ -186,12 +192,14 @@ const GROUP_ORDER: ReadonlyArray<GridGroupKey> = [
   'latlon',
   'octahedral',
   'reduced',
+  'regular',
 ]
 
 function groupOf(spec: GridSpec): GridGroupKey {
   if (spec.kind === 'auto') return 'keep'
   if (spec.kind === 'latlon') return 'latlon'
-  return spec.family === 'O' ? 'octahedral' : 'reduced'
+  if (spec.family === 'O') return 'octahedral'
+  return spec.family === 'N' ? 'reduced' : 'regular'
 }
 
 function sortKey(spec: GridSpec): number {

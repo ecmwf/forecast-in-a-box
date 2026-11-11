@@ -15,9 +15,8 @@ import { cutsOutDomain } from './geo-domain'
 import { GlyphFieldWrapper } from './GlyphFieldWrapper'
 import {
   AUTO_GRID,
+  GAUSSIAN_NUMBERS,
   LARGE_GRID_POINTS,
-  MAX_GAUSSIAN_NUMBER,
-  MIN_GAUSSIAN_NUMBER,
   MIN_GRID_RESOLUTION,
   canonicalGrid,
   gridPoints,
@@ -65,6 +64,7 @@ const GROUP_LABEL_KEY = {
   latlon: 'grid.groupLatlon',
   octahedral: 'grid.groupOctahedral',
   reduced: 'grid.groupReduced',
+  regular: 'grid.groupRegular',
 } as const satisfies Record<Exclude<GridGroupKey, 'keep'>, string>
 
 /** Room below the field (px) that keeps the list there: about five rows. */
@@ -316,10 +316,9 @@ function gridErrorMessage(t: TFunction<'common'>, error: GridError): string {
         resolution: error.resolution,
         min: MIN_GRID_RESOLUTION,
       })
-    case 'gaussianRange':
-      return t('grid.error.gaussianRange', {
-        min: MIN_GAUSSIAN_NUMBER,
-        max: MAX_GAUSSIAN_NUMBER,
+    case 'gaussianNumber':
+      return t('grid.error.gaussianNumber', {
+        numbers: GAUSSIAN_NUMBERS.join(', '),
       })
     case 'leadingZeros':
       return t('grid.error.leadingZeros')

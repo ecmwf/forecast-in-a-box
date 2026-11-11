@@ -246,12 +246,13 @@
     "groupLatlon": "Regular lat/lon",
     "groupOctahedral": "Octahedral Gaussian",
     "groupReduced": "Reduced Gaussian",
+    "groupRegular": "Regular Gaussian",
     "error": {
       "notGrid": "Not a grid. Use a resolution such as 0.25, a pair such as 0.25/0.5, a Gaussian grid such as O96, or auto.",
       "tooManyParts": "Use at most two resolutions: west-east/south-north.",
       "notPositive": "{{resolution}} is not a positive number of degrees.",
       "tooFine": "{{resolution}} is finer than the minimum of {{min}}°.",
-      "gaussianRange": "Gaussian grid numbers run from {{min}} to {{max}}.",
+      "gaussianNumber": "The Gaussian grid number must be one of {{numbers}}.",
       "leadingZeros": "Write the Gaussian grid number without leading zeros, as in O96."
     }
   },
