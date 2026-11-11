@@ -379,15 +379,66 @@ class TestLatLonBoxesForName:
 
 UNITED_KINGDOM: LatLonBox = (58.635, -7.572, 49.96, 1.68)
 
+# the points of the 34th row from the pole in the stubbed classical rows below
+CLASSICAL_ROW_34 = 20 + 3 * 33
+
+
+@pytest.fixture
+def classical_rows(monkeypatch: pytest.MonkeyPatch) -> list[int]:
+    """Replace the MIR lookup of the classical rows by points growing by 3 per row, 20 on the first, for N96 (192 rows)."""
+    rows = [20 + 3 * index for index in range(192)]
+    monkeypatch.setattr(runtime, "_classical_row_points", lambda number: rows)
+    return rows
+
 
 class TestGridSpacing:
     def test_o96_latitude_spacing_and_octahedral_longitude_spacing_at_the_poleward_edge(self) -> None:
         # the row at 58.635 degrees north is the 34th from the pole (ceil(31.365 / 0.9375)), which has 4 * 34 + 16 = 152 points
         assert runtime.grid_spacing("O96", UNITED_KINGDOM) == pytest.approx((0.9375, 360.0 / 152))
 
-    @pytest.mark.parametrize("name", ["O96", "o96", "N96", "n96", " O96 "])
-    def test_octahedral_and_classical_names_are_case_insensitive_and_alike(self, name: str) -> None:
+    @pytest.mark.parametrize("name", ["O96", "o96", " O96 "])
+    def test_octahedral_names_are_case_insensitive(self, name: str) -> None:
         assert runtime.grid_spacing(name, UNITED_KINGDOM) == pytest.approx((0.9375, 360.0 / 152))
+
+    @pytest.mark.parametrize("name", ["N96", "n96", " N96 "])
+    def test_classical_names_are_case_insensitive(self, name: str, classical_rows: list[int]) -> None:
+        assert runtime.grid_spacing(name, UNITED_KINGDOM) == pytest.approx((0.9375, 360.0 / CLASSICAL_ROW_34))
+
+    def test_classical_grid_uses_its_own_row_points_and_not_the_octahedral_count(self, classical_rows: list[int]) -> None:
+        # the 34th row from the pole of N96 holds CLASSICAL_ROW_34 points here, where O96 holds 4 * 34 + 16 = 152
+        classical = runtime.grid_spacing("N96", UNITED_KINGDOM)
+        octahedral = runtime.grid_spacing("O96", UNITED_KINGDOM)
+
+        assert classical == pytest.approx((0.9375, 360.0 / CLASSICAL_ROW_34))
+        assert octahedral == pytest.approx((0.9375, 360.0 / 152))
+        assert classical != octahedral
+
+    def test_classical_grid_asks_for_the_rows_of_its_own_number(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        asked: list[int] = []
+
+        def _rows(number: int) -> list[int]:
+            asked.append(number)
+            return [64] * (2 * number)
+
+        monkeypatch.setattr(runtime, "_classical_row_points", _rows)
+
+        runtime.grid_spacing("n16", UNITED_KINGDOM)
+
+        assert asked == [16]
+
+    def test_classical_grid_at_the_equator_uses_the_equatorial_row(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # the equatorial rows of N16 hold 64 points, where the octahedral count would be 4 * 16 + 16 = 80
+        monkeypatch.setattr(runtime, "_classical_row_points", lambda number: [20] * (number - 1) + [64] * (number + 1))
+
+        assert runtime.grid_spacing("N16", (0.0, 0.0, -0.0, 10.0)) == pytest.approx((5.625, 5.625))
+        assert runtime.grid_spacing("O16", (0.0, 0.0, -0.0, 10.0)) == pytest.approx((5.625, 4.5))
+
+    def test_classical_grid_at_a_pole_uses_the_first_row(self, classical_rows: list[int]) -> None:
+        assert runtime.grid_spacing("N96", (90.0, 0.0, 80.0, 10.0)) == pytest.approx((0.9375, 360.0 / classical_rows[0]))
+
+    def test_classical_grid_in_the_south_uses_the_row_from_the_south_pole(self, classical_rows: list[int]) -> None:
+        # 60 degrees south is ceil(30 / 0.9375) = 32 rows from the south pole, as 60 degrees north is from the north pole
+        assert runtime.grid_spacing("N96", (10.0, 0.0, -60.0, 10.0)) == pytest.approx((0.9375, 360.0 / classical_rows[31]))
 
     def test_longitude_spacing_uses_the_latitude_nearest_a_pole(self) -> None:
         # 60 degrees south is further poleward than 10 degrees north: ceil(30 / 0.9375) = 32 rows, 4 * 32 + 16 = 144 points
@@ -449,6 +500,14 @@ class TestPadNamedBox:
         assert south == pytest.approx(49.96 - 0.9375 - 0.5)
         assert west == pytest.approx(-7.572 - 360.0 / 152 - 0.5)
         assert east == pytest.approx(1.68 + 360.0 / 152 + 0.5)
+
+    def test_n96_pads_by_the_classical_row_points(self, classical_rows: list[int]) -> None:
+        north, west, south, east = runtime.pad_named_box(UNITED_KINGDOM, "N96")
+
+        assert north == pytest.approx(58.635 + 0.9375 + 0.5)
+        assert south == pytest.approx(49.96 - 0.9375 - 0.5)
+        assert west == pytest.approx(-7.572 - 360.0 / CLASSICAL_ROW_34 - 0.5)
+        assert east == pytest.approx(1.68 + 360.0 / CLASSICAL_ROW_34 + 0.5)
 
     def test_numeric_grid_pads_by_its_increment_and_the_fixed_margin(self) -> None:
         assert runtime.pad_named_box(UNITED_KINGDOM, 0.25) == pytest.approx((59.385, -8.322, 49.21, 2.43))

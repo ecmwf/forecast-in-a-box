@@ -306,6 +306,68 @@ class TestRegridBoundingBox:
         assert np.asarray(cutout[0].to_numpy()).size < np.asarray(global_result[0].to_numpy()).size
 
 
+class TestRegridGaussianBoundingBox:
+    # the United Kingdom box (north, west, south, east) that a named domain lookup gives, without the network
+    UNITED_KINGDOM = (58.635, -7.572, 49.96, 1.68)
+
+    @pytest.fixture
+    def united_kingdom(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # the real lookup reads natural earth shapes through cartopy, which can need the network
+        monkeypatch.setattr(runtime, "_get_bbox_from_names", lambda identifiers: BBox(self.UNITED_KINGDOM, fmt="nwse"))
+
+    def _assert_covers_the_box(self, result: ekd.FieldList) -> None:
+        north, west, south, east = self.UNITED_KINGDOM
+        assert len(result) == len(PARAMS)
+        for field in result:
+            assert field.metadata("gridType") == "reduced_gg"
+            latlon = field.to_latlon()
+            lat = np.asarray(latlon["lat"]).ravel()
+            lon = np.asarray(latlon["lon"]).ravel()
+            assert lat.max() > north
+            assert lat.min() < south
+            assert lat.max() < 90.0
+            # the rows on the edge of the box keep points beyond its west and east edges
+            for row_lat in np.unique(lat):
+                if south <= row_lat <= north:
+                    row_lon = (lon[lat == row_lat] + 180.0) % 360.0 - 180.0
+                    assert row_lon.min() <= west
+                    assert row_lon.max() >= east
+
+    def test_o96_named_domain_covers_the_box(self, input_fields: ekd.FieldList, united_kingdom: None) -> None:
+        result = _regrid(input_fields, grid="O96", domain="United Kingdom")
+
+        self._assert_covers_the_box(result)
+        _assert_values_match_analytic(result)
+
+    def test_n96_named_domain_covers_the_box(self, input_fields: ekd.FieldList, united_kingdom: None) -> None:
+        result = _regrid(input_fields, grid="N96", domain="United Kingdom")
+
+        self._assert_covers_the_box(result)
+        _assert_values_match_analytic(result)
+
+    def test_classical_row_points_are_read_from_mir(self) -> None:
+        runtime._classical_row_points.cache_clear()
+
+        rows = runtime._classical_row_points(96)
+
+        assert len(rows) == 192
+        assert list(rows[:3]) == [18, 25, 36]
+        assert list(rows) == list(rows[::-1])
+        assert max(rows) == 384
+
+    def test_classical_longitude_spacing_at_the_equator_is_wider_than_the_octahedral_one(self) -> None:
+        equator = (0.0, 0.0, -0.0, 10.0)
+
+        assert runtime.grid_spacing("N16", equator) == pytest.approx((5.625, 360.0 / 64))
+        assert runtime.grid_spacing("O16", equator) == pytest.approx((5.625, 360.0 / 80))
+
+    def test_classical_longitude_spacing_uses_the_row_points_of_mir(self) -> None:
+        rows = runtime._classical_row_points(96)
+
+        # the poleward edge of the box is the 34th row from the pole
+        assert runtime.grid_spacing("N96", self.UNITED_KINGDOM) == pytest.approx((0.9375, 360.0 / rows[33]))
+
+
 class TestRegridAcrossAntimeridian:
     # The union of the two named boxes below is north -10, south -22, and longitudes from 175 east over the 180 line to 190 (170 west).
     # With an area given, MIR anchors the 1 degree grid at the south west corner, so the cut-out holds 13 rows and 16 columns.

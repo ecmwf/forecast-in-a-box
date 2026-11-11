@@ -13,6 +13,7 @@ import math
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import TYPE_CHECKING, cast
 
 from .extent import LatLonBox, box_from_preset, boxes_from_geometry, pad_box, union_boxes
@@ -140,11 +141,21 @@ def _numeric_increments(grid: object) -> tuple[float, float] | None:
     return west_east, south_north
 
 
+@lru_cache(maxsize=32)
+def _classical_row_points(number: int) -> Sequence[int]:
+    """Return the points of each latitude row of the classical reduced Gaussian grid N<number>, from the north pole to the south pole."""
+    # mir is an optional runtime dependency, so it is imported when the row counts are needed
+    import mir  # type: ignore[unresolved-import]
+
+    return tuple(mir.Grid(f"N{number}").catalog["pl"])
+
+
 def grid_spacing(grid: object, box: LatLonBox) -> tuple[float, float] | None:
     """Return the (latitude, longitude) spacing in degrees of the grid around the box, or None if it cannot be determined.
 
-    A Gaussian grid O<N>, N<N> or F<N> has latitude spacing 90/N. The longitude spacing of F<N> is 90/N, and that of O<N> and N<N>
-    is 360 divided by the points of the octahedral row nearest the pole of the box, 4*i + 16 points for the i-th row from the pole.
+    A Gaussian grid O<N>, N<N> or F<N> has latitude spacing 90/N. The longitude spacing of F<N> is 90/N. The longitude spacing of
+    O<N> and N<N> is 360 divided by the points of the row nearest the pole of the box, the i-th row from the pole. That row has
+    4*i + 16 points on O<N> and the points given by MIR for the classical grid on N<N>.
     A numeric grid, a single resolution or a [west_east, south_north] pair, uses its increments.
     """
     if isinstance(grid, str):
@@ -158,6 +169,8 @@ def grid_spacing(grid: object, box: LatLonBox) -> tuple[float, float] | None:
                 return latitude_spacing, latitude_spacing
             poleward = min(90.0, max(abs(box[0]), abs(box[2])))
             row = max(1, math.ceil((90.0 - poleward) / latitude_spacing - 1e-9))
+            if match.group(1).upper() == "N":
+                return latitude_spacing, 360.0 / _classical_row_points(number)[min(row, number) - 1]
             return latitude_spacing, 360.0 / (4 * row + 16)
     increments = _numeric_increments(grid)
     if increments is None:
