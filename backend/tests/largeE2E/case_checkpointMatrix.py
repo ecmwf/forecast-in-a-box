@@ -158,7 +158,7 @@ def build_blueprint_builder(plugin: dict[str, str], checkpoint: str, source: str
                 "input_source": source,
                 "lead_time": str(model.lead_time_hours),
                 "base_time": base_time.strftime("%Y-%m-%dT%H:%M:%S"),
-                "number": "1",
+                "number": "none",
             },
             {},
         ),
@@ -185,7 +185,10 @@ def build_blueprint_builder(plugin: dict[str, str], checkpoint: str, source: str
                 {"dataset": "source"},
             )
         )
-    return {"blocks": blocks, "environment": None, "local_glyphs": {}}
+    # NOTE a single worker runs every task after the one that installed the checkpoint environment. A second, fresh worker
+    # loads the model output, and with it the latest eccodes stack of its base venv, before installing the task environment,
+    # which then fails for checkpoints pinning an older eccodes stack (eg through mirlib)
+    return {"blocks": blocks, "environment": {"workers_per_host": 1}, "local_glyphs": {}}
 
 
 def verify_outputs(client: httpx.Client, detail: dict, model: ModelCase) -> None:

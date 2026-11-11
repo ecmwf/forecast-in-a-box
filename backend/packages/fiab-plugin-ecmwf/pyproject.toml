@@ -35,6 +35,7 @@ dev = [
   "ty==0.0.2",
   "pytest_lazy_fixtures",
   "pymetkit", # due to test-time injection
+  "ecmwf-opendata", # imported by scripts/opendata_dataset.py
 ]
 
 [tool.setuptools_scm]

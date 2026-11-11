@@ -26,7 +26,7 @@ def _grib_field(grid_keys: dict, values: np.ndarray) -> ekd.FieldList:
         message = eccodes.codes_get_message(handle)
     finally:
         eccodes.codes_release(handle)
-    return ekd.from_source("memory", message)
+    return ekd.from_source("memory", message)  # type: ignore[invalid-return-type]
 
 
 @pytest.fixture

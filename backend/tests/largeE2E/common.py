@@ -176,7 +176,8 @@ def resolve_checkpoint(client: httpx.Client, checkpoint: str, *, attempts: int =
         return (response.json() or None) if response.status_code == 200 else None
 
     models = retry_until(do_action, verify_ok, attempts=attempts, sleep=sleep, error_msg="the backend's artifact catalog stayed empty")
-    matches = [m for m in models if m["composite_id"]["artifact_local_id"] == checkpoint]
+    assert models is not None  # retry_until raises instead of returning None
+    matches =[m for m in models if m["composite_id"]["artifact_local_id"] == checkpoint]
     if not matches:
         known = sorted(f"{m['composite_id']['artifact_store_id']}:{m['composite_id']['artifact_local_id']}" for m in models)
         raise AssertionError(f"model {checkpoint!r} is in none of the configured artifact stores, known models: {known}")
@@ -252,7 +253,9 @@ def ensure_run_completed(client: httpx.Client, run_id: str, *, attempts: int = 9
         assert status in {"submitted", "preparing", "running", "completed"}, f"unexpected status {status!r}: {data}"
         return data if status == "completed" else None
 
-    return retry_until(do_action, verify_ok, attempts=attempts, sleep=sleep, error_msg=f"run {run_id} did not complete in time")
+    detail = retry_until(do_action, verify_ok, attempts=attempts, sleep=sleep, error_msg=f"run {run_id} did not complete in time")
+    assert detail is not None  # retry_until raises instead of returning None
+    return detail
 
 
 _TASK_MARKER_RE = re.compile(r"task=(.*);action=(task_started|task_computed);at=(\d+)")
