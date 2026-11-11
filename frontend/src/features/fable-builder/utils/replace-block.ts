@@ -101,14 +101,17 @@ function valueFits(value: string, from: string, to: string): boolean {
   if (value === '') return false
   if (from === to) return true
   const target = parseFableType(to)
-  const closed =
-    target?.kind === 'enum'
-      ? target
-      : target?.kind === 'list' && target.item.kind === 'enum'
-        ? target.item
-        : undefined
-  if (closed?.closed) {
-    const items = new Set(closed.items.map(String))
+  // One choice: the whole value is an item.
+  if (target?.kind === 'enum' && target.closed) {
+    return target.items.map(String).includes(value)
+  }
+  // Several choices: each comma-separated part is an item.
+  if (
+    target?.kind === 'list' &&
+    target.item.kind === 'enum' &&
+    target.item.closed
+  ) {
+    const items = new Set(target.item.items.map(String))
     return value.split(',').every((item) => items.has(item.trim()))
   }
   return baseKind(parseFableType(from)) === baseKind(target)

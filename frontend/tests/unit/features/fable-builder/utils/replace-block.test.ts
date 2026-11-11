@@ -210,6 +210,39 @@ describe('replaceBlockInstance', () => {
     )
     expect(instance.configuration_values.operator).toBe('max')
   })
+
+  /** Moves `operator: value` from a text option onto `type`. */
+  const moveOperator = (value: string, type: string) =>
+    replaceBlockInstance(
+      { ...fable.blocks.thr, configuration_values: { operator: value } },
+      {
+        ...factories.threshold,
+        configuration_options: { operator: option('str') },
+      },
+      id('quantiles'),
+      {
+        ...factories.quantiles,
+        configuration_options: { operator: option(type, 'max') },
+      },
+    )
+
+  it('keeps a value for one choice only when it is one item', () => {
+    const { instance, dropped } = moveOperator(
+      'min,max',
+      'enumClosed[str](min,max)',
+    )
+    expect(instance.configuration_values.operator).toBe('max')
+    expect(dropped).toEqual(['operator'])
+  })
+
+  it('keeps a value for several choices when each part is an item', () => {
+    const { instance, kept } = moveOperator(
+      'min,max',
+      'list[enumClosed[str](min,max)]',
+    )
+    expect(instance.configuration_values.operator).toBe('min,max')
+    expect(kept).toEqual(['operator'])
+  })
 })
 
 describe('sameBlockInstance', () => {
