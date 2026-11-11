@@ -110,14 +110,19 @@ describe('Models page', () => {
     })
   })
 
-  const overview = (id: string, name: string, compatible: boolean) => ({
+  const overview = (
+    id: string,
+    name: string,
+    compatible: boolean,
+    available = false,
+  ) => ({
     composite_id: { artifact_store_id: 'ecmwf', artifact_local_id: id },
     display_name: name,
     display_author: 'ECMWF',
     disk_size_bytes: 1_000_000,
     supported_platforms: ['linux'],
     tags: {},
-    is_available: false,
+    is_available: available,
     is_locally_compatible: compatible,
     local_compatibility_detail: compatible ? null : 'No GPU on this host.',
   })
@@ -256,6 +261,38 @@ describe('Models page', () => {
     await expect
       .poll(() => rowNames(screen))
       .toEqual(['AIFS Single MSE 1.1', 'AIFS ENS'])
+  })
+
+  it('shows a downloaded model that cannot run here as incompatible', async () => {
+    worker.use(
+      http.get(API_ENDPOINTS.artifacts.listModels, () =>
+        HttpResponse.json([
+          overview('aifs-ens-v0.3.0', 'AIFS ENS', false, true),
+          overview('aifs-single-v1.0', 'AIFS Single', true, true),
+          overview('aifs-single-mse-1.1_w_sdpa', 'AIFS Single MSE 1.1', true),
+        ]),
+      ),
+    )
+    const screen = await renderPage()
+
+    const incompatible = screen.getByText('Incompatible', { exact: true })
+    await incompatible.hover()
+    await expect
+      .element(
+        screen.getByText(
+          "Downloaded, but can't run on this machine: No GPU on this host.",
+        ),
+      )
+      .toBeVisible()
+    await expect
+      .element(screen.getByText('Downloaded', { exact: true }).last())
+      .toBeVisible()
+
+    // Usable downloads first, the one that can't run last.
+    await screen.getByRole('button', { name: /^Availability/ }).click()
+    await expect
+      .poll(() => rowNames(screen))
+      .toEqual(['AIFS Single', 'AIFS Single MSE 1.1', 'AIFS ENS'])
   })
 
   it('tells same-name variants apart by id, and finds them by it', async () => {

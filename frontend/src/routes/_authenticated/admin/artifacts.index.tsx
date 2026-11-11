@@ -67,9 +67,9 @@ function matchesFilter(artifact: ArtifactInfo, filter: ArtifactFilter) {
   return artifact.isAvailable === (filter === 'downloaded')
 }
 
-// Downloaded, then downloadable, then incompatible here.
+// Downloaded, then downloadable, then incompatible here, downloaded or not.
 const availabilityRank = (a: ArtifactInfo) =>
-  a.isAvailable ? 0 : a.isLocallyCompatible ? 1 : 2
+  !a.isLocallyCompatible ? 2 : a.isAvailable ? 0 : 1
 
 // Models without a maturity last.
 function byMaturity(a: ArtifactInfo, b: ArtifactInfo) {

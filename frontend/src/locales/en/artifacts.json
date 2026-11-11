@@ -25,6 +25,8 @@
   "status": {
     "downloaded": "Downloaded",
     "downloadedHint": "Stored on this machine. Runs use it right away.",
+    "downloadedIncompatible": "Downloaded, but can't run on this machine.",
+    "downloadedIncompatibleDetail": "Downloaded, but can't run on this machine: {{detail}}",
     "downloading": "Downloading {{progress}}%",
     "available": "Available",
     "availableHint": "Not on this machine yet. Runs download it before they start.",

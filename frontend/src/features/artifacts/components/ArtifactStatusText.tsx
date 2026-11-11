@@ -46,23 +46,27 @@ export function ArtifactStatusText({
       </WithReason>
     )
   }
+  if (!artifact.isLocallyCompatible) {
+    const detail = artifact.localCompatibilityDetail
+    // Downloaded yet incompatible, e.g. after a catalogue update.
+    const reason = artifact.isAvailable
+      ? detail === null
+        ? t('status.downloadedIncompatible')
+        : t('status.downloadedIncompatibleDetail', { detail })
+      : (detail ?? t('compatibility.notCompatibleHint'))
+    return (
+      <WithReason
+        reason={reason}
+        className="text-amber-700 dark:text-amber-400"
+      >
+        {t('compatibility.notCompatible')}
+      </WithReason>
+    )
+  }
   if (artifact.isAvailable) {
     return (
       <WithReason reason={t('status.downloadedHint')}>
         {t('status.downloaded')}
-      </WithReason>
-    )
-  }
-  if (!artifact.isLocallyCompatible) {
-    return (
-      <WithReason
-        reason={
-          artifact.localCompatibilityDetail ??
-          t('compatibility.notCompatibleHint')
-        }
-        className="text-amber-700 dark:text-amber-400"
-      >
-        {t('compatibility.notCompatible')}
       </WithReason>
     )
   }
