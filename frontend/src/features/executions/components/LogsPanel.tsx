@@ -16,12 +16,15 @@ import {
   useRef,
   useState,
 } from 'react'
+import { formatDistanceToNow } from 'date-fns'
 import {
   CircleAlert,
   Download,
   FileText,
   Files,
+  History,
   RefreshCw,
+  ScrollText,
   Search,
   WrapText,
 } from 'lucide-react'
@@ -33,6 +36,7 @@ import type {
   LogViewRow,
   LogViewportHandle,
 } from '@/features/executions/components/LogViewport'
+import type { PreviousSnapshot } from '@/features/executions/hooks/useLogSnapshot'
 import type {
   FileContent,
   LogFileMeta,
@@ -44,6 +48,7 @@ import type {
   LogLevel,
   RunWindow,
 } from '@/features/executions/utils/run-logs'
+import { downloadJobLogs } from '@/api/endpoints/job'
 import { isTerminalStatus } from '@/api/types/job.types'
 import { formatBytes } from '@/api/types/artifacts.types'
 import { P } from '@/components/base/typography'
@@ -78,6 +83,7 @@ import { LogViewport } from '@/features/executions/components/LogViewport'
 import { useLogSnapshot } from '@/features/executions/hooks/useLogSnapshot'
 import {
   defaultLogFile,
+  firstIndexFrom,
   formatLogTime,
   indexOfLine,
   lineLevel,
@@ -143,7 +149,7 @@ export function LogsPanel({
 }: LogsPanelProps) {
   const { t } = useTranslation('executions')
   const logs = useLogSnapshot(jobId)
-  const { snapshot, call, load: loadSnapshot } = logs
+  const { snapshot, previous, call, load: loadSnapshot } = logs
   const [selected, setSelected] = useState<string | null>(null)
   const [level, setLevel] = useState<LevelFilter>(ALL_LEVELS)
   const [filter, setFilter] = useState('')
@@ -217,8 +223,8 @@ export function LogsPanel({
       ? files.find((f) => f.name === pane.file)
       : undefined
   const rows = useMemo(
-    () => buildRows(pane, shownFile, jumpTo, files, t),
-    [pane, shownFile, jumpTo, files, t],
+    () => buildRows(pane, shownFile, previous, jumpTo, files, t),
+    [pane, shownFile, previous, jumpTo, files, t],
   )
 
   // Applies the pending scroll once its view is on screen.
@@ -269,14 +275,6 @@ export function LogsPanel({
     void loadSnapshot()
   }
 
-  // Loads on first show; a focus request loads its own.
-  const startedRef = useRef(false)
-  useEffect(() => {
-    if (startedRef.current || focus) return
-    startedRef.current = true
-    void loadSnapshot()
-  }, [focus, loadSnapshot])
-
   // Each request: a fresh snapshot, then the failure.
   const appliedFocusRef = useRef<number | null>(null)
   useEffect(() => {
@@ -300,19 +298,13 @@ export function LogsPanel({
   }, [focus, loadSnapshot, call])
 
   if (!snapshot) {
-    return logs.error ? (
-      <div className="flex flex-col items-center gap-3 rounded-lg border py-12 text-center">
-        <P className="font-medium">{t('logs.loadFailed')}</P>
-        <P className="text-sm text-muted-foreground">{logs.error.message}</P>
-        <Button variant="outline" onClick={() => void loadSnapshot()}>
-          {t('logs.retry')}
-        </Button>
-      </div>
-    ) : (
-      <div className="flex items-center justify-center gap-3 rounded-lg border py-12 text-sm text-muted-foreground">
-        <LoadingSpinner size="sm" />
-        {t('logs.loading')}
-      </div>
+    return (
+      <LogsLanding
+        jobId={jobId}
+        isLoading={logs.isLoading}
+        error={logs.error}
+        onView={() => void loadSnapshot()}
+      />
     )
   }
 
@@ -367,6 +359,13 @@ export function LogsPanel({
   return (
     <TooltipProvider delay={120}>
       <div className="flex flex-col gap-3 min-[1280px]:h-full">
+        <SnapshotStrip
+          fetchedAt={snapshot.fetchedAt}
+          isRunning={isRunning}
+          isLoading={logs.isLoading}
+          onRefresh={refresh}
+          onDownload={() => downloadBlob(snapshot.blob, `logs-${jobId}.zip`)}
+        />
         <div className="flex flex-wrap items-center gap-2">
           <Select
             value={allFiles ? ALL_FILES : (current?.name ?? null)}
@@ -472,38 +471,8 @@ export function LogsPanel({
               className="pl-8"
             />
           </div>
-          <IconTip label={t('logs.refresh')}>
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label={t('logs.refresh')}
-              onClick={refresh}
-              disabled={logs.isLoading}
-            >
-              <RefreshCw
-                className={cn('h-4 w-4', logs.isLoading && 'animate-spin')}
-              />
-            </Button>
-          </IconTip>
-          <IconTip label={t('actions.downloadLogs')}>
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label={t('actions.downloadLogs')}
-              onClick={() => downloadBlob(snapshot.blob, `logs-${jobId}.zip`)}
-            >
-              <Download className="h-4 w-4" />
-            </Button>
-          </IconTip>
         </div>
 
-        {isRunning && (
-          <P className="text-sm text-muted-foreground">
-            {t('logs.fetchedAt', {
-              time: new Date(snapshot.fetchedAt).toLocaleTimeString(),
-            })}
-          </P>
-        )}
         {snapshot.collectError !== null ? (
           <Notice>
             {t('logs.collectError', { detail: snapshot.collectError })}
@@ -690,6 +659,7 @@ const NO_ROWS: Rows = {
 function buildRows(
   pane: Pane | null,
   file: LogFileMeta | undefined,
+  previous: PreviousSnapshot | null,
   jumpTo: JumpTarget | null,
   files: ReadonlyArray<LogFileMeta>,
   t: TFunction<'executions'>,
@@ -739,6 +709,13 @@ function buildRows(
   if (!content || !indices || !file) return NO_ROWS
   // Older lines than the budget reads: a note at the top.
   const cut = file.firstNumber > 1 ? 1 : 0
+  const before = previous?.totals.get(file.name)
+  let divider = -1
+  if (before !== undefined && before < file.totalLines) {
+    const at = firstIndexFrom(content, indices, before + 1)
+    if (at < indices.length) divider = at
+  }
+  const extra = cut + (divider === -1 ? 0 : 1)
   const lineAt = (position: number): LogViewRow => {
     const i = indices[position]
     const number = content.firstNumber + i
@@ -751,7 +728,7 @@ function buildRows(
     }
   }
   return {
-    count: indices.length + cut,
+    count: indices.length + extra,
     row: (index) => {
       if (cut && index === 0) {
         return {
@@ -762,16 +739,142 @@ function buildRows(
           }),
         }
       }
-      return lineAt(index - cut)
+      const position = index - cut
+      if (divider === -1 || position < divider) return lineAt(position)
+      if (position === divider) {
+        return {
+          kind: 'note',
+          text: t('logs.newSince', {
+            time: clockTime(previous?.fetchedAt ?? 0),
+          }),
+        }
+      }
+      return lineAt(position - 1)
     },
     indexOfLine: (line) => {
       const position = indexOfLine(content, indices, line)
       if (position === -1) return -1
-      return position + cut
+      return position + cut + (divider !== -1 && position >= divider ? 1 : 0)
     },
     numberDigits: String(file.totalLines).length,
     copyText: () => Array.from(indices, (i) => lineText(content, i)).join('\n'),
   }
+}
+
+/** `HH:MM` in the viewer's time zone. */
+function clockTime(ms: number): string {
+  return new Date(ms).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+/** Re-renders every `ms`, for relative times. */
+function useNow(ms: number): number {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), ms)
+    return () => clearInterval(id)
+  }, [ms])
+  return now
+}
+
+function SnapshotStrip({
+  fetchedAt,
+  isRunning,
+  isLoading,
+  onRefresh,
+  onDownload,
+}: {
+  fetchedAt: number
+  isRunning: boolean
+  isLoading: boolean
+  onRefresh: () => void
+  onDownload: () => void
+}) {
+  const { t } = useTranslation('executions')
+  const now = useNow(30_000)
+  const ago = formatDistanceToNow(Math.min(fetchedAt, now), {
+    addSuffix: true,
+  })
+  return (
+    <div
+      data-slot="log-snapshot"
+      className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground"
+    >
+      <History className="h-4 w-4 shrink-0" />
+      <span>
+        {t('logs.snapshotFrom', { ago })}
+        {isRunning && ` ${t('logs.stillRunning')}`}
+      </span>
+      <div className="ms-auto flex gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onRefresh}
+          disabled={isLoading}
+        >
+          <RefreshCw className={cn(isLoading && 'animate-spin')} />
+          {t('logs.refresh')}
+        </Button>
+        <Button variant="outline" size="sm" onClick={onDownload}>
+          <Download />
+          {t('logs.downloadZip')}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+/** Before any log is fetched: view here, or download. */
+function LogsLanding({
+  jobId,
+  isLoading,
+  error,
+  onView,
+}: {
+  jobId: string
+  isLoading: boolean
+  error: Error | null
+  onView: () => void
+}) {
+  const { t } = useTranslation('executions')
+  const [downloading, setDownloading] = useState(false)
+  const download = () => {
+    setDownloading(true)
+    downloadJobLogs(jobId)
+      .then((blob) => downloadBlob(blob, `logs-${jobId}.zip`))
+      .catch(() => showToast.error(t('logs.downloadFailed')))
+      .finally(() => setDownloading(false))
+  }
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center gap-3 rounded-lg border py-12 text-sm text-muted-foreground">
+        <LoadingSpinner size="sm" />
+        {t('logs.loading')}
+      </div>
+    )
+  }
+  return (
+    <div className="flex flex-col items-center gap-3 rounded-lg border px-6 py-10 text-center">
+      <ScrollText className="h-6 w-6 text-muted-foreground" />
+      <P className="font-medium">
+        {error ? t('logs.loadFailed') : t('logs.landingTitle')}
+      </P>
+      <P className="max-w-prose text-sm text-muted-foreground">
+        {error ? error.message : t('logs.landingText')}
+      </P>
+      <div className="mt-1 flex flex-wrap justify-center gap-2">
+        <Button onClick={onView}>
+          {error ? t('logs.retry') : t('logs.viewHere')}
+        </Button>
+        <Button variant="outline" onClick={download} disabled={downloading}>
+          <Download />
+          {t('logs.downloadZip')}
+        </Button>
+      </div>
+    </div>
+  )
 }
 
 function FileMeta({

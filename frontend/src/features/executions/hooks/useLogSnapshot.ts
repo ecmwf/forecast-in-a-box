@@ -87,13 +87,21 @@ export interface LogSnapshot extends LogSnapshotSummary {
   blob: Blob
 }
 
+/** Line totals of the snapshot before, by file. */
+export interface PreviousSnapshot {
+  fetchedAt: number
+  totals: ReadonlyMap<string, number>
+}
+
 /** A run's logs as one snapshot, fetched only on `load`; the worker lives as long as the caller. */
 export function useLogSnapshot(runId: string) {
   const clientRef = useRef<LogWorkerClient | null>(null)
   const [snapshot, setSnapshot] = useState<LogSnapshot | null>(null)
+  const [previous, setPrevious] = useState<PreviousSnapshot | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<Error | null>(null)
   const loadsRef = useRef(0)
+  const snapshotRef = useRef<LogSnapshot | null>(null)
 
   useEffect(
     () => () => {
@@ -125,6 +133,14 @@ export function useLogSnapshot(runId: string) {
         })
         if (ticket !== loadsRef.current) return null
         const next = { ...summary, fetchedAt, blob }
+        const before = snapshotRef.current
+        setPrevious(
+          before && {
+            fetchedAt: before.fetchedAt,
+            totals: new Map(before.files.map((f) => [f.name, f.totalLines])),
+          },
+        )
+        snapshotRef.current = next
         setSnapshot(next)
         return next
       } catch (caught) {
@@ -141,5 +157,5 @@ export function useLogSnapshot(runId: string) {
     return next
   }, [runId, call])
 
-  return { snapshot, isLoading, error, load, call }
+  return { snapshot, previous, isLoading, error, load, call }
 }

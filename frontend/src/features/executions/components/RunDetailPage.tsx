@@ -457,7 +457,12 @@ export function RunDetailPage() {
                     onViewLogs={() => setActiveTab('logs')}
                   />
                 </TabsContent>
-                <TabsContent value="logs" className={WIDE_TAB_CONTENT}>
+                {/* Kept mounted: the snapshot outlives tab switches. */}
+                <TabsContent
+                  value="logs"
+                  keepMounted
+                  className={WIDE_TAB_CONTENT}
+                >
                   <LogsPanel
                     key={jobId}
                     jobId={jobId}

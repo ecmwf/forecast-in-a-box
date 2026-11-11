@@ -22,6 +22,7 @@ import { render } from 'vitest-browser-react'
 import { userEvent } from 'vitest/browser'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { HttpResponse, http } from 'msw'
+import { strToU8, zipSync } from 'fflate'
 import { I18nextProvider } from 'react-i18next'
 import {
   Outlet,
@@ -936,8 +937,101 @@ describe('RunDetailPage Integration', () => {
     const openLogs = async (runId: string) => {
       const screen = await renderDetailPage(runId)
       await screen.getByRole('tab', { name: 'Logs' }).click()
+      await screen.getByRole('button', { name: 'View here' }).click()
       return screen
     }
+
+    /** Counts `/run/logs` requests until `stop` is called. */
+    const countLogFetches = () => {
+      let fetches = 0
+      const count = ({ request }: { request: Request }) => {
+        if (request.url.includes('/run/logs')) fetches++
+      }
+      worker.events.on('request:start', count)
+      return {
+        get fetches() {
+          return fetches
+        },
+        stop: () => worker.events.removeListener('request:start', count),
+      }
+    }
+
+    it('offers View here and Download before fetching anything', async () => {
+      const counter = countLogFetches()
+      try {
+        const screen = await renderDetailPage('job-completed-001')
+        await screen.getByRole('tab', { name: 'Logs' }).click()
+        await expect.element(screen.getByText('Run logs')).toBeVisible()
+        await expect
+          .element(screen.getByRole('button', { name: 'Download .zip' }))
+          .toBeVisible()
+        expect(counter.fetches).toBe(0)
+
+        await screen.getByRole('button', { name: 'View here' }).click()
+        await expect
+          .element(screen.getByText(/^Snapshot from .+ ago\.$/))
+          .toBeVisible()
+        await expect
+          .element(screen.getByRole('button', { name: 'Refresh' }))
+          .toBeVisible()
+        expect(counter.fetches).toBe(1)
+      } finally {
+        counter.stop()
+      }
+    })
+
+    it('marks the lines new since the last snapshot after a refresh', async () => {
+      const at = '2026-11-08 08:10:00,000:INFO:a:1'
+      const controller = (n: number) =>
+        Array.from({ length: n }, (_, i) => `${at}:step ${i + 1}`).join('\n')
+      let served = 0
+      worker.use(
+        http.get(API_ENDPOINTS.job.logs, () => {
+          served++
+          const zip = zipSync({
+            'job_abc.controller.logs.txt': strToU8(controller(served + 1)),
+          })
+          return HttpResponse.arrayBuffer(zip.slice().buffer, {
+            headers: { 'Content-Type': 'application/zip' },
+          })
+        }),
+      )
+      const screen = await openLogs('job-completed-001')
+      await expect.element(screen.getByText(/step 2/)).toBeVisible()
+      expect(document.querySelector('[data-slot="log-note"]')).toBeNull()
+
+      await screen.getByRole('button', { name: 'Refresh' }).click()
+      await expect.element(screen.getByText(/step 3/)).toBeVisible()
+      const note = document.querySelector('[data-slot="log-note"]')
+      expect(note?.textContent).toMatch(/^New since /)
+      // The note sits right above the new line.
+      expect(
+        note?.parentElement?.nextElementSibling
+          ?.querySelector('[data-line]')
+          ?.getAttribute('data-line'),
+      ).toBe('3')
+    })
+
+    it('opens a failure from the error banner without the landing step', async () => {
+      const counter = countLogFetches()
+      try {
+        const screen = await renderDetailPage('job-errored-003')
+        await screen.getByRole('button', { name: 'Show in logs' }).click()
+        await expect
+          .element(screen.getByLabelText('Log file'))
+          .toMatchTextContent('host_0.worker_w0')
+        await expect
+          .poll(() =>
+            document
+              .querySelector('[data-line="2"]')
+              ?.getAttribute('data-variant'),
+          )
+          .toBe('highlighted')
+        expect(counter.fetches).toBe(1)
+      } finally {
+        counter.stop()
+      }
+    })
 
     it('opens the run file with the most errors', async () => {
       const screen = await openLogs('job-completed-001')
