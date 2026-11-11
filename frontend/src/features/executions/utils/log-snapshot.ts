@@ -127,8 +127,8 @@ export class LogSnapshotStore {
     view = VIEW_LIMITS,
     archive = ARCHIVE_LIMITS,
   ): LogSnapshotSummary {
-    this.zip = zip
-    this.files = []
+    // Built aside: a failed load keeps the previous snapshot.
+    const files: Array<StoredFile> = []
     const { entries, skipped } = listArchive(zip, archive)
     const unread: Array<ArchiveEntry> = []
     let budget = view.totalBytes
@@ -145,7 +145,7 @@ export class LogSnapshotStore {
       budget -= bytes.length
       const log = parseLogText(strFromU8(bytes), cutLines + 1)
       const counts = countEntries(log)
-      this.files.push({
+      files.push({
         log,
         meta: {
           name: entry.name,
@@ -160,9 +160,11 @@ export class LogSnapshotStore {
         },
       })
     }
-    const collect = this.files.find((f) => f.meta.name === COLLECT_ERROR_FILE)
+    this.zip = zip
+    this.files = files
+    const collect = files.find((f) => f.meta.name === COLLECT_ERROR_FILE)
     return {
-      files: this.files.map((f) => f.meta),
+      files: files.map((f) => f.meta),
       skipped,
       unread,
       collectError: collect ? collect.log.text : null,

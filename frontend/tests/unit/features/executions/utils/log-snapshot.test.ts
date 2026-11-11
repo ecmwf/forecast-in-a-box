@@ -80,6 +80,17 @@ describe('LogSnapshotStore.load', () => {
   it('passes on the server note when it could not collect the logs', () => {
     expect(loaded().summary.collectError).toBe('no logs directory')
   })
+
+  it('keeps the previous snapshot when a new archive fails to load', () => {
+    const { store } = loaded()
+    expect(() => store.load(strToU8('<html>Bad gateway</html>'))).toThrow()
+
+    const name = `${JOB}.controller.logs.txt`
+    const view = store.view(request({ file: name }))
+    expect(Array.from(view.indices ?? [])).toEqual([0, 1, 2, 3])
+    expect(Object.keys(view.perFile)).toHaveLength(4)
+    expect(new TextDecoder().decode(store.fileBytes(name))).toContain('boom')
+  })
 })
 
 describe('LogSnapshotStore.view', () => {
