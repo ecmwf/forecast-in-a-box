@@ -13,11 +13,11 @@
 export const AUTO_GRID = 'auto'
 
 /** The finest lat/lon increment in degrees, inclusive. */
-export const MIN_GRID_RESOLUTION = 0.01
+export const MIN_GRID_RESOLUTION = 0.1
 
 /** The inclusive range of a Gaussian grid number, such as 320 in `N320`. */
 export const MIN_GAUSSIAN_NUMBER = 1
-export const MAX_GAUSSIAN_NUMBER = 8000
+export const MAX_GAUSSIAN_NUMBER = 1280
 
 /** Global grids above this many points are flagged as large. */
 export const LARGE_GRID_POINTS = 5_000_000

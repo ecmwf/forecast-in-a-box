@@ -36,10 +36,10 @@ describe('parseGrid', () => {
   it('accepts what the backend accepts', () => {
     for (const valid of [
       '0.25',
-      '0.01',
+      '0.1',
       '0.25/0.5',
       'n320',
-      'O8000',
+      'O1280',
       'O96',
       'auto',
       '1',
@@ -52,14 +52,14 @@ describe('parseGrid', () => {
   })
 
   it('rejects what the backend rejects, with its reason', () => {
-    expect(errorCode('0.001')).toBe('tooFine')
-    expect(errorCode('0.0099')).toBe('tooFine')
-    expect(errorCode('0.25/0.001')).toBe('tooFine')
+    expect(errorCode('0.01')).toBe('tooFine')
+    expect(errorCode('0.099')).toBe('tooFine')
+    expect(errorCode('0.25/0.01')).toBe('tooFine')
     expect(errorCode('1/2/3')).toBe('tooManyParts')
     expect(errorCode('N0')).toBe('gaussianRange')
     expect(errorCode('O0')).toBe('gaussianRange')
-    expect(errorCode('O8001')).toBe('gaussianRange')
-    expect(errorCode('N8001')).toBe('gaussianRange')
+    expect(errorCode('O1281')).toBe('gaussianRange')
+    expect(errorCode('N1281')).toBe('gaussianRange')
     expect(errorCode('O096')).toBe('leadingZeros')
     expect(errorCode('AUTO')).toBe('notGrid')
     expect(errorCode('F80')).toBe('notGrid')
