@@ -52,6 +52,7 @@ import {
 import { isGribDirMime } from '@/features/executions/outputs/adapters/grib'
 import { isFetchableMime } from '@/features/executions/outputs/mime'
 import { OutputZipButton } from '@/features/executions/outputs/OutputZipButton'
+import { useExecutionHoverStore } from '@/features/executions/stores/executionHoverStore'
 import { SLOT_B_OFF, entryRef } from '@/features/visualise/entry-ref'
 import {
   lensOwnerKey,
@@ -212,6 +213,14 @@ function StoredOutputRowItem({
   runName?: string
 }) {
   const { t } = useTranslation('executions')
+  // Graph selection, shown like the output cards: ring on this sink, fade on others.
+  const selection = useExecutionHoverStore((state) =>
+    state.selectedBlockId === null
+      ? null
+      : state.selectedBlockId === row.blockId
+        ? 'this'
+        : 'other',
+  )
   // false only when the backend reports SkinnyWMS as not installed.
   const wmsUnavailable = useSkinnyWmsAvailable() === false
   const startMutation = useStartSkinnyWms()
@@ -317,7 +326,14 @@ function StoredOutputRowItem({
   const sharedFolder = !!dirPath && !dirPath.includes(jobId)
 
   return (
-    <li className="flex flex-wrap items-start gap-3 py-2.5">
+    <li
+      className={cn(
+        // Side padding on every row keeps the ring off the text without a shift.
+        '-mx-2 flex flex-wrap items-start gap-3 rounded-md px-2 py-2.5 transition-opacity',
+        selection === 'this' && 'ring-2 ring-primary ring-inset',
+        selection === 'other' && 'opacity-40',
+      )}
+    >
       <span
         className={cn(
           'mt-0.5 shrink-0 rounded-md px-1.5 py-0.5 font-mono text-sm font-semibold',

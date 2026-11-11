@@ -14,6 +14,7 @@
  * Full-page view of plugin details with block factories grid.
  */
 
+import { formatDistanceToNow } from 'date-fns'
 import { ArrowLeft, Search } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
@@ -23,14 +24,22 @@ import { BlockFactoryCard } from './BlockFactoryCard'
 import { CapabilityBadges } from './CapabilityBadges'
 import { PluginDiagnostics } from './PluginDiagnostics'
 import { PluginIcon } from './PluginIcon'
-import { PluginStatusBadge } from './PluginStatusBadge'
+import { PluginStatusText } from './PluginStatusText'
+import { PluginVersionText } from './PluginVersionText'
 import type {
   BlockFactoryCatalogue,
   PluginBlockFactoryId,
 } from '@/api/types/fable.types'
 import type { PluginCapability, PluginInfo } from '@/api/types/plugins.types'
 import { BLOCK_KIND_ORDER, getFactory } from '@/api/types/fable.types'
-import { toPluginDisplayId } from '@/api/types/plugins.types'
+import {
+  pluginDisplayVersion,
+  toPluginDisplayId,
+} from '@/api/types/plugins.types'
+import {
+  CatalogueFact,
+  CatalogueFacts,
+} from '@/components/common/catalogue/CatalogueFacts'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
@@ -50,6 +59,11 @@ export function PluginDetailPage({ plugin, catalogue }: PluginDetailPageProps) {
     Set<PluginCapability>
   >(new Set())
   const [searchQuery, setSearchQuery] = useState('')
+  const version = pluginDisplayVersion(plugin)
+  // plugin.updatedAt is Z-suffixed UTC; don't route through serverTimeToLocal.
+  const updatedTimeAgo = plugin.updatedAt
+    ? formatDistanceToNow(new Date(plugin.updatedAt), { addSuffix: true })
+    : null
 
   const handleCapabilityToggle = useCallback((capability: PluginCapability) => {
     setSelectedCapabilities((prev) => {
@@ -138,19 +152,24 @@ export function PluginDetailPage({ plugin, catalogue }: PluginDetailPageProps) {
         <PluginIcon plugin={plugin} size="lg" />
         <div className="min-w-0 flex-1">
           <H1 className="text-2xl">{plugin.name}</H1>
-          <P className="mt-1 text-muted-foreground">
-            {plugin.author}
-            {plugin.version &&
-              t('detail.versionSuffix', { version: plugin.version })}
-          </P>
-          <div className="mt-2">
-            <PluginStatusBadge
-              status={plugin.status}
-              hasUpdate={plugin.hasUpdate}
-              severity={plugin.errorSeverity}
-              isEnabled={plugin.isEnabled}
-            />
-          </div>
+          <P className="mt-1 text-muted-foreground">{plugin.author}</P>
+          {/* The catalogue's columns as labelled values. */}
+          <CatalogueFacts className="mt-4">
+            {version && (
+              <CatalogueFact label={t('card.version')}>
+                <PluginVersionText version={version} plugin={plugin} />
+              </CatalogueFact>
+            )}
+            {updatedTimeAgo && (
+              <CatalogueFact label={t('table.headers.updated')}>
+                {updatedTimeAgo}
+              </CatalogueFact>
+            )}
+            <CatalogueFact label={t('table.headers.status')}>
+              {/* The diagnostics show in full below. */}
+              <PluginStatusText plugin={plugin} hoverDiagnostics={false} />
+            </CatalogueFact>
+          </CatalogueFacts>
         </div>
       </div>
 

@@ -22,6 +22,7 @@ import { render } from 'vitest-browser-react'
 import { userEvent } from 'vitest/browser'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { HttpResponse, http } from 'msw'
+import { strToU8, zipSync } from 'fflate'
 import { I18nextProvider } from 'react-i18next'
 import {
   Outlet,
@@ -60,7 +61,7 @@ const anonymousAuth: AuthContextValue = {
   signOut: () => Promise.resolve(),
 }
 
-function renderDetailPage(jobId: string, search = '') {
+async function renderDetailPage(jobId: string, search = '') {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false, gcTime: 0, staleTime: 0 },
@@ -97,13 +98,14 @@ function renderDetailPage(jobId: string, search = '') {
     }),
   })
 
-  return render(
+  const screen = await render(
     <QueryClientProvider client={queryClient}>
       <I18nextProvider i18n={i18n}>
         <RouterProvider router={router} />
       </I18nextProvider>
     </QueryClientProvider>,
   )
+  return Object.assign(screen, { router })
 }
 
 describe('RunDetailPage Integration', () => {
@@ -897,6 +899,356 @@ describe('RunDetailPage Integration', () => {
       const screen = await renderDetailPage('job-unresolved-010')
 
       await expect.element(screen.getByText('${format}')).toBeVisible()
+    })
+  })
+
+  describe('specification tab', () => {
+    it('shows the workflow JSON with line numbers and a copy button', async () => {
+      injectMockExecution(resolvedConfigExecution)
+      const screen = await renderDetailPage('job-resolved-009')
+      await screen.getByRole('tab', { name: 'Specification' }).click()
+
+      await expect
+        .element(screen.getByText('Workflow specification'))
+        .toBeVisible()
+      await expect
+        .element(screen.getByRole('button', { name: 'Copy specification' }))
+        .toBeVisible()
+      await expect
+        .poll(
+          () =>
+            document.querySelectorAll('[data-slot="code-block-line"]').length,
+        )
+        .toBeGreaterThan(3)
+      expect(
+        document.querySelector(
+          '[data-slot="code-block-content"][data-numbered]',
+        ),
+      ).not.toBeNull()
+      // Keys and string values are coloured.
+      const key = document.querySelector(
+        '[data-slot="code-block-line"] span span',
+      )
+      expect(key?.textContent).toBe('"blocks"')
+      expect(key?.className).toContain('text-blue-600')
+    })
+  })
+
+  describe('logs tab', () => {
+    const openLogs = async (runId: string) => {
+      const screen = await renderDetailPage(runId)
+      await screen.getByRole('tab', { name: 'Logs' }).click()
+      await screen.getByRole('button', { name: 'View here' }).click()
+      return screen
+    }
+
+    /** Counts `/run/logs` requests until `stop` is called. */
+    const countLogFetches = () => {
+      let fetches = 0
+      const count = ({ request }: { request: Request }) => {
+        if (request.url.includes('/run/logs')) fetches++
+      }
+      worker.events.on('request:start', count)
+      return {
+        get fetches() {
+          return fetches
+        },
+        stop: () => worker.events.removeListener('request:start', count),
+      }
+    }
+
+    it('offers View here and Download before fetching anything', async () => {
+      const counter = countLogFetches()
+      try {
+        const screen = await renderDetailPage('job-completed-001')
+        await screen.getByRole('tab', { name: 'Logs' }).click()
+        await expect.element(screen.getByText('Run logs')).toBeVisible()
+        await expect
+          .element(screen.getByRole('button', { name: 'Download .zip' }))
+          .toBeVisible()
+        expect(counter.fetches).toBe(0)
+
+        await screen.getByRole('button', { name: 'View here' }).click()
+        await expect
+          .element(screen.getByText(/^Snapshot from .+ ago\.$/))
+          .toBeVisible()
+        await expect
+          .element(screen.getByRole('button', { name: 'Refresh' }))
+          .toBeVisible()
+        expect(counter.fetches).toBe(1)
+      } finally {
+        counter.stop()
+      }
+    })
+
+    it('marks the lines new since the last snapshot after a refresh', async () => {
+      const at = '2026-11-08 08:10:00,000:INFO:a:1'
+      const controller = (n: number) =>
+        Array.from({ length: n }, (_, i) => `${at}:step ${i + 1}`).join('\n')
+      let served = 0
+      worker.use(
+        http.get(API_ENDPOINTS.job.logs, () => {
+          served++
+          const zip = zipSync({
+            'job_abc.controller.logs.txt': strToU8(controller(served + 1)),
+          })
+          return HttpResponse.arrayBuffer(zip.slice().buffer, {
+            headers: { 'Content-Type': 'application/zip' },
+          })
+        }),
+      )
+      const screen = await openLogs('job-completed-001')
+      await expect.element(screen.getByText(/step 2/)).toBeVisible()
+      expect(document.querySelector('[data-slot="log-note"]')).toBeNull()
+
+      await screen.getByRole('button', { name: 'Refresh' }).click()
+      await expect.element(screen.getByText(/step 3/)).toBeVisible()
+      const note = document.querySelector('[data-slot="log-note"]')
+      expect(note?.textContent).toMatch(/^New since /)
+      // The note sits right above the new line.
+      expect(
+        note?.parentElement?.nextElementSibling
+          ?.querySelector('[data-line]')
+          ?.getAttribute('data-line'),
+      ).toBe('3')
+    })
+
+    it('opens a failure from the error banner without the landing step', async () => {
+      const counter = countLogFetches()
+      try {
+        const screen = await renderDetailPage('job-errored-003')
+        await screen.getByRole('button', { name: 'Show in logs' }).click()
+        await expect
+          .element(screen.getByLabelText('Log file'))
+          .toMatchTextContent('host_0.worker_w0')
+        await expect
+          .poll(() =>
+            document
+              .querySelector('[data-line="2"]')
+              ?.getAttribute('data-variant'),
+          )
+          .toBe('highlighted')
+        expect(counter.fetches).toBe(1)
+      } finally {
+        counter.stop()
+      }
+    })
+
+    it('keeps a Show in logs request to its own run', async () => {
+      const counter = countLogFetches()
+      try {
+        const screen = await renderDetailPage('job-errored-003')
+        await screen.getByRole('button', { name: 'Show in logs' }).click()
+        await expect
+          .element(screen.getByLabelText('Log file'))
+          .toMatchTextContent('host_0.worker_w0')
+
+        // Same page, another run: its Logs tab waits for View here.
+        await screen.router.navigate({
+          to: '/execute/$jobId',
+          params: { jobId: 'job-completed-001' },
+        })
+        await expect
+          .element(screen.getByText('job-completed-001'))
+          .toBeVisible()
+        await expect
+          .element(screen.getByRole('button', { name: 'View here' }))
+          .toBeVisible()
+        expect(counter.fetches).toBe(1)
+      } finally {
+        counter.stop()
+      }
+    })
+
+    it('starts a new log worker on Retry after one failed to start', async () => {
+      const RealWorker = Worker
+      let created = 0
+      // The first worker fails to load, as after an upgrade.
+      function FlakyWorker(url: URL, options?: WorkerOptions) {
+        created++
+        if (created > 1) return new RealWorker(url, options)
+        const broken = {
+          onmessage: null,
+          onerror: null as ((event: ErrorEvent) => void) | null,
+          postMessage: () =>
+            setTimeout(() =>
+              broken.onerror?.(
+                new ErrorEvent('error', { message: 'Worker script missing' }),
+              ),
+            ),
+          terminate: () => {},
+        }
+        return broken
+      }
+      vi.stubGlobal('Worker', FlakyWorker)
+      try {
+        const screen = await renderDetailPage('job-completed-001')
+        await screen.getByRole('tab', { name: 'Logs' }).click()
+        await screen.getByRole('button', { name: 'View here' }).click()
+        await expect
+          .element(screen.getByText('Worker script missing'))
+          .toBeVisible()
+
+        await screen.getByRole('button', { name: 'Retry' }).click()
+        await expect
+          .element(screen.getByText(/^Snapshot from .+ ago\.$/))
+          .toBeVisible()
+        expect(created).toBe(2)
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    })
+
+    it('opens the run file with the most errors', async () => {
+      const screen = await openLogs('job-completed-001')
+
+      await expect
+        .element(screen.getByText(/command failed with 1/))
+        .toBeVisible()
+      await expect
+        .element(screen.getByLabelText('Log file'))
+        .toMatchTextContent('host_0.worker_w0')
+      // The file's own line numbers, kept through filters.
+      const error = document.querySelector('[data-line="2"]')
+      expect(error?.textContent).toContain(':ERROR:')
+    })
+
+    it('filters by level, keeping a traceback with its error', async () => {
+      const screen = await openLogs('job-completed-001')
+      await expect.element(screen.getByText(/running task plot/)).toBeVisible()
+
+      await screen.getByLabelText('Log level').click()
+      await screen.getByRole('option', { name: 'Errors only' }).click()
+      await expect
+        .element(screen.getByText(/RuntimeError: plot failed/))
+        .toBeVisible()
+      await expect
+        .element(screen.getByText(/running task plot/))
+        .not.toBeInTheDocument()
+      expect(document.querySelector('[data-line="5"]')).not.toBeNull()
+    })
+
+    it('lists server-wide files and switches to one', async () => {
+      const screen = await openLogs('job-completed-001')
+      await screen.getByLabelText('Log file').click()
+      await expect.element(screen.getByText('This run')).toBeVisible()
+      await expect.element(screen.getByText('Server-wide')).toBeVisible()
+      // Empty files are left out.
+      expect(screen.getByText(/lens\.65e780a2/).elements()).toHaveLength(0)
+
+      await screen.getByRole('option', { name: /^backend/ }).click()
+      await expect
+        .element(screen.getByText(/starting background compilation/))
+        .toBeVisible()
+    })
+
+    it("keeps server-wide lines to the run's time until turned off", async () => {
+      const screen = await openLogs('job-completed-001')
+      await screen.getByLabelText('Log file').click()
+      await screen.getByRole('option', { name: /^backend/ }).click()
+
+      await expect
+        .element(screen.getByText(/starting background compilation/))
+        .toBeVisible()
+      await expect.element(screen.getByText(/1 of 3 lines/)).toBeVisible()
+      expect(
+        screen.getByText(/Started server process/).elements(),
+      ).toHaveLength(0)
+      expect(screen.getByText(/will fetch logs/).elements()).toHaveLength(0)
+
+      // DOM click: the unstyled checkbox is too small.
+      ;(
+        screen
+          .getByRole('checkbox', { name: 'During run' })
+          .element() as HTMLElement
+      ).click()
+      await expect
+        .element(screen.getByText(/Started server process/))
+        .toBeVisible()
+      await expect.element(screen.getByText(/will fetch logs/)).toBeVisible()
+    })
+
+    it('searches all files and opens a match in its file', async () => {
+      const screen = await openLogs('job-completed-001')
+      await expect.element(screen.getByText(/running task plot/)).toBeVisible()
+      await screen.getByPlaceholder('Filter lines...').fill('503')
+
+      await screen.getByLabelText('Log file').click()
+      await expect
+        .element(screen.getByRole('option', { name: /host_0\.worker_w1/ }))
+        .toMatchTextContent(/1 match/)
+      await screen.getByRole('option', { name: /^All files/ }).click()
+
+      const match = screen.getByText(/attempt 1 of 500/)
+      await expect.element(match).toBeVisible()
+      const marks = () =>
+        [...document.querySelectorAll('mark')].map((m) => m.textContent)
+      expect(marks()).toEqual(['503'])
+      expect(
+        document.querySelectorAll('[data-slot="log-section"]'),
+      ).toHaveLength(1)
+
+      await match.click()
+      await expect
+        .element(screen.getByLabelText('Log file'))
+        .toMatchTextContent('host_0.worker_w1')
+      await expect
+        .element(screen.getByPlaceholder('Filter lines...'))
+        .toHaveValue('')
+      await expect.poll(marks).toEqual([])
+      await expect
+        .element(screen.getByText(/starting _get_initial_conditions/))
+        .toBeVisible()
+      expect(
+        document.querySelector('[data-line="2"]')?.getAttribute('data-variant'),
+      ).toBe('highlighted')
+    })
+
+    it('opens the failure from the error banner on fresh logs', async () => {
+      let fetches = 0
+      const count = ({ request }: { request: Request }) => {
+        if (request.url.includes('/run/logs')) fetches++
+      }
+      worker.events.on('request:start', count)
+      try {
+        const screen = await openLogs('job-errored-003')
+        await expect
+          .element(screen.getByText(/running task plot/))
+          .toBeVisible()
+        await screen.getByLabelText('Log file').click()
+        await screen.getByRole('option', { name: /^backend/ }).click()
+        await screen.getByRole('tab', { name: 'Outputs' }).click()
+
+        await screen.getByRole('button', { name: 'Show in logs' }).click()
+        await expect
+          .element(screen.getByRole('tab', { name: 'Logs' }))
+          .toHaveAttribute('aria-selected', 'true')
+        await expect
+          .element(screen.getByLabelText('Log file'))
+          .toMatchTextContent('host_0.worker_w0')
+        await expect
+          .poll(() =>
+            document
+              .querySelector('[data-line="2"]')
+              ?.getAttribute('data-variant'),
+          )
+          .toBe('highlighted')
+        expect(fetches).toBe(2)
+      } finally {
+        worker.events.removeListener('request:start', count)
+      }
+    })
+
+    it('says so when the run files are gone after a restart', async () => {
+      // No cascade job id: only server-wide files.
+      const screen = await openLogs('job-submitted-004')
+
+      await expect
+        .element(screen.getByText(/no longer on this server/))
+        .toBeVisible()
+      await expect
+        .element(screen.getByLabelText('Log file'))
+        .toMatchTextContent('backend')
     })
   })
 })

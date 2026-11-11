@@ -16,6 +16,7 @@ import {
   datetimeType,
   floatType,
   geodomainType,
+  gridType,
   intType,
   listOf,
   noneType,
@@ -41,6 +42,7 @@ describe('serializeValueType', () => {
     expect(serializeValueType(timedeltaType)).toBe('timedelta')
     expect(serializeValueType(noneType)).toBe('none')
     expect(serializeValueType(geodomainType)).toBe('geodomain')
+    expect(serializeValueType(gridType)).toBe('grid')
     expect(serializeValueType(artifactType)).toBe('artifact')
     expect(serializeValueType(paramType)).toBe('param')
   })
@@ -53,6 +55,12 @@ describe('serializeValueType', () => {
     expect(
       serializeValueType(openEnum(['2026-01-01T00:00:00'], datetimeType)),
     ).toBe('enumOpen[datetime](2026-01-01T00:00:00)')
+    // GridType.value_to_str items (ecmwf#667).
+    expect(
+      serializeValueType(
+        openEnum(['auto', '0.25', '0.5', '1', 'O96', 'O320', 'N320'], gridType),
+      ),
+    ).toBe('enumOpen[grid](auto,0.25,0.5,1,O96,O320,N320)')
     // str-ish subtypes stay quoted, including artifact and param.
     expect(serializeValueType(closedEnum(['fc:t:step0'], artifactType))).toBe(
       "enumClosed[artifact]('fc:t:step0')",
@@ -123,6 +131,11 @@ describe('parseFableType', () => {
       unionOf([datetimeType, timedeltaType]),
       unionOf([stringType, noneType]),
       closedEnum(['PT3H', 'PT6H'], timedeltaType),
+      // fiab-core grid (ecmwf#667).
+      gridType,
+      listOf(gridType),
+      openEnum(['auto', '0.25', '0.25/0.5', 'O96', 'N320'], gridType),
+      closedEnum(['auto', 'O96'], gridType),
     ]
     for (const t of representatives) {
       expect(parseFableType(serializeValueType(t))).toEqual(t)
@@ -165,6 +178,9 @@ describe('parseFableType', () => {
       floatType,
     )
     expect(parseFableType('list[int{positive}]')).toEqual(listOf(intType))
+    // fiab-core `finite` (ecmwf#667), the trait inside bboxWSEN.
+    expect(parseFableType('float{finite}')).toEqual(floatType)
+    expect(parseFableType('list[float{finite}]')).toEqual(listOf(floatType))
     expect(parseFableType('union[int{positive},str]')).toEqual(
       unionOf([intType, stringType]),
     )

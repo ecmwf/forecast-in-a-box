@@ -393,6 +393,42 @@ describe('parseValueType', () => {
     })
   })
 
+  describe('grid type', () => {
+    it('parses a bare "grid" with the built-in suggestions', () => {
+      expect(parseValueType('grid')).toEqual({
+        type: 'grid',
+        options: ['auto', '0.25', '0.5', '1', 'O96', 'O320', 'N320'],
+        closed: false,
+      })
+    })
+
+    // As fiab-plugin-ecmwf sends it (ecmwf#667).
+    it('parses the plugin suggestions as an open grid, not a select', () => {
+      expect(
+        parseValueType('enumOpen[grid](auto,0.25,0.5,1,O96,O320,N320)'),
+      ).toEqual({
+        type: 'grid',
+        options: ['auto', '0.25', '0.5', '1', 'O96', 'O320', 'N320'],
+        closed: false,
+      })
+    })
+
+    it('keeps a closed grid enum closed', () => {
+      expect(parseValueType('enumClosed[grid](auto,O96)')).toEqual({
+        type: 'grid',
+        options: ['auto', 'O96'],
+        closed: true,
+      })
+    })
+
+    it('leaves a list of grids without a widget', () => {
+      expect(parseValueType('list[grid]')).toEqual({
+        type: 'unknown',
+        raw: 'list[grid]',
+      })
+    })
+  })
+
   describe('traits', () => {
     // *TODO* once traits feed the UI, assert on the parsed trait info
     // instead of just the base widget type.
@@ -404,6 +440,10 @@ describe('parseValueType', () => {
       expect(parseValueType('float{nonNegative,divisibleBy(3)}')).toEqual({
         type: 'float',
       })
+    })
+
+    it('reads float{finite} as a plain float', () => {
+      expect(parseValueType('float{finite}')).toEqual({ type: 'float' })
     })
 
     it('ignores a traits suffix nested inside a list', () => {
@@ -423,6 +463,16 @@ describe('getDefaultValueForType', () => {
 
   it('returns empty string for string type', () => {
     expect(getDefaultValueForType({ type: 'string' })).toBe('')
+  })
+
+  it('returns the first suggestion for grid type', () => {
+    expect(
+      getDefaultValueForType({
+        type: 'grid',
+        options: ['auto'],
+        closed: false,
+      }),
+    ).toBe('auto')
   })
 
   it('returns "0" for int type', () => {

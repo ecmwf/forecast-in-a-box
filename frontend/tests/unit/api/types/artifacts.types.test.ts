@@ -16,6 +16,7 @@ import {
   artifactLabels,
   artifactMaturity,
   displayTags,
+  nonMaturityTags,
   toArtifactInfo,
 } from '@/api/types/artifacts.types'
 
@@ -126,5 +127,27 @@ describe('artifactMaturity', () => {
 
   it('is null without a maturity tag', () => {
     expect(artifactMaturity({ resolution: 'n320' })).toBeNull()
+  })
+
+  it('trims and lower-cases the value', () => {
+    expect(artifactMaturity({ maturity: ' Demo ' })).toBe('demo')
+    expect(artifactMaturity({ status: 'OPERATIONAL' })).toBe('operational')
+  })
+
+  it('is null for a blank or missing value', () => {
+    expect(artifactMaturity({ maturity: '' })).toBeNull()
+    expect(artifactMaturity({ maturity: '  ' })).toBeNull()
+    expect(artifactMaturity({ maturity: null })).toBeNull()
+  })
+})
+
+describe('nonMaturityTags', () => {
+  it('drops maturity under either key and keeps the rest', () => {
+    expect(nonMaturityTags({ status: 'demo', resolution: 'o96' })).toEqual({
+      resolution: 'o96',
+    })
+    expect(
+      nonMaturityTags({ maturity: 'operational', status: 'x', ensemble: null }),
+    ).toEqual({ ensemble: null })
   })
 })

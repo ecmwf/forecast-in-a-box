@@ -41,6 +41,7 @@ export type FableType =
   | { kind: 'geodomain' }
   | { kind: 'geodomainSingle' }
   | { kind: 'bboxWSEN' }
+  | { kind: 'grid' }
   | { kind: 'artifact' }
   | { kind: 'param' }
   | {
@@ -64,6 +65,7 @@ export const timedeltaType: FableType = { kind: 'timedelta' }
 /** Only valid as a union member: `union[str,none]` admits an explicit null. */
 export const noneType: FableType = { kind: 'none' }
 export const geodomainType: FableType = { kind: 'geodomain' }
+export const gridType: FableType = { kind: 'grid' }
 export const artifactType: FableType = { kind: 'artifact' }
 export const paramType: FableType = { kind: 'param' }
 
@@ -108,12 +110,13 @@ export function unionOf(types: ReadonlyArray<FableType>): FableType {
 
 // -------- Serialization (mirrors FableType.serialize) --------
 
-/** Mirrors `_serialize_enum_item`: date/datetime/timedelta items bare ISO, str-ish quoted. */
+/** Mirrors `_serialize_enum_item`: time and grid items bare, str-ish quoted. */
 function serializeEnumItem(item: string | number, subtype: FableType): string {
   if (
     subtype.kind === 'date' ||
     subtype.kind === 'datetime' ||
-    subtype.kind === 'timedelta'
+    subtype.kind === 'timedelta' ||
+    subtype.kind === 'grid'
   ) {
     return String(item)
   }
@@ -142,6 +145,8 @@ export function serializeValueType(t: FableType): string {
       return 'geodomainSingle'
     case 'bboxWSEN':
       return 'bboxWSEN'
+    case 'grid':
+      return 'grid'
     case 'artifact':
       return 'artifact'
     case 'param':
@@ -176,6 +181,7 @@ const ATOMS: ReadonlyArray<[keyword: string, kind: FableType]> = [
   ['number', floatType],
   ['param', paramType],
   ['float', floatType],
+  ['grid', gridType],
   ['none', noneType],
   ['date', dateType],
   ['int', intType],

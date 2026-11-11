@@ -10,17 +10,23 @@
 
 import { formatDistanceToNow } from 'date-fns'
 import { useTranslation } from 'react-i18next'
+import { Link } from '@tanstack/react-router'
 import { CapabilityBadges } from './CapabilityBadges'
 import { PluginActions, usePluginBusyLabel } from './PluginActions'
 import { PluginDiagnostics } from './PluginDiagnostics'
 import { PluginIcon } from './PluginIcon'
-import { PluginStatusBadge } from './PluginStatusBadge'
+import { PluginStatusText } from './PluginStatusText'
+import { PluginVersionText } from './PluginVersionText'
 import type { PluginItemHandlers } from './PluginActions'
 import type { PluginOperation } from '@/api/hooks/usePlugins'
 import type { PluginInfo } from '@/api/types/plugins.types'
+import { encodePluginId, pluginDisplayVersion } from '@/api/types/plugins.types'
+import {
+  CatalogueFact,
+  CatalogueFacts,
+} from '@/components/common/catalogue/CatalogueFacts'
 import { Card } from '@/components/ui/card'
 import { P } from '@/components/base/typography'
-import { cn } from '@/lib/utils'
 
 interface PluginCardProps extends PluginItemHandlers {
   plugin: PluginInfo
@@ -39,47 +45,27 @@ export function PluginCard({
   const updatedTimeAgo = plugin.updatedAt
     ? formatDistanceToNow(new Date(plugin.updatedAt), { addSuffix: true })
     : null
-  const hasDiagnostics = !!plugin.errorDetail || plugin.status === 'errored'
-  const version =
-    plugin.version ??
-    (plugin.latestVersion !== 'unknown' ? plugin.latestVersion : null)
+  const version = pluginDisplayVersion(plugin)
 
   return (
-    <Card
-      className={cn(
-        'group w-full gap-0 py-0 transition-colors hover:border-primary/30',
-        hasDiagnostics &&
-          (plugin.errorSeverity === 'warning'
-            ? 'border-amber-200 dark:border-amber-800'
-            : 'border-red-200 dark:border-red-800'),
-      )}
-    >
-      <div
-        className={cn(
-          'flex flex-1 flex-col gap-4 p-5',
-          plugin.isInstalled && !plugin.isEnabled && 'opacity-70',
-        )}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 gap-3">
-            <PluginIcon plugin={plugin} />
-            <div className="min-w-0">
-              <h3 className="truncate text-base font-semibold">
+    <Card className="group w-full gap-0 py-0 transition-colors hover:border-primary/30">
+      <div className="flex flex-1 flex-col gap-4 p-5">
+        <div className="flex min-w-0 gap-3">
+          <PluginIcon plugin={plugin} />
+          <div className="min-w-0">
+            <h3 className="truncate text-base font-semibold">
+              <Link
+                to="/admin/plugins/$pluginId"
+                params={{ pluginId: encodePluginId(plugin.id) }}
+                className="hover:underline"
+              >
                 {plugin.name}
-              </h3>
-              <P className="mt-0.5 truncate text-muted-foreground">
-                {plugin.author}
-              </P>
-            </div>
+              </Link>
+            </h3>
+            <P className="mt-0.5 truncate text-muted-foreground">
+              {plugin.author}
+            </P>
           </div>
-          <PluginStatusBadge
-            status={plugin.status}
-            hasUpdate={plugin.hasUpdate}
-            severity={plugin.errorSeverity}
-            isEnabled={plugin.isEnabled}
-            busyLabel={busyLabel}
-            className="shrink-0"
-          />
         </div>
 
         <P className="line-clamp-2 min-h-10 text-muted-foreground">
@@ -90,26 +76,28 @@ export function PluginCard({
           <PluginDiagnostics errors={plugin.errorDetail} className="py-2" />
         )}
 
-        <div className="mt-auto flex flex-wrap items-center gap-2">
+        {/* The table's columns as labelled values. */}
+        <CatalogueFacts className="mt-auto">
           {version && (
-            <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 font-mono text-sm font-medium text-muted-foreground">
-              {t('item.version', { version })}
-            </span>
-          )}
-          {plugin.hasUpdate && plugin.latestVersion && (
-            <span className="inline-flex items-center rounded-md bg-amber-100 px-2 py-0.5 font-mono text-sm font-medium text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
-              {t('card.versionArrow', { version: plugin.latestVersion })}
-            </span>
-          )}
-          {plugin.capabilities.length > 0 && (
-            <CapabilityBadges capabilities={plugin.capabilities} />
+            <CatalogueFact label={t('card.version')}>
+              <PluginVersionText version={version} plugin={plugin} />
+            </CatalogueFact>
           )}
           {updatedTimeAgo && (
-            <span className="text-sm text-muted-foreground">
-              {t('card.updatedAgo', { time: updatedTimeAgo })}
-            </span>
+            <CatalogueFact label={t('table.headers.updated')}>
+              {updatedTimeAgo}
+            </CatalogueFact>
           )}
-        </div>
+          <CatalogueFact label={t('table.headers.status')}>
+            <PluginStatusText plugin={plugin} busyLabel={busyLabel} />
+          </CatalogueFact>
+        </CatalogueFacts>
+
+        {plugin.capabilities.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <CapabilityBadges capabilities={plugin.capabilities} />
+          </div>
+        )}
       </div>
 
       <div className="flex items-center border-t border-border/60 px-5 py-3">

@@ -17,7 +17,11 @@ import { useTranslation } from 'react-i18next'
 import type { ArtifactInfo } from '@/api/types/artifacts.types'
 import type { DeleteArtifactTarget } from '@/features/artifacts/components/ConfirmDeleteArtifactDialog'
 import type { SortOption } from '@/components/common/catalogue/useStableOrder'
-import { artifactIdToWire, encodeArtifactId } from '@/api/types/artifacts.types'
+import {
+  artifactIdToWire,
+  artifactMaturity,
+  encodeArtifactId,
+} from '@/api/types/artifacts.types'
 import {
   useArtifacts,
   useDeleteModel,
@@ -26,6 +30,13 @@ import {
   useDownloadingKeys,
 } from '@/api/hooks/useArtifacts'
 import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ListPageContainer } from '@/components/common/ListPageContainer'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
@@ -49,12 +60,32 @@ export const Route = createFileRoute('/_authenticated/admin/artifacts/')({
 type ArtifactFilter = 'all' | 'downloaded' | 'available'
 
 const GRID =
-  'sm:grid-cols-[minmax(0,1fr)_9rem_15rem] lg:grid-cols-[minmax(0,1fr)_6rem_9rem_16rem]'
+  'sm:grid-cols-[minmax(0,1fr)_9rem_15rem] md:grid-cols-[minmax(0,1fr)_7rem_9rem_15rem] lg:grid-cols-[minmax(0,1fr)_7rem_6rem_9rem_16rem]'
 
 function matchesFilter(artifact: ArtifactInfo, filter: ArtifactFilter) {
   if (filter === 'all') return true
   return artifact.isAvailable === (filter === 'downloaded')
 }
+
+// Downloaded, then downloadable, then incompatible here, downloaded or not.
+const availabilityRank = (a: ArtifactInfo) =>
+  !a.isLocallyCompatible ? 2 : a.isAvailable ? 0 : 1
+
+// Models without a maturity last.
+function byMaturity(a: ArtifactInfo, b: ArtifactInfo) {
+  const ma = artifactMaturity(a.tags)
+  const mb = artifactMaturity(b.tags)
+  if (ma === mb) return 0
+  if (ma === null) return 1
+  if (mb === null) return -1
+  return ma.localeCompare(mb)
+}
+
+const ALL_MATURITIES = 'all'
+
+// Catalogue values are lower case, e.g. `demo`.
+const maturityLabel = (maturity: string) =>
+  maturity.charAt(0).toUpperCase() + maturity.slice(1)
 
 // Same-name variants sort by id.
 const byName = (a: ArtifactInfo, b: ArtifactInfo) =>
@@ -71,6 +102,7 @@ function ArtifactsPage() {
 
   const [searchQuery, setSearchQuery] = useState('')
   const [filter, setFilter] = useState<ArtifactFilter>('all')
+  const [maturityFilter, setMaturityFilter] = useState(ALL_MATURITIES)
   const [pendingDelete, setPendingDelete] =
     useState<DeleteArtifactTarget | null>(null)
 
@@ -80,22 +112,42 @@ function ArtifactsPage() {
   const downloadingKeys = useDownloadingKeys()
   const deletingKeys = useDeletingKeys()
 
+  const maturities = useMemo(
+    () =>
+      [...new Set(artifacts.map((a) => artifactMaturity(a.tags)))]
+        .filter((m) => m !== null)
+        .sort(),
+    [artifacts],
+  )
+  // Applies only while the filter shows and its value is still in the catalogue.
+  const activeMaturity =
+    maturities.length > 1 && maturities.includes(maturityFilter)
+      ? maturityFilter
+      : ALL_MATURITIES
+  // Narrows the availability counts too.
   const searched = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
     return artifacts.filter(
       (a) =>
-        !query ||
-        a.displayName.toLowerCase().includes(query) ||
-        a.author.toLowerCase().includes(query) ||
-        artifactIdToWire(a.id).toLowerCase().includes(query),
+        (activeMaturity === ALL_MATURITIES ||
+          artifactMaturity(a.tags) === activeMaturity) &&
+        (!query ||
+          a.displayName.toLowerCase().includes(query) ||
+          a.author.toLowerCase().includes(query) ||
+          artifactIdToWire(a.id).toLowerCase().includes(query)),
     )
-  }, [artifacts, searchQuery])
+  }, [artifacts, searchQuery, activeMaturity])
+  const maturityItems = [
+    { value: ALL_MATURITIES, label: t('filters.allMaturities') },
+    ...maturities.map((m) => ({ value: m, label: maturityLabel(m) })),
+  ]
   // As in the picker: store ids only with several stores.
   const showStore =
     new Set(artifacts.map((a) => a.id.artifact_store_id)).size > 1
 
   const sortOptions: Array<SortOption<ArtifactInfo>> = [
     { key: 'name', label: t('table.model'), compare: byName },
+    { key: 'maturity', label: t('table.maturity'), compare: byMaturity },
     {
       key: 'size',
       label: t('table.size'),
@@ -105,7 +157,7 @@ function ArtifactsPage() {
     {
       key: 'status',
       label: t('table.availability'),
-      compare: (a, b) => Number(b.isAvailable) - Number(a.isAvailable),
+      compare: (a, b) => availabilityRank(a) - availabilityRank(b),
     },
   ]
   const sorting = resolveCatalogueSort(
@@ -116,7 +168,7 @@ function ArtifactsPage() {
   )
 
   // Only user actions re-sort or release held items.
-  const viewKey = `${filter}|${searchQuery}|${sorting.sort.key}|${sorting.sort.dir}`
+  const viewKey = `${filter}|${activeMaturity}|${searchQuery}|${sorting.sort.key}|${sorting.sort.dir}`
   const held = useHeldKeys([...downloadingKeys, ...deletingKeys], viewKey)
   const visible = useStableOrder(
     searched.filter((a) => matchesFilter(a, filter) || held.has(a.encodedId)),
@@ -150,7 +202,10 @@ function ArtifactsPage() {
     )
   }
 
-  const isFiltered = filter !== 'all' || searchQuery.trim() !== ''
+  const isFiltered =
+    filter !== 'all' ||
+    activeMaturity !== ALL_MATURITIES ||
+    searchQuery.trim() !== ''
 
   return (
     <ListPageContainer>
@@ -192,7 +247,31 @@ function ArtifactsPage() {
           sort={sorting.sort}
           onSortChange={sorting.onSortSelect}
           onSortDirToggle={sorting.onSortDirToggle}
-        />
+        >
+          {maturities.length > 1 && (
+            <Select
+              value={activeMaturity}
+              onValueChange={(value) =>
+                setMaturityFilter(value ?? ALL_MATURITIES)
+              }
+              items={maturityItems}
+            >
+              <SelectTrigger
+                className="min-w-40"
+                aria-label={t('filters.maturityLabel')}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {maturityItems.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </CatalogueToolbar>
 
         <CatalogueView
           items={visible}
@@ -203,6 +282,11 @@ function ArtifactsPage() {
           onSortChange={sorting.onSortChange}
           columns={[
             { label: t('table.model'), sortKey: 'name' },
+            {
+              label: t('table.maturity'),
+              className: 'hidden md:block',
+              sortKey: 'maturity',
+            },
             {
               label: t('table.size'),
               className: 'hidden lg:block',
@@ -239,6 +323,7 @@ function ArtifactsPage() {
                     variant="outline"
                     onClick={() => {
                       setFilter('all')
+                      setMaturityFilter(ALL_MATURITIES)
                       setSearchQuery('')
                     }}
                   >

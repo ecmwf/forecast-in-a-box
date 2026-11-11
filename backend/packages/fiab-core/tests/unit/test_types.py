@@ -891,23 +891,23 @@ class TestFableTypeParseRemainder:
 
 
 class TestGridType:
-    """GridType: union over named Gaussian grid (e.g. 'N320'), single positive
+    """GridType: union over named Gaussian grid (e.g. 'N320', 'F320', 'O96'), single positive
     resolution, and a two-element [west_east, south_north] pair of resolutions."""
 
     def test_serialize(self) -> None:
         assert GridType().serialize() == "grid"
 
-    @pytest.mark.parametrize("value", ["N320", "O96", "N1", "O8000"])
+    @pytest.mark.parametrize("value", ["N320", "O96", "F80", "N32", "O1280", "O8000", "F8000"])
     def test_convert_named_gaussian_grid(self, value: str) -> None:
         assert GridType().validate_convert(value) == value
 
-    @pytest.mark.parametrize(("value", "expected"), [("n320", "N320"), ("o96", "O96"), ("n1280", "N1280"), ("o48", "O48")])
+    @pytest.mark.parametrize(("value", "expected"), [("n320", "N320"), ("o96", "O96"), ("n1280", "N1280"), ("o48", "O48"), ("f80", "F80")])
     def test_gaussian_grid_name_is_converted_to_upper_case(self, value: str, expected: str) -> None:
         assert GridType().validate_convert(value) == expected
 
-    @pytest.mark.parametrize("value", ["N0", "O0", "n0", "N8001", "O9000", "O100000"])
-    def test_gaussian_grid_number_out_of_range_raises(self, value: str) -> None:
-        with pytest.raises(WrongType, match="must be from 1 to 8000"):
+    @pytest.mark.parametrize("value", ["N0", "O0", "n0", "N1", "O100", "F90", "N1281", "O2560", "O8001", "O100000"])
+    def test_gaussian_grid_number_not_listed_raises(self, value: str) -> None:
+        with pytest.raises(WrongType, match="must be one of 32, 48, .*, 1280, 8000"):
             GridType().validate_convert(value)
 
     @pytest.mark.parametrize("value", ["O096", "N00320", "o01"])
@@ -920,15 +920,13 @@ class TestGridType:
         with pytest.raises(WrongType):
             GridType().validate_convert(value)
 
-    @pytest.mark.parametrize("value", ["0.01", 0.01, "0.01/0.01", [0.01, 0.01], "0.25/0.01", 1e-2])
+    @pytest.mark.parametrize("value", ["0.1", 0.1, "0.1/0.1", [0.1, 0.1], "0.25/0.1", 1e-1])
     def test_finest_resolution_is_accepted(self, value: object) -> None:
         GridType().validate_convert(value)
 
-    @pytest.mark.parametrize(
-        "value", ["0.0099", "0.001", "0.0001", 0.001, 0.0099, "0.25/0.001", "0.001/0.25", [0.25, 0.001], [0.001, 0.25], "1e-5"]
-    )
+    @pytest.mark.parametrize("value", ["0.099", "0.05", "0.01", 0.01, 0.099, "0.25/0.01", "0.01/0.25", [0.25, 0.01], [0.01, 0.25], "1e-5"])
     def test_resolution_finer_than_minimum_raises(self, value: object) -> None:
-        with pytest.raises(WrongType, match="finer than the minimum of 0.01 degrees"):
+        with pytest.raises(WrongType, match="finer than the minimum of 0.1 degrees"):
             GridType().validate_convert(value)
 
     def test_value_to_str_is_canonical_and_converts_back(self) -> None:
@@ -939,7 +937,7 @@ class TestGridType:
             ("0.25", "0.25"),
             ("1", "1"),
             ("1.0", "1"),
-            ("0.01", "0.01"),
+            ("0.1", "0.1"),
             ("0.25/0.5", "0.25/0.5"),
             ("1/2", "1/2"),
             ("0.5/1.0", "0.5/1"),
@@ -1063,7 +1061,7 @@ class TestGridEnum:
         assert t.validate_convert("n1280") == "N1280"
         assert t.validate_convert("O48") == "O48"
 
-    @pytest.mark.parametrize("value", ["0.001", "O0", "N8001", "abc", "1/2/3", "inf", ""])
+    @pytest.mark.parametrize("value", ["0.01", "O0", "O100", "N1281", "abc", "1/2/3", "inf", ""])
     def test_invalid_free_entries_are_rejected(self, value: str) -> None:
         with pytest.raises(WrongType):
             parse(self.TERM).validate_convert(value)

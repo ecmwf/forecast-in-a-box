@@ -19,6 +19,7 @@ import {
   useEffect,
   useLayoutEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 import {
@@ -41,6 +42,7 @@ import { LogsPanel } from './LogsPanel'
 import { OutputsPanel } from './OutputsPanel'
 import { SpecificationPanel } from './SpecificationPanel'
 import { StoredOutputsCard } from './StoredOutputsCard'
+import type { LogFocus } from './LogsPanel'
 import type { CSSProperties, ReactNode } from 'react'
 import { useBlockDisplayNames } from '@/features/fable-builder/hooks/useBlockDisplayNames'
 import { RunMetadataDialog } from '@/features/journal/components/RunMetadataDialog'
@@ -119,6 +121,11 @@ export function RunDetailPage() {
   const { jobId } = useParams({ from: '/_authenticated/execute/$jobId' })
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('outputs')
+  // The page outlives a switch to another run; the request names its run.
+  const [logFocus, setLogFocus] = useState<
+    (LogFocus & { jobId: string }) | null
+  >(null)
+  const tabsRef = useRef<HTMLDivElement>(null)
   const [metadataOpen, setMetadataOpen] = useState(false)
   const [toolbarSlot, setToolbarSlot] = useState<HTMLDivElement | null>(null)
   const handleToolbarRef = useCallback((node: HTMLDivElement | null) => {
@@ -228,6 +235,16 @@ export function RunDetailPage() {
     )
   }
 
+  // The logs tab takes a fresh snapshot for it.
+  const handleShowInLogs = (message: string) => {
+    setLogFocus({ jobId, message, at: Date.now() })
+    setActiveTab('logs')
+    const tabs = tabsRef.current
+    if (tabs && tabs.getBoundingClientRect().top > window.innerHeight / 2) {
+      tabs.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }
+
   const handleEditConfig = () => {
     if (!jobData?.blueprint_id) return
     navigate({
@@ -324,6 +341,7 @@ export function RunDetailPage() {
         <RunErrorBanner
           error={jobData.error}
           jobId={jobId}
+          onShowInLogs={() => handleShowInLogs(jobData.error ?? '')}
           onRestart={handleRestart}
           onEditConfig={handleEditConfig}
           canEditConfig={canEditConfig}
@@ -376,6 +394,7 @@ export function RunDetailPage() {
           details={
             <div className={WIDE_COLUMN}>
               <Tabs
+                ref={tabsRef}
                 value={activeTab}
                 onValueChange={setActiveTab}
                 className="min-[1280px]:flex min-[1280px]:h-full min-[1280px]:min-h-0 min-[1280px]:flex-col"
@@ -441,8 +460,20 @@ export function RunDetailPage() {
                     onViewLogs={() => setActiveTab('logs')}
                   />
                 </TabsContent>
-                <TabsContent value="logs" className={WIDE_TAB_CONTENT}>
-                  <LogsPanel jobId={jobId} status={jobData.status} />
+                {/* Kept mounted: the snapshot outlives tab switches. */}
+                <TabsContent
+                  value="logs"
+                  keepMounted
+                  className={WIDE_TAB_CONTENT}
+                >
+                  <LogsPanel
+                    key={jobId}
+                    jobId={jobId}
+                    status={jobData.status}
+                    createdAt={jobData.created_at}
+                    updatedAt={jobData.updated_at}
+                    focus={logFocus?.jobId === jobId ? logFocus : null}
+                  />
                 </TabsContent>
                 <TabsContent value="compilation" className={WIDE_TAB_CONTENT}>
                   <CompilationPanel

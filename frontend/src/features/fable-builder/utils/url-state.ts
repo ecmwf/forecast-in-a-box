@@ -15,6 +15,7 @@ import {
   isStateTooLarge,
 } from '@/lib/url-state'
 import { FableBuilderV1Schema, serializeFable } from '@/api/types/fable.types'
+import { workflowNameIssue } from '@/features/fable-builder/utils/workflow-names'
 
 export { isStateTooLarge }
 
@@ -24,6 +25,8 @@ export function encodeFableToURL(fable: FableBuilderV1): string {
   return encodeStateToURL(serializeFable(fable))
 }
 
+/** The link's workflow; null when it can't be read or names a built-in or missing block. */
 export function decodeFableFromURL(encoded: string): FableBuilderV1 | null {
-  return decodeStateFromURL(encoded, FableBuilderV1Schema)
+  const fable = decodeStateFromURL(encoded, FableBuilderV1Schema)
+  return fable && workflowNameIssue(fable) === null ? fable : null
 }

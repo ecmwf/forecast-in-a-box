@@ -299,7 +299,7 @@ export default function GeoDomainMap({
       ) as OlExtent
       const next = serializeBbox(latLon)
       if (isDegenerateBboxValue(next)) {
-        // zero-size after whole-degree rounding: restore once Draw has added the sketch
+        // zero-size after snapping: restore once Draw has added the sketch
         setTimeout(restoreBoxFromValue, 0)
         return
       }
