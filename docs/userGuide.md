@@ -49,7 +49,7 @@ The launcher installs everything else into `~/.fiab`. There is no need to clone 
 
 ## Developer
 
-Pre-requisites:
+Pre-requisites (tools are expected to be found in `$PATH`):
 * `just` - run project commands
 * `uv` - create and manage Python virtual environments
 * `npm` - node package manager

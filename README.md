@@ -38,7 +38,7 @@ The following guides are available for different user profiles:
 
 ## Contributions and Support
 Forecast-in-a-Box is provided by ECMWF as an open source software, without support.
-External contributions are welcome - please read the [Guidelines](./CONTRIBUTING.md) for more information.
+For external contributions, please read the [Guidelines](./CONTRIBUTING.md).
 
 ## License
 Please consult Forecast-in-a-Box [License Terms](./LICENSE).
