@@ -22,7 +22,7 @@ It starts the backend from your checkout with editable installs. More details ar
 
 | Command | What it runs |
 |---|---|
-| `just val` | Type checking with `ty`, then `just test`. Run this before a commit. |
+| `just val` | Type checking with `ty`, then `just test`. Run this before a final push. |
 | `just test` | Unit tests in `tests/unit`, then integration tests in `tests/integration`. |
 | `uv run pytest tests/unit -n4` | Quick unit tests while you work. |
 
