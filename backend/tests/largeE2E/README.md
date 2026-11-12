@@ -93,7 +93,7 @@ artifact stores, or `<store>:<local id>` to pick the store:
 FIAB_E2E_CHECKPOINTS="aifs-global-demo" just run checkpointMatrix
 FIAB_E2E_CHECKPOINTS="demo" just run checkpointMatrix
 FIAB_E2E_CHECKPOINTS="oper" just run checkpointMatrix
-FIAB_E2E_CHECKPOINTS="bris-africa-2.0=polytope:mars;local:aifs-single-global-2.0=opendata:ecmwf:highres" just run checkpointMatrix
+FIAB_E2E_CHECKPOINTS="bris-nordic-2025.10=polytope:mars;local:aifs-single-global-2.0=opendata:ecmwf:highres" just run checkpointMatrix
 ```
 
 Every combination is attempted and the results are summarised at the end; the scenario fails if

@@ -19,7 +19,7 @@ Opt-in: nothing runs unless FIAB_E2E_CHECKPOINTS is set, since the combinations 
 data (opendata, polytope credentials, ...) and some checkpoints need a large GPU. The variable is a
 `;`-separated list of entries, each either
  - a checkpoint listed in MODELS, eg `aifs-global-demo`, run against its listed sources,
- - `<checkpoint>=<source>,<source>`, eg `bris-africa-2.0=polytope:mars`, to run any checkpoint
+ - `<checkpoint>=<source>,<source>`, eg `bris-nordic-2025.10=polytope:mars`, to run any checkpoint
    the backend knows about against the given sources,
  - a preset from PRESETS: `oper` for every checkpoint listed in MODELS, `demo` for the small demo
    checkpoints only.
@@ -89,14 +89,16 @@ MODELS: dict[str, ModelCase] = {
     "aifs-global-demo": ModelCase(sources=["opendata:ecmwf:lowres"], plot_domain="global"),
     "bris-europe-demo": ModelCase(sources=["opendata:ecmwf:lowres"]),
     "bris-africa-1.0": ModelCase(sources=["opendata:ecmwf:highres"]),
-    "aifs-single-global-2.0": ModelCase(sources=["opendata:ecmwf:lowres"]),
     "aila-nordic-2.0": ModelCase(sources=["opendata:ecmwf:highres"]),
     "bris-nordic-2025.10": ModelCase(sources=["opendata:ecmwf:highres"]),
-    "aifs-single-global-3.0": ModelCase(sources=["opendata:ecmwf:highres"]),
-    # 24h step, and pressure levels (2, 5, 30, 70 hPa) that are not in open data
-    "aifs-subs-global-0.1": ModelCase(sources=["polytope:mars"], lead_time_hours=48),
     "bris-nz-2026.11": ModelCase(sources=["opendata:ecmwf:highres"]),
     "anemoi-alps-2026.11": ModelCase(sources=["opendata:ecmwf:highres"]),
+    # "aifs-single-global-2.0": ModelCase(sources=["opendata:ecmwf:lowres"]),
+    # "aifs-single-global-3.0": ModelCase(sources=["opendata:ecmwf:highres"]),
+    # # 24h step, and pressure levels (2, 5, 30, 70 hPa) that are not in open data
+    # "aifs-subs-global-0.1": ModelCase(sources=["polytope:mars"], lead_time_hours=48),
+    # "bris-africa-2.0": ModelCase(sources=["opendata:ecmwf:highres"]),
+
 }
 
 # Named sets of MODELS, usable as FIAB_E2E_CHECKPOINTS entries

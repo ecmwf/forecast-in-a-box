@@ -37,7 +37,7 @@ template = BlueprintTemplate(
             factory_id=BlockFactoryId("anemoiSource"),
             instance=BlockInstance(
                 configuration_values={
-                    ConfigurationOptionId("checkpoint"): "ecmwf:aifs-global-o48",
+                    ConfigurationOptionId("checkpoint"): "ecmwf:aifs-global-demo",
                     ConfigurationOptionId("input_source"): "${initialConditions}",
                     ConfigurationOptionId("lead_time"): "72",
                     ConfigurationOptionId("base_time"): YESTERDAY_MIDNIGHT,
