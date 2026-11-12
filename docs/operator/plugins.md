@@ -36,7 +36,7 @@ This list is read only on the first run. It is never changed by the backend afte
 
 ## Troubleshooting
 
-When an installation fails, the backend log shows the reason. Please inspect the plugin's id or module name.
+When an installation fails, the backend log shows the reason. Please inspect the plugin's ID or module name.
 
 | Symptom | What to check |
 |---|---|
