@@ -10,6 +10,7 @@
 
 /** Run attempt each lens was started for; the backend knows only its folder. */
 
+import type { LensInstanceDetailResponse } from '@/api/types/lens.types'
 import { readStorageJson, writeStorageJson } from '@/lib/storage'
 import { STORAGE_KEYS } from '@/lib/storage-keys'
 
@@ -48,4 +49,20 @@ export function lensFitsOwner(lensId: string, owner: string | null): boolean {
   if (owner === null) return true
   const recorded = lensOwner(lensId)
   return recorded === undefined || recorded === owner
+}
+
+/** The live lens serving `localPath` for `owner`, running ones first. */
+export function pickMatchedLens(
+  lenses: ReadonlyArray<LensInstanceDetailResponse> | undefined,
+  localPath: string | null,
+  owner: string | null,
+): LensInstanceDetailResponse | undefined {
+  if (!lenses || !localPath) return undefined
+  const candidates = lenses.filter(
+    (l) =>
+      l.lens_params.local_path === localPath &&
+      (l.status === 'running' || l.status === 'starting') &&
+      lensFitsOwner(l.lens_instance_id, owner),
+  )
+  return candidates.find((l) => l.status === 'running') ?? candidates[0]
 }

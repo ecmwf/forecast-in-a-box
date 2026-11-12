@@ -45,16 +45,22 @@ import { MapLoadingBar } from '../components/MapLoadingBar'
 import { PinnedLegendsBar } from '../components/PinnedLegendsBar'
 import { useContextOverlays, useOverlayHover } from './overlays'
 import { OverlayHoverCard } from './OverlayHoverCard'
-import { isAnnotationFeature, useAnnotationLayer } from './annotations'
+import {
+  annotationVisibleOn,
+  isAnnotationFeature,
+  useAnnotationLayer,
+} from './annotations'
 import { CompareSlotTag } from './CompareSlotTag'
 import { LoupeOverlay } from './LoupeOverlay'
 import { PanelCorner, SlotStatusBadges } from './SlotStatusBadges'
 import { MapNavControls } from './MapNavControls'
 import { NAV_CLEARANCE, navEaseMs, panView, zoomView } from './map-nav'
+import { dialogOpen } from './useGeoShortcuts'
 import type { PinnedLegendItem } from '../components/PinnedLegendsBar'
 import type { MapAnnotation } from './annotations'
 import type { ContextOverlay } from './overlays'
-import type { MeasureMode } from '../hooks/useMeasure'
+import type { MeasureMode, Measurement } from '../hooks/useMeasure'
+import type Geometry from 'ol/geom/Geometry'
 import type { SourceSlot } from './layer-pairing'
 import type RenderEvent from 'ol/render/Event'
 import type View from 'ol/View'
@@ -65,6 +71,7 @@ import type {
   FitBboxAction,
   SingleMapMode,
 } from './types'
+import { useSpaceKey } from '@/hooks/useSpaceKey'
 import { cn } from '@/lib/utils'
 import { useUiStore } from '@/stores/uiStore'
 
@@ -95,7 +102,9 @@ export function SingleMapView({
   basemapId,
   basemapOpacity,
   measureMode,
-  measureClearNonce,
+  measurements,
+  onMeasurementAdd,
+  onMeasurementRemove,
   overlays,
   annotations,
   annotateArmed,
@@ -122,7 +131,13 @@ export function SingleMapView({
   basemapId: string
   basemapOpacity: number
   measureMode: MeasureMode
-  measureClearNonce: number
+  measurements: ReadonlyArray<Measurement>
+  onMeasurementAdd: (
+    geometry: Geometry,
+    label: string,
+    sourceId: string | null,
+  ) => void
+  onMeasurementRemove: (id: string) => void
   overlays: ReadonlyArray<ContextOverlay>
   annotations: ReadonlyArray<MapAnnotation>
   annotateArmed: boolean
@@ -267,13 +282,6 @@ export function SingleMapView({
     },
   )
 
-  useMeasure(
-    mapRef,
-    measureMode,
-    measureClearNonce,
-    t('measure.remove'),
-    mapVersion,
-  )
   useTimeStepPrefetch(mapRef, {
     enabled: preload,
     baseUrl: a.baseUrl,
@@ -312,6 +320,14 @@ export function SingleMapView({
             : [a.id],
     [captureOnly, a.id, bId],
   )
+  const bindTo =
+    captureOnly === null
+      ? solo
+        ? a.id
+        : null
+      : captureOnly === 'a'
+        ? a.id
+        : bId
   useAnnotationLayer(
     mapRef,
     annotations,
@@ -319,21 +335,27 @@ export function SingleMapView({
     annotateArmed,
     {
       onCreate: (coordinate) =>
-        onAnnotationCreate(
-          coordinate,
-          captureOnly === null
-            ? solo
-              ? a.id
-              : null
-            : captureOnly === 'a'
-              ? a.id
-              : bId,
-          captureOnly,
-        ),
+        onAnnotationCreate(coordinate, bindTo, captureOnly),
       onEdit: onAnnotationEdit,
       onMove: onAnnotationMove,
     },
     annotationHighlightId,
+    mapVersion,
+  )
+  // Measurements follow the pins' binding rule.
+  const shownMeasurements = useMemo(
+    () => measurements.filter((m) => annotationVisibleOn(m, pinScope)),
+    [measurements, pinScope],
+  )
+  useMeasure(
+    mapRef,
+    measureMode,
+    shownMeasurements,
+    {
+      onAdd: (geometry, label) => onMeasurementAdd(geometry, label, bindTo),
+      onRemove: onMeasurementRemove,
+    },
+    t('measure.remove'),
     mapVersion,
   )
 
@@ -606,19 +628,11 @@ export function SingleMapView({
     () => setFlickerFrame((f) => (f === 'a' ? 'b' : 'a')),
     [],
   )
-  useEffect(() => {
-    if (mode !== 'flicker' || solo) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.code !== 'Space') return
-      const target = e.target as HTMLElement | null
-      if (target && target.closest('input, button, textarea, [role="slider"]'))
-        return
-      e.preventDefault()
-      toggleFlicker()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [mode, solo, toggleFlicker])
+  useSpaceKey(toggleFlicker, {
+    enabled: mode === 'flicker' && !solo,
+    scope: '[data-geo-viewer]',
+    isBlocked: dialogOpen,
+  })
 
   // Swipe divider drag + keyboard.
   const updateSwipe = useCallback(

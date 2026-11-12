@@ -217,9 +217,19 @@ export function displayTags(
   )
 }
 
-/** Maturity such as `demo` or `operational`; null without one. */
+/** Display tags other than maturity, keyed as `displayTags` names them. */
+export function nonMaturityTags(
+  tags: Record<string, string | null>,
+): Record<string, string | null> {
+  return Object.fromEntries(
+    displayTags(tags).filter(([key]) => key !== MATURITY_TAG),
+  )
+}
+
+/** Maturity such as `demo`, trimmed and lower case; null when missing or blank. */
 export function artifactMaturity(
   tags: Record<string, string | null>,
 ): string | null {
-  return displayTags(tags).find(([key]) => key === MATURITY_TAG)?.[1] ?? null
+  const value = displayTags(tags).find(([key]) => key === MATURITY_TAG)?.[1]
+  return value?.trim().toLowerCase() || null
 }

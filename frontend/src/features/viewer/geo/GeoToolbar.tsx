@@ -93,6 +93,12 @@ function KeyBadge({ label, show }: { label: string; show: boolean }) {
   )
 }
 
+/** Button + chevron pair; hit halos grow vertically only. */
+const SPLIT_BUTTON = {
+  'data-slot': 'button-group',
+  className: 'flex items-center',
+} as const
+
 /** Source-focus control (A · both · B); selected A/B use their source colour. */
 const FOCUS_CHOICES = [
   {
@@ -512,7 +518,7 @@ export function GeoToolbar({
               <Ruler className="h-4 w-4" />
             </Button>
             {/* Area split-button: click = freeform, chevron picks the shape. */}
-            <span className="flex items-center">
+            <span {...SPLIT_BUTTON}>
               <Button
                 variant={
                   measureMode === 'area' || measureMode === 'box'
@@ -571,7 +577,7 @@ export function GeoToolbar({
             >
               <Eraser className="h-4 w-4" />
             </Button>
-            <span className="flex items-center">
+            <span {...SPLIT_BUTTON}>
               <Button
                 variant={annotateArmed ? 'secondary' : 'ghost'}
                 size="icon"
@@ -629,7 +635,7 @@ export function GeoToolbar({
             </span>
           </span>
           <span className="mx-1 h-5 w-px bg-border" />
-          <span className="flex items-center">
+          <span {...SPLIT_BUTTON}>
             <Button
               variant="ghost"
               size="icon"
@@ -680,7 +686,7 @@ export function GeoToolbar({
             {t('export.label')}
           </Button>
           {/* Magnifier split-button: click latches, chevron opens settings. */}
-          <span className="flex items-center">
+          <span {...SPLIT_BUTTON}>
             <Button
               variant={options.loupeLatched ? 'secondary' : 'ghost'}
               size="icon"

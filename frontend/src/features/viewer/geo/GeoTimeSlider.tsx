@@ -17,7 +17,7 @@
  * 50+-step external source stays legible.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import {
   ChevronLeft,
   ChevronRight,
@@ -30,6 +30,7 @@ import { useTranslation } from 'react-i18next'
 import { firstNumber, formatStep } from '../format'
 import { availabilityRange, overlapRange } from './compare-timeline'
 import { TIME_LINK_MODES } from './time-link'
+import { COMPARE_KEYS, dialogOpen, viewerKeyBlocked } from './useGeoShortcuts'
 import type { CompareTimeline } from './compare-timeline'
 import type { SourceSlot } from './layer-pairing'
 import type { TimeLinkMode } from './time-link'
@@ -44,6 +45,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { TOUR, tourActionAttr, tourAttr } from '@/features/tutorials/anchors'
+import { isTextEntry } from '@/hooks/useHoldPan'
+import { useSpaceKey } from '@/hooks/useSpaceKey'
 import { cn } from '@/lib/utils'
 
 const AUTOPLAY_INTERVAL_MS = 1200
@@ -93,6 +96,7 @@ export function GeoTimeSlider({
   clip,
   onClipChange,
   hoverTimes,
+  playKey = true,
 }: {
   /** Solo hides the link select, B track, and B/A∩B clip presets. */
   hasB?: boolean
@@ -118,6 +122,8 @@ export function GeoTimeSlider({
   /** Per-side resolved instants for a hovered axis epoch (offset/nearest
    *  modes); null → show the plain axis instant. */
   hoverTimes: (epoch: number) => { a: string | null; b: string | null } | null
+  /** Space plays and pauses; false while flicker mode uses Space. */
+  playKey?: boolean
 }) {
   const { t } = useTranslation('executions')
   const { t: tCompare } = useTranslation('visualise')
@@ -160,6 +166,40 @@ export function GeoTimeSlider({
 
   const sharedAxis = focused || linkMode !== 'independent'
   const hasSharedAxis = sharedAxis && steps.length > 0
+  const canStep = hasSharedAxis && steps.length > 1
+
+  /** One step back or forward, wrapping inside the clip window. */
+  const stepBy = (direction: 1 | -1) =>
+    onChange(
+      direction < 0
+        ? safeIndex <= rangeStart
+          ? rangeEnd
+          : safeIndex - 1
+        : safeIndex >= rangeEnd
+          ? rangeStart
+          : safeIndex + 1,
+    )
+
+  useSpaceKey(() => setPlaying((p) => !p), {
+    enabled: playKey && canStep,
+    scope: '[data-geo-viewer]',
+    isBlocked: dialogOpen,
+  })
+  const [prevKey, nextKey] = COMPARE_KEYS.step
+  const stepKey = useEffectEvent((e: KeyboardEvent) => {
+    const direction = e.key === prevKey ? -1 : e.key === nextKey ? 1 : 0
+    if (!direction || !canStep || e.metaKey || e.ctrlKey || e.altKey) return
+    if (isTextEntry(e.target) || viewerKeyBlocked(e.key) || dialogOpen()) {
+      return
+    }
+    e.preventDefault()
+    stepBy(direction)
+  })
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => stepKey(e)
+    window.addEventListener('keydown', down)
+    return () => window.removeEventListener('keydown', down)
+  }, [])
   // Keep the bar present (no layout jump) and say WHY there is no slider.
   if (sharedAxis && steps.length === 0) {
     return (
@@ -347,9 +387,7 @@ export function GeoTimeSlider({
                 size="icon"
                 className="h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
                 disabled={steps.length <= 1}
-                onClick={() =>
-                  onChange(safeIndex <= rangeStart ? rangeEnd : safeIndex - 1)
-                }
+                onClick={() => stepBy(-1)}
                 aria-label={t('lens.prevStep')}
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
@@ -373,9 +411,7 @@ export function GeoTimeSlider({
                 size="icon"
                 className="h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
                 disabled={steps.length <= 1}
-                onClick={() =>
-                  onChange(safeIndex >= rangeEnd ? rangeStart : safeIndex + 1)
-                }
+                onClick={() => stepBy(1)}
                 aria-label={t('lens.nextStep')}
                 {...tourActionAttr('time-step')}
               >

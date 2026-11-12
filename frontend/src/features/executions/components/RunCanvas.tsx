@@ -27,7 +27,7 @@ import {
   useReactFlow,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { Maximize2, Minimize2, Settings2 } from 'lucide-react'
+import { Maximize2, Minimize2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type {
   BlockFactoryCatalogue,
@@ -49,6 +49,7 @@ import { BeamEdge } from '@/features/executions/components/BeamEdge'
 import { RunNode } from '@/features/executions/components/RunNode'
 import { useExecutionHoverStore } from '@/features/executions/stores/executionHoverStore'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { cn } from '@/lib/utils'
 
 const ShowConfigContext = createContext(false)
@@ -322,17 +323,15 @@ function RunCanvasInner({
               />
               {showMiniMap && <CanvasMiniMap />}
               <Panel position="top-left" className="top-2! left-2!">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 gap-1.5 bg-background/80 text-sm backdrop-blur-sm"
-                  onClick={() => setShowConfig((prev) => !prev)}
-                >
-                  <Settings2 className="h-3.5 w-3.5" />
-                  {showConfig
-                    ? t('detail.hideParameters')
-                    : t('detail.showParameters')}
-                </Button>
+                <label className="flex h-7 cursor-pointer items-center gap-2 rounded-md border bg-background/80 px-2.5 text-sm font-medium shadow-xs backdrop-blur-sm hover:bg-muted">
+                  <Checkbox
+                    checked={showConfig}
+                    onCheckedChange={(checked) => setShowConfig(checked)}
+                    // A neutral tick: no primary fill on the canvas.
+                    className="data-checked:border-input data-checked:bg-transparent data-checked:text-foreground dark:data-checked:bg-input/30"
+                  />
+                  {t('detail.parameters')}
+                </label>
               </Panel>
               <Panel position="top-right" className="top-2! right-2!">
                 <Button

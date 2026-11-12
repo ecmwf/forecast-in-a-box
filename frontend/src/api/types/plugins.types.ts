@@ -508,3 +508,13 @@ export function calculatePluginStats(plugins: Array<PluginInfo>): PluginsStats {
     updatesAvailableCount: plugins.filter((p) => p.hasUpdate).length,
   }
 }
+
+/** The installed version, else the latest known one; null without either. */
+export function pluginDisplayVersion(
+  plugin: Pick<PluginInfo, 'version' | 'latestVersion'>,
+): string | null {
+  return (
+    plugin.version ??
+    (plugin.latestVersion !== 'unknown' ? plugin.latestVersion : null)
+  )
+}

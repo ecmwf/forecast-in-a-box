@@ -41,10 +41,19 @@ import { resetPollIntervals } from '@/api/pollIntervals'
 // Start MSW browser worker before all tests
 beforeAll(async () => {
   await worker.start({
-    onUnhandledFrame: 'error',
+    onUnhandledFrame: ({ frame, defaults }) => {
+      if (!isViteModuleFrame(frame)) defaults.error()
+    },
     quiet: true,
   })
 })
+
+/** Vite `/@id/` module URLs, e.g. Vitest 5.1's `vi.mock` modules. */
+function isViteModuleFrame(frame: { protocol: string; data: unknown }) {
+  if (frame.protocol !== 'http') return false
+  const { request } = frame.data as { request: Request }
+  return new URL(request.url).pathname.startsWith('/@id/')
+}
 
 /** Reset shared mock + store state. Called from both afterEach and beforeEach
  *  so any async tails from the previous test are wiped _before_ the next

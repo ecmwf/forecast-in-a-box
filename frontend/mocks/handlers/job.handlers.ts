@@ -13,6 +13,7 @@
  */
 
 import { HttpResponse, delay, http } from 'msw'
+import { strToU8, zipSync } from 'fflate'
 import {
   addExecution,
   deleteExecution,
@@ -30,6 +31,66 @@ import type {
   RunOutputMetadata,
 } from '@/api/types/job.types'
 import { API_ENDPOINTS } from '@/api/endpoints'
+
+/** The `GET /run/logs` zip; no run files without a cascade job id. */
+/** Python logging's timestamp format. */
+function logStamp(ms: number): string {
+  const d = new Date(ms)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())},${String(d.getMilliseconds()).padStart(3, '0')}`
+}
+
+export function mockRunLogArchive(
+  cascadeJobId: string | null,
+  run: { run_id: string; created_at: string } = {
+    run_id: 'run',
+    created_at: new Date().toISOString(),
+  },
+): Uint8Array {
+  const created = Date.parse(run.created_at)
+  const at = (s: string) => `2026-11-07 13:17:${s}`
+  const files: Record<string, Uint8Array> = {
+    'db_entity.json': strToU8('{"status": "failed"}'),
+    'gw_state.json': strToU8('{"progresses": {}}'),
+    // Before, during and after the run, then the logs request.
+    'backend.logs.txt': strToU8(
+      [
+        `${logStamp(created - 3_600_000)}:INFO:uvicorn.error:7946:Started server process`,
+        `${logStamp(created + 1_000)}:DEBUG:forecastbox.domain.run.background:7946:starting background compilation of run_id='${run.run_id}'`,
+        `${logStamp(Date.now())}:INFO:forecastbox.routes.run:7946:will fetch logs for run_id='${run.run_id}'`,
+      ].join('\n'),
+    ),
+    'lens.65e780a2.stdout.txt': new Uint8Array(),
+  }
+  if (cascadeJobId) {
+    const job = `job_${cascadeJobId}`
+    files[`${job}.controller.logs.txt`] = strToU8(
+      [
+        `${at('14,008')}:DEBUG:cascade.controller.report:27432:initialising reporter`,
+        `${at('30,197')}:INFO:cascade.executor.bridge:27432:about to start receiving registrations`,
+        `${at('30,246')}:WARNING:cascade.executor.bridge:27432:double registration of l0`,
+      ].join('\n'),
+    )
+    files[`${job}.host_0.worker_w0.logs.txt`] = strToU8(
+      [
+        `${at('40,001')}:INFO:cascade.executor.runner:27461:running task plot`,
+        `${at('41,051')}:ERROR:cascade.executor.runner:27461:command failed with 1`,
+        'Traceback (most recent call last):',
+        '  File "runner.py", line 12, in run',
+        'RuntimeError: plot failed',
+        `${at('42,000')}:INFO:cascade.executor.runner:27461:worker exiting`,
+      ].join('\n'),
+    )
+    files[`${job}.host_0.worker_w1.logs.txt`] = strToU8(
+      [
+        `${at('20,500')}:DEBUG:cascade.executor.runner:27462:starting _get_initial_conditions`,
+        `${at('25,694')}:WARNING:multiurl.retry:27462:Recovering from HTTP error [503 Service Unavailable], attempt 1 of 500`,
+        `${at('25,695')}:WARNING:multiurl.retry:27462:Retrying in 120 seconds`,
+      ].join('\n'),
+    )
+  }
+  return zipSync(files)
+}
 
 type JobExecutionDetailWire = Omit<JobExecutionDetail, 'outputs'> & {
   outputs: { outputs: Record<string, RunOutputMetadata> } | null
@@ -249,10 +310,7 @@ export const jobHandlers = [
       )
     }
 
-    const zipBytes = new Uint8Array([
-      0x50, 0x4b, 0x05, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    ])
+    const zipBytes = mockRunLogArchive(exec.cascade_job_id, exec)
     return new HttpResponse(zipBytes, {
       headers: {
         'Content-Type': 'application/zip',

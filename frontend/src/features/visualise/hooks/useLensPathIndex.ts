@@ -32,7 +32,7 @@ import { isGribDirMime } from '@/features/executions/outputs/adapters/grib'
 import { classifyOutput } from '@/features/executions/outputs/availability'
 
 /** Most-recent runs scanned for GRIB markers. */
-const INDEXED_RUNS = 20
+export const INDEXED_RUNS = 20
 
 export interface LensPathMatch {
   jobId: string

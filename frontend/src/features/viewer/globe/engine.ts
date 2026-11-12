@@ -14,6 +14,7 @@ import type { FlatProjectionId } from '../projection-ids'
 import type { BboxAxisOrder } from '../projections'
 import type { Bbox, ScaleBand } from '../wms-capabilities'
 import type { SourceSlot } from '../geo/layer-pairing'
+import type { FeatureCollection } from 'geojson'
 
 /** Neutral camera; centre ground m/px = EQUATOR_MPP_Z0 / 2^zoom. */
 export interface GlobeCamera {
@@ -69,6 +70,36 @@ export type GlobeBasemapSpec = GlobeOutlineSpec &
     | { kind: 'wms'; layers: ReadonlyArray<GlobeLayerSpec> }
   )
 
+/** A text label at a WGS84 point. */
+export interface GlobeLabel {
+  lon: number
+  lat: number
+  text: string
+}
+
+/** An annotation pin: a badge disc and its truncated note. */
+export interface GlobePin {
+  id: string
+  lon: number
+  lat: number
+  badge: string
+  /** On-map note; '' = none. */
+  note: string
+  /** CSS colour of the disc. */
+  color: string
+  highlighted: boolean
+}
+
+/** The user's vectors above the data, in WGS84; pins draw on top. */
+export interface GlobeVectorSpec {
+  /** Features carry an `index` property, returned by `overlayAt`. */
+  overlays: FeatureCollection
+  overlayLabels: ReadonlyArray<GlobeLabel>
+  measurements: FeatureCollection
+  measurementLabels: ReadonlyArray<GlobeLabel>
+  pins: ReadonlyArray<GlobePin>
+}
+
 /** How to reach a camera: cut, or ease over `easeMs`. */
 export interface CameraMove {
   easeMs?: number
@@ -87,12 +118,15 @@ export interface GlobeEngineEvents {
   onContextLost: () => void
   /** The vector basemap's style did not load; the outline stands in. */
   onBasemapFailed: () => void
+  /** A click on an annotation pin of the settled globe. */
+  onPinClick?: (id: string) => void
 }
 
 export interface GlobeEngine {
   mount: (container: HTMLElement, events: GlobeEngineEvents) => Promise<void>
   setLayers: (specs: ReadonlyArray<GlobeLayerSpec>) => void
   setBasemap: (spec: GlobeBasemapSpec) => void
+  setVectors: (spec: GlobeVectorSpec) => void
   /** Hidden (warm) globes keep their layers but fetch nothing until live. */
   setLive: (live: boolean) => void
   setCamera: (camera: GlobeCamera, move?: CameraMove) => void
@@ -109,6 +143,8 @@ export interface GlobeEngine {
   bendOut: (to: FlatCamera, durationMs: number) => Promise<void>
   /** Screen px (container-relative) -> lon/lat, null off the globe. */
   pick: (px: readonly [number, number]) => { lon: number; lat: number } | null
+  /** Overlay feature `index` at a container px; null if none or mid-bend. */
+  overlayAt: (px: readonly [number, number]) => number | null
   /** Render now and copy the frame into a 2D canvas. */
   capture: () => HTMLCanvasElement
   /** Render now and draw the CSS-px region from `origin` at `scale` (loupe). */

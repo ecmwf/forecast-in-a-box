@@ -416,14 +416,13 @@ GridValue = str | int | float | list[int | float]
 """A converted grid: a Gaussian grid name, a single resolution in degrees, or a [west_east, south_north] pair of resolutions."""
 
 
-MIN_GRID_RESOLUTION = 0.01
+MIN_GRID_RESOLUTION = 0.1
 """The finest lat/lon increment in degrees, inclusive."""
 
-MIN_GAUSSIAN_NUMBER = 1
-MAX_GAUSSIAN_NUMBER = 8000
-"""The inclusive range of the number of a Gaussian grid name, such as 320 in 'N320'."""
+GAUSSIAN_NUMBERS = (32, 48, 64, 80, 96, 128, 160, 200, 256, 320, 400, 512, 640, 800, 1024, 1280, 8000)
+"""The numbers a Gaussian grid name may have, such as 320 in 'N320'."""
 
-_GAUSSIAN_NAME = re.compile(r"([NnOo])([0-9]+)")
+_GAUSSIAN_NAME = re.compile(r"([NnFfOo])([0-9]+)")
 
 
 def _is_number(value: object) -> bool:
@@ -439,17 +438,19 @@ def _check_resolution(resolution: Any, value: Any) -> None:
 
 
 class GridType(FableType):
-    """Grid type. A union of a named Gaussian grid ('N320' or 'O96', in any case, with a number from 1 to 8000), a single resolution
-    in degrees, and a pair of resolutions in degrees written 'west_east/south_north', the order used by MARS and MIR. A resolution
-    is at least 0.01 degrees. The string 'auto' converts to None, and a Gaussian grid name converts to its upper case form."""
+    """Grid type. A union of a named Gaussian grid (reduced 'N320', regular 'F320' or octahedral 'O96', in any case, with a number
+    from GAUSSIAN_NUMBERS), a single resolution in degrees, and a pair of resolutions in degrees written 'west_east/south_north', the
+    order used by MARS and MIR. A resolution is at least 0.1 degrees. The string 'auto' converts to None, and a Gaussian grid name
+    converts to its upper case form."""
 
     def _validate_gaussian_grid(self, value: str, match: re.Match[str]) -> str:
         digits = match.group(2)
         number = int(digits)
-        if not MIN_GAUSSIAN_NUMBER <= number <= MAX_GAUSSIAN_NUMBER:
-            raise WrongType(f"Gaussian grid number {number} in {value!r} must be from {MIN_GAUSSIAN_NUMBER} to {MAX_GAUSSIAN_NUMBER}.")
         if digits != str(number):
             raise WrongType(f"Gaussian grid number {digits!r} in {value!r} must not have leading zeros.")
+        if number not in GAUSSIAN_NUMBERS:
+            allowed = ", ".join(str(n) for n in GAUSSIAN_NUMBERS)
+            raise WrongType(f"Gaussian grid number {number} in {value!r} must be one of {allowed}.")
         return f"{match.group(1).upper()}{number}"
 
     def _validate_string_resolution(self, value: str) -> float | list[float]:

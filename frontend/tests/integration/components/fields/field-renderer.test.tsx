@@ -28,6 +28,7 @@ import {
   useDownloadActions,
 } from '@/api/hooks/useArtifacts'
 import { FieldRenderer } from '@/components/base/fields/FieldRenderer'
+import { BlockConfigProvider } from '@/features/fable-builder/context/BlockConfigContext'
 
 /**
  * Controlled wrapper to capture onChange values
@@ -104,6 +105,21 @@ describe('FieldRenderer Integration', () => {
       await expect
         .element(screen.getByText('A helpful description'))
         .toBeVisible()
+    })
+
+    it('renders "- " description lines as a bullet list', async () => {
+      const screen = await renderWithProviders(
+        <ControlledFieldRenderer
+          valueType="str"
+          description={'Pick one.\n- first: a\n- second: b\nAfter.'}
+        />,
+      )
+      await expect.element(screen.getByText('Pick one.')).toBeVisible()
+      const items = screen.getByRole('listitem')
+      await expect.element(items.nth(0)).toHaveTextContent('first: a')
+      await expect.element(items.nth(1)).toHaveTextContent('second: b')
+      expect(items.all()).toHaveLength(2)
+      await expect.element(screen.getByText('After.')).toBeVisible()
     })
   })
 
@@ -353,6 +369,101 @@ describe('FieldRenderer Integration', () => {
         <ControlledFieldRenderer valueType="geodomain" />,
       )
       await expect.element(screen.getByText('Select an area…')).toBeVisible()
+    })
+  })
+
+  // The grid option of ecmwf#667.
+  describe('Grid field', () => {
+    const gridType = 'enumOpen[grid](auto,0.25,0.5,1,O96,O320,N320)'
+
+    it('summarises the grid with its spacing', async () => {
+      const screen = await renderWithProviders(
+        <ControlledFieldRenderer valueType={gridType} initialValue="0.25" />,
+      )
+      await expect.element(screen.getByText('0.25° lat/lon')).toBeVisible()
+      await expect.element(screen.getByText('~28 km')).toBeVisible()
+    })
+
+    it('lists the suggestions by family and picks one', async () => {
+      const screen = await renderWithProviders(
+        <ControlledFieldRenderer valueType={gridType} initialValue="auto" />,
+      )
+      await screen.getByText('Keep input grid').click()
+      await expect.element(screen.getByText('Regular lat/lon')).toBeVisible()
+      await expect
+        .element(screen.getByText('Octahedral Gaussian'))
+        .toBeVisible()
+      await expect.element(screen.getByText('Reduced Gaussian')).toBeVisible()
+
+      await screen.getByRole('option', { name: /O96/ }).click()
+      await expect
+        .element(screen.getByTestId('current-value'))
+        .toHaveTextContent('O96')
+    })
+
+    it('accepts a typed grid in canonical form', async () => {
+      const screen = await renderWithProviders(
+        <ControlledFieldRenderer valueType={gridType} initialValue="auto" />,
+      )
+      await screen.getByText('Keep input grid').click()
+      await screen.getByPlaceholder(/type a grid/).fill('n640')
+      await expect.element(screen.getByText('Your entry')).toBeVisible()
+      await userEvent.keyboard('{Enter}')
+      await expect
+        .element(screen.getByTestId('current-value'))
+        .toHaveTextContent('N640')
+    })
+
+    it('notes that the counts are global when the block cuts out a domain', async () => {
+      const screen = await renderWithProviders(
+        <BlockConfigProvider
+          values={{ domain: 'Central Europe' }}
+          valueTypes={{ domain: 'geodomain', 'test-field': gridType }}
+        >
+          <ControlledFieldRenderer valueType={gridType} initialValue="auto" />
+        </BlockConfigProvider>,
+      )
+      await screen.getByText('Keep input grid').click()
+      const row = screen.getByRole('option', { name: /0\.25°/ })
+      await expect.element(row.getByText('1M points')).toBeVisible()
+      await expect
+        .element(screen.getByText(/whole globe, before the domain cut-out/))
+        .toBeVisible()
+    })
+
+    it.each(['auto', 'Global'])(
+      'has no note when the domain is %s',
+      async (domain) => {
+        const screen = await renderWithProviders(
+          <BlockConfigProvider
+            values={{ domain }}
+            valueTypes={{ domain: 'geodomain', 'test-field': gridType }}
+          >
+            <ControlledFieldRenderer valueType={gridType} initialValue="auto" />
+          </BlockConfigProvider>,
+        )
+        await screen.getByText('Keep input grid').click()
+        const row = screen.getByRole('option', { name: /0\.25°/ })
+        await expect.element(row.getByText('1M points')).toBeVisible()
+        await expect
+          .element(screen.getByText(/whole globe, before the domain cut-out/))
+          .not.toBeInTheDocument()
+      },
+    )
+
+    it('explains why a typed grid is invalid', async () => {
+      const screen = await renderWithProviders(
+        <ControlledFieldRenderer valueType={gridType} initialValue="auto" />,
+      )
+      await screen.getByText('Keep input grid').click()
+      await screen.getByPlaceholder(/type a grid/).fill('O100')
+      await expect
+        .element(
+          screen.getByText(
+            /Gaussian grid number must be one of 32, .*, 8000\./,
+          ),
+        )
+        .toBeVisible()
     })
   })
 

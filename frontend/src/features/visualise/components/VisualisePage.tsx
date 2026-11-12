@@ -515,6 +515,7 @@ export function VisualisePage() {
           {stateA.phase !== 'running' ? (
             // Lens still coming: the viewer-shaped skeleton holds the layout.
             <GeoViewerSkeleton
+              lensStarting={stateA.phase === 'starting'}
               label={
                 stateA.phase === 'starting'
                   ? t('lens.starting')

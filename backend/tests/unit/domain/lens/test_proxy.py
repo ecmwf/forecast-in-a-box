@@ -9,6 +9,7 @@
 
 """Unit tests for the lens reverse proxy."""
 
+import asyncio
 import subprocess
 from collections.abc import AsyncIterator, Iterator
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -18,6 +19,7 @@ import pytest
 import pytest_asyncio
 from fastapi import HTTPException, Request
 from pyrsistent import pmap
+from starlette.types import Message, Receive
 
 from forecastbox.domain.lens import proxy as lens_proxy
 from forecastbox.domain.lens.exceptions import LensFailure, LensStarting, NoLensFound, UnproxyableLens
@@ -25,7 +27,9 @@ from forecastbox.domain.lens.manager import LensInstance, LensInstanceId, LensIn
 from forecastbox.utility.http_pools import HttpProfile
 
 
-def _make_request(method: str = "GET", headers: list[tuple[bytes, bytes]] | None = None, query: bytes = b"") -> Request:
+def _make_request(
+    method: str = "GET", headers: list[tuple[bytes, bytes]] | None = None, query: bytes = b"", receive: Receive | None = None
+) -> Request:
     scope = {
         "type": "http",
         "method": method,
@@ -35,7 +39,11 @@ def _make_request(method: str = "GET", headers: list[tuple[bytes, bytes]] | None
         "client": ("10.0.0.5", 12345),
         "scheme": "http",
     }
-    return Request(scope)
+    return Request(scope, receive) if receive else Request(scope)
+
+
+async def _gone() -> Message:
+    return {"type": "http.disconnect"}
 
 
 @pytest.fixture(autouse=True)
@@ -43,6 +51,13 @@ def reset_lens_manager() -> Iterator[None]:
     original = LensInstanceManager.instances
     yield
     LensInstanceManager.instances = original
+
+
+@pytest.fixture(autouse=True)
+def reset_upstream_slots() -> Iterator[None]:
+    lens_proxy._slots.clear()
+    yield
+    lens_proxy._slots.clear()
 
 
 @pytest.fixture(autouse=True)
@@ -262,3 +277,121 @@ class TestUpstreamRequestFraming:
             await lens_proxy.forward(iid, "wms", request)
         sent = send.await_args.args[0]
         assert sent.headers.get("transfer-encoding") == "chunked"
+
+
+class TestUpstreamSlots:
+    """Requests beyond the lens's slots wait in the proxy, not in the lens's accept queue."""
+
+    @staticmethod
+    def _running(iid: LensInstanceId) -> None:
+        mock_proc = MagicMock(spec=subprocess.Popen)
+        mock_proc.poll.return_value = None
+        LensInstanceManager.instances = pmap({iid: LensInstance(process=mock_proc, lens_params={}, lens_name="skinnyWMS", ports={19042})})
+
+    @staticmethod
+    def _upstream() -> AsyncMock:
+        async def fake_aiter_raw() -> AsyncIterator[bytes]:
+            yield b"ok"
+
+        response = AsyncMock()
+        response.status_code = 200
+        response.headers = httpx.Headers({"content-type": "image/png"})
+        response.aiter_raw = fake_aiter_raw
+        response.aclose = AsyncMock()
+        return response
+
+    @staticmethod
+    async def _fill(iid: LensInstanceId) -> asyncio.Semaphore:
+        slots = lens_proxy._slots.setdefault(iid, asyncio.Semaphore(lens_proxy.UPSTREAM_SLOTS))
+        for _ in range(lens_proxy.UPSTREAM_SLOTS):
+            await slots.acquire()
+        return slots
+
+    @pytest.mark.asyncio
+    async def test_waiting_request_of_a_gone_client_never_reaches_the_lens(self, proxied_client: httpx.AsyncClient) -> None:
+        iid = LensInstanceId("busy-id")
+        self._running(iid)
+        await self._fill(iid)
+        send = AsyncMock(return_value=self._upstream())
+        with patch.object(proxied_client, "send", send):
+            response = await lens_proxy.forward(iid, "wms", _make_request(receive=_gone))
+        assert response.status_code == lens_proxy.CLIENT_CLOSED_REQUEST
+        send.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_disconnect_after_the_body_message_is_noticed(self, proxied_client: httpx.AsyncClient) -> None:
+        """Like uvicorn behind BaseHTTPMiddleware: the body first, then a blocking wait."""
+        iid = LensInstanceId("busy-id")
+        self._running(iid)
+        await self._fill(iid)
+        left = asyncio.Event()
+        messages = 0
+
+        async def receive() -> Message:
+            nonlocal messages
+            messages += 1
+            if messages == 1:
+                return {"type": "http.request", "body": b"", "more_body": False}
+            await left.wait()
+            return {"type": "http.disconnect"}
+
+        send = AsyncMock(return_value=self._upstream())
+        with patch.object(proxied_client, "send", send):
+            waiting = asyncio.create_task(lens_proxy.forward(iid, "wms", _make_request(receive=receive)))
+            await asyncio.sleep(0.05)
+            left.set()
+            response = await asyncio.wait_for(waiting, timeout=2)
+        assert response.status_code == lens_proxy.CLIENT_CLOSED_REQUEST
+        send.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_cancelled_waiting_request_keeps_no_slot(self, proxied_client: httpx.AsyncClient) -> None:
+        iid = LensInstanceId("busy-id")
+        self._running(iid)
+        slots = await self._fill(iid)
+        with patch.object(proxied_client, "send", AsyncMock(return_value=self._upstream())):
+            waiting = asyncio.create_task(lens_proxy.forward(iid, "wms", _make_request()))
+            await asyncio.sleep(0.05)
+            waiting.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await waiting
+        for _ in range(lens_proxy.UPSTREAM_SLOTS):
+            slots.release()
+        assert slots._value == lens_proxy.UPSTREAM_SLOTS
+
+    @pytest.mark.asyncio
+    async def test_request_waits_for_a_free_slot(self, proxied_client: httpx.AsyncClient) -> None:
+        iid = LensInstanceId("busy-id")
+        self._running(iid)
+        slots = await self._fill(iid)
+        send = AsyncMock(return_value=self._upstream())
+        with patch.object(proxied_client, "send", send):
+            waiting = asyncio.create_task(lens_proxy.forward(iid, "wms", _make_request()))
+            await asyncio.sleep(0.05)
+            send.assert_not_awaited()
+            slots.release()
+            response = await waiting
+        assert response.status_code == 200
+        send.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("outcome", ["answer", "unreachable"])
+    async def test_slot_is_freed_once_the_lens_answers_or_fails(self, outcome: str, proxied_client: httpx.AsyncClient) -> None:
+        iid = LensInstanceId("running-id")
+        self._running(iid)
+        send = AsyncMock(return_value=self._upstream()) if outcome == "answer" else AsyncMock(side_effect=httpx.ConnectError("refused"))
+        with patch.object(proxied_client, "send", send):
+            try:
+                await lens_proxy.forward(iid, "wms", _make_request())
+            except HTTPException:
+                pass
+        assert lens_proxy._slots[iid]._value == lens_proxy.UPSTREAM_SLOTS
+
+    @pytest.mark.asyncio
+    async def test_slots_of_a_stopped_lens_are_dropped(self) -> None:
+        iid = LensInstanceId("gone-id")
+        lens_proxy._slots[iid] = asyncio.Semaphore(lens_proxy.UPSTREAM_SLOTS)
+        LensInstanceManager.instances = pmap()
+        with pytest.raises(NoLensFound):
+            await lens_proxy.forward(iid, "wms", _make_request())
+        assert iid not in lens_proxy._slots

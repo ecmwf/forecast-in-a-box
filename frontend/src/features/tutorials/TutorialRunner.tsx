@@ -103,7 +103,11 @@ function ActiveTutorial({
 }) {
   const { definition: def, useLaunchContext } = TUTORIALS[id]
   const { t } = useTranslation('tutorials')
-  const tDyn = t as (key: string, opts?: Record<string, unknown>) => string
+  // Keys built at runtime from the tutorial definitions.
+  const tDyn = t as unknown as (
+    key: string,
+    opts?: Record<string, unknown>,
+  ) => string
 
   const launch = useLaunchContext()
   // Raw-string selector is structural-sharing-safe; parse off the router.

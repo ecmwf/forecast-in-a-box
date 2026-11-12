@@ -32,17 +32,14 @@ import { DraftStatus } from './DraftStatus'
 import { GraphOptionsDropdown } from './graph-mode/GraphOptionsDropdown'
 import { SaveConfigPopover } from './SaveConfigPopover'
 import { ConfigureHelpDialog } from './ConfigureHelpDialog'
-import type {
-  BlockFactoryCatalogue,
-  FableBuilderV1,
-} from '@/api/types/fable.types'
+import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
 import { getBlocksByKind } from '@/api/types/fable.types'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import { useFableRetrieve } from '@/api/hooks/useFable'
 import { stripSystemTags } from '@/lib/system-tags'
 import { Badge } from '@/components/ui/badge'
-import { shelveBenchIfDirty } from '@/features/fable-builder/stores/workbenchShelfStore'
 import { downloadFableJson } from '@/features/fable-builder/utils/export-config'
+import { useLoadWorkflowFile } from '@/features/fable-builder/hooks/useLoadWorkflowFile'
 import { useUndoRedoShortcuts } from '@/features/fable-builder/hooks/useUndoRedoShortcuts'
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
@@ -93,7 +90,7 @@ export function FableBuilderHeader({
   const storeFableId = useFableBuilderStore((s) => s.fableId)
 
   const setStep = useFableBuilderStore((s) => s.setStep)
-  const setFable = useFableBuilderStore((s) => s.setFable)
+  const loadWorkflowFile = useLoadWorkflowFile()
   const setSubmitDialogOpen = useFableBuilderStore((s) => s.setSubmitDialogOpen)
   const undo = useFableBuilderStore((s) => s.undo)
   const redo = useFableBuilderStore((s) => s.redo)
@@ -162,56 +159,9 @@ export function FableBuilderHeader({
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>): void {
     const file = event.target.files?.[0]
     if (!file) return
-
-    // Prevent client-side DoS from oversized files (1 MB limit)
-    const MAX_CONFIG_SIZE = 1 * 1024 * 1024
-    if (file.size > MAX_CONFIG_SIZE) {
-      showToast.error(
-        t('header.fileTooLargeTitle'),
-        t('header.fileTooLargeDescription'),
-      )
-      return
-    }
-
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      try {
-        const content = e.target?.result as string
-        const parsed = JSON.parse(content) as unknown
-        if (
-          parsed &&
-          typeof parsed === 'object' &&
-          'blocks' in parsed &&
-          typeof parsed.blocks === 'object'
-        ) {
-          const { shelved, evicted } = shelveBenchIfDirty(
-            parsed as FableBuilderV1,
-          )
-          if (evicted) showToast.warning(t('shelf.evicted'))
-          setFable(parsed as FableBuilderV1, null)
-          showToast.success(t('header.configLoaded'))
-          if (shelved) showToast.info(t('shelf.setAside'))
-          onConfigLoaded?.()
-        } else {
-          showToast.error(
-            t('header.invalidConfigTitle'),
-            t('header.invalidConfigDescription'),
-          )
-        }
-      } catch (error) {
-        showToast.error(
-          t('header.parseFailed'),
-          error instanceof Error ? error.message : String(error),
-        )
-      }
-    }
-    reader.onerror = () => {
-      showToast.error(
-        t('header.readFailed'),
-        reader.error?.message ?? t('header.readUnknownError'),
-      )
-    }
-    reader.readAsText(file)
+    void loadWorkflowFile(file).then((loaded) => {
+      if (loaded) onConfigLoaded?.()
+    })
 
     // Reset input so same file can be loaded again
     event.target.value = ''

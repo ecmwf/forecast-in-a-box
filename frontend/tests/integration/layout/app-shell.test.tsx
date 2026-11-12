@@ -70,6 +70,7 @@ describe('Layout', () => {
       await expect
         .element(screen.getByAltText('Destination Earth'))
         .toBeVisible()
+      await expect.element(screen.getByAltText('European Union')).toBeVisible()
       await expect
         .element(screen.getByAltText(/member and co-operating states/))
         .toBeVisible()

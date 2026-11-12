@@ -31,10 +31,13 @@ import type { SourceSlot } from './layer-pairing'
 
 export function useViewerAnnotations({
   viewRef,
+  centerGlobe,
   onToggle,
 }: {
   /** Shared camera — locate() pans it to a pin. */
   viewRef: RefObject<View | null>
+  /** Turns the globe to a pin; false while the flat map is shown. */
+  centerGlobe: (lon: number, lat: number) => boolean
   /** Fires on every arm/disarm toggle — the caller disarms rival tools. */
   onToggle: () => void
 }) {
@@ -153,13 +156,13 @@ export function useViewerAnnotations({
     (id: string) => {
       const annotation = annotations.find((ann) => ann.id === id)
       const view = viewRef.current
-      if (!annotation || !view) return
+      if (!annotation || centerGlobe(...annotation.lonLat) || !view) return
       view.animate({
         center: fromLonLat(annotation.lonLat, view.getProjection()),
         duration: 350,
       })
     },
-    [annotations, viewRef],
+    [annotations, viewRef, centerGlobe],
   )
 
   const onToggleRef = useRef(onToggle)

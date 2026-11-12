@@ -30,13 +30,14 @@ const STEPS: ReadonlyArray<{
 ]
 
 const PARTNER_LOGOS: ReadonlyArray<{
-  key: 'ecmwf' | 'metNorway' | 'fmi' | 'destinE'
+  key: 'ecmwf' | 'metNorway' | 'fmi'
   src: string
   darkSrc?: string
   href: string
   size: string
 }> = [
   // Widths compensate for the padding baked into the ECMWF and MET Norway PNGs.
+  // None may be taller than the EU flag (h-10 below).
   {
     key: 'ecmwf',
     src: '/logos/org/ECMWF.png',
@@ -54,13 +55,7 @@ const PARTNER_LOGOS: ReadonlyArray<{
     src: '/logos/org/FMI.png',
     darkSrc: '/logos/org/FMI-dark.png',
     href: 'https://en.ilmatieteenlaitos.fi',
-    size: 'h-12 w-auto',
-  },
-  {
-    key: 'destinE',
-    src: '/logos/org/destine.png',
-    href: DESTINE_URL,
-    size: 'w-44',
+    size: 'h-9 w-auto',
   },
 ]
 const ARCX_URL = 'https://africa-knowledge-platform.ec.europa.eu/arcx'
@@ -159,36 +154,43 @@ export function AboutPage() {
 
       <section className={`${SECTION} pt-20`}>
         <H2 className="border-0 pb-0 text-2xl">{t('collaboration.title')}</H2>
-        {/* One row from lg; the 1px gaps over bg-border draw the hairlines. */}
-        <div className="mt-10 grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-5">
+        {/* Institutes, then EU programmes; 1px gaps draw the hairlines. */}
+        <div className="mt-10 grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-6">
           {PARTNER_LOGOS.map(({ key, src, darkSrc, href, size }) => (
             <a
               key={key}
               href={href}
-              className="flex items-center justify-center bg-background px-8 py-5"
+              className="flex items-center justify-center bg-background px-6 py-5 lg:col-span-2"
             >
-              <img
+              <LogoImage
                 src={src}
+                darkSrc={darkSrc}
                 alt={t(`brand.${key}`)}
-                className={cn(
-                  'h-auto object-contain',
-                  size,
-                  darkSrc && 'dark:hidden',
-                )}
+                className={size}
               />
-              {darkSrc && (
-                <img
-                  src={darkSrc}
-                  alt={t(`brand.${key}`)}
-                  className={cn(size, 'hidden object-contain dark:block')}
-                />
-              )}
             </a>
           ))}
+          <a
+            href={DESTINE_URL}
+            className="flex items-center justify-center gap-3 bg-background px-6 py-5 lg:col-span-3"
+          >
+            {/* One row; only the wordmark shrinks on narrow screens. */}
+            <LogoImage
+              src="/logos/org/eu-flag.svg"
+              alt={t('brand.eu')}
+              className="h-10 w-auto shrink-0"
+            />
+            <LogoImage
+              src="/logos/org/destine-wordmark.svg"
+              darkSrc="/logos/org/destine-wordmark-dark.svg"
+              alt={t('brand.destinE')}
+              className="h-5 w-auto min-w-0"
+            />
+          </a>
           {/* ArcX has no logo of its own; its materials set the name in type. */}
           <a
             href={ARCX_URL}
-            className="flex flex-col items-center justify-center bg-background px-8 py-5 text-center sm:col-span-2 lg:col-span-1"
+            className="flex flex-col items-center justify-center bg-background px-6 py-5 text-center sm:col-span-2 lg:col-span-3"
           >
             <span className="text-2xl font-bold tracking-tight">
               {t('brand.arcx')}
@@ -218,5 +220,39 @@ export function AboutPage() {
         </div>
       </section>
     </div>
+  )
+}
+
+/** A logo, swapped for its dark variant in dark mode when there is one. */
+function LogoImage({
+  src,
+  darkSrc,
+  alt,
+  className,
+}: {
+  src: string
+  darkSrc?: string
+  alt: string
+  className: string
+}) {
+  return (
+    <>
+      <img
+        src={src}
+        alt={alt}
+        className={cn(
+          'h-auto object-contain',
+          className,
+          darkSrc && 'dark:hidden',
+        )}
+      />
+      {darkSrc && (
+        <img
+          src={darkSrc}
+          alt={alt}
+          className={cn(className, 'hidden object-contain dark:block')}
+        />
+      )}
+    </>
   )
 }

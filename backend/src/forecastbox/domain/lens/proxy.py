@@ -69,24 +69,38 @@ URL handling -- the lens's responsibility
 
 The proxy does NOT rewrite response bodies. Any URL adaptation is the client's job,
 per the rules above.
+
+Flow control
+------------
+- At most `UPSTREAM_SLOTS` requests are in flight to one lens; further requests wait
+  in the proxy. A waiting bodyless request whose client disconnects is answered 499
+  without reaching the lens.
 """
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator
 
 import httpx
 from fastapi import HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from starlette.datastructures import Headers
 
 from forecastbox.domain.lens.core import PREFIX as PREFIX_ROOT
-from forecastbox.domain.lens.exceptions import LensFailure, LensStarting, UnproxyableLens
+from forecastbox.domain.lens.exceptions import LensFailure, LensStarting, NoLensFound, UnproxyableLens
 from forecastbox.domain.lens.manager import LensInstanceId, get_status
 from forecastbox.utility.http_pools import HttpProfile, get_async
 
 logger = logging.getLogger(__name__)
 
 PREFIX = f"{PREFIX_ROOT}/proxy"
+
+#: Requests in flight to one lens: it renders serially, one queued keeps it busy.
+UPSTREAM_SLOTS = 2
+#: nginx's status for a request whose client went away before the answer.
+CLIENT_CLOSED_REQUEST = 499
+
+_slots: dict[LensInstanceId, asyncio.Semaphore] = {}
 
 #: Headers that are meaningful only for a single hop and must not be forwarded
 #: verbatim in either direction (RFC 7230 section 6.1, plus Content-Length since
@@ -193,6 +207,40 @@ def _has_body(request: Request) -> bool:
         return False
 
 
+async def _until_gone(request: Request) -> None:
+    """Return once the client disconnects; raises without a receive channel."""
+    # A blocking receive: is_disconnected() never fires under BaseHTTPMiddleware
+    while (await request.receive())["type"] != "http.disconnect":
+        pass
+
+
+def _left(watcher: asyncio.Task[None]) -> bool:
+    return watcher.done() and not watcher.cancelled() and watcher.exception() is None
+
+
+async def _acquire_slot(slots: asyncio.Semaphore, request: Request) -> bool:
+    """Wait for a free slot; False when the client of a bodyless request leaves first."""
+    if _has_body(request):
+        # A streamed body needs the receive channel
+        await slots.acquire()
+        return True
+    acquire = asyncio.ensure_future(slots.acquire())
+    watcher = asyncio.ensure_future(_until_gone(request))
+    try:
+        await asyncio.wait({acquire, watcher}, return_when=asyncio.FIRST_COMPLETED)
+        if not acquire.done() and _left(watcher):
+            acquire.cancel()
+        await asyncio.wait({acquire})
+    except asyncio.CancelledError:
+        acquire.cancel()
+        # A slot granted before the cancel landed goes back
+        acquire.add_done_callback(lambda done: None if done.cancelled() else slots.release())
+        raise
+    finally:
+        watcher.cancel()
+    return not acquire.cancelled()
+
+
 def _build_upstream_url(port: int, upstream_path: str, query: str) -> str:
     url = f"http://127.0.0.1:{port}/{upstream_path}"
     if query:
@@ -200,14 +248,19 @@ def _build_upstream_url(port: int, upstream_path: str, query: str) -> str:
     return url
 
 
-async def forward(lens_instance_id: LensInstanceId, upstream_path: str, request: Request) -> StreamingResponse:
+async def forward(lens_instance_id: LensInstanceId, upstream_path: str, request: Request) -> Response:
     """Forward `request` to the lens identified by `lens_instance_id`, streaming both
     the request body upstream and the response body back downstream.
 
     Forwards exceptions such as NoLensFound, LensStarting, LensFailure, or UnproxyableLens.
-    Raises HTTP exceptions in case of upstream connection failure.
+    Raises HTTP exceptions in case of upstream connection failure. Answers 499 when the
+    client disconnects while the request waits for an upstream slot.
     """
-    port = _resolve_port(lens_instance_id)
+    try:
+        port = _resolve_port(lens_instance_id)
+    except NoLensFound:
+        _slots.pop(lens_instance_id, None)
+        raise
 
     url = _build_upstream_url(port, upstream_path, request.url.query)
     headers = _build_upstream_headers(request, port, lens_instance_id)
@@ -220,6 +273,10 @@ async def forward(lens_instance_id: LensInstanceId, upstream_path: str, request:
         **({"content": request.stream()} if _has_body(request) else {}),  # ty:ignore # NOTE ty is for some reason mishandling the kwarg expansion
     )
 
+    slots = _slots.setdefault(lens_instance_id, asyncio.Semaphore(UPSTREAM_SLOTS))
+    if not await _acquire_slot(slots, request):
+        return Response(status_code=CLIENT_CLOSED_REQUEST)
+
     # NOTE here we raise HTTP exceptions directly, not domain exceptions -- because we are indeed
     # converting underlying http errors
     try:
@@ -228,6 +285,9 @@ async def forward(lens_instance_id: LensInstanceId, upstream_path: str, request:
         raise HTTPException(status_code=502, detail=f"Lens instance {lens_instance_id!r} is unreachable")
     except httpx.TimeoutException:
         raise HTTPException(status_code=504, detail=f"Lens instance {lens_instance_id!r} timed out")
+    finally:
+        # The lens has rendered once its headers arrive; the body only streams
+        slots.release()
 
     async def body_iterator() -> AsyncIterator[bytes]:
         try:

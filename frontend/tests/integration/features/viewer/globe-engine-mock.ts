@@ -19,12 +19,14 @@ import type {
   GlobeEngine,
   GlobeEngineEvents,
   GlobeLayerSpec,
+  GlobeVectorSpec,
 } from '@/features/viewer/globe/engine'
 
 /** What reached the engine; one module instance per test file. */
 export const engineCalls = {
   layers: [] as Array<ReadonlyArray<GlobeLayerSpec>>,
   basemaps: [] as Array<GlobeBasemapSpec>,
+  vectors: [] as Array<GlobeVectorSpec>,
   seeds: [] as Array<boolean>,
   live: [] as Array<boolean>,
   mounted: 0,
@@ -33,6 +35,8 @@ export const engineCalls = {
   loaded: Promise.resolve(),
   captures: 0,
   events: null as GlobeEngineEvents | null,
+  /** What `overlayAt` answers. */
+  overlayAt: (): number | null => null,
   commits: 0,
 }
 
@@ -50,6 +54,7 @@ function fakeEngine(): GlobeEngine {
     },
     setLayers: (specs) => engineCalls.layers.push(specs),
     setBasemap: (spec) => engineCalls.basemaps.push(spec),
+    setVectors: (spec) => engineCalls.vectors.push(spec),
     setLive: (live) => engineCalls.live.push(live),
     setCamera: (next) => {
       camera = next
@@ -63,6 +68,7 @@ function fakeEngine(): GlobeEngine {
     },
     bendOut: () => Promise.resolve(),
     pick: () => null,
+    overlayAt: () => engineCalls.overlayAt(),
     capture: () => {
       engineCalls.captures++
       return document.createElement('canvas')

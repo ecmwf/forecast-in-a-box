@@ -76,6 +76,26 @@ def union_boxes(boxes: Sequence[LatLonBox]) -> LatLonBox:
     return (north, round(west, LONGITUDE_DECIMALS), south, round(west + width, LONGITUDE_DECIMALS))
 
 
+def pad_box(box: LatLonBox, latitude_padding: float, longitude_padding: float) -> LatLonBox:
+    """Return the box widened by the latitude padding to the north and south and by the longitude padding to the west and east.
+
+    The latitudes are limited to [-90, 90]. West stays in [-180, 180) and east is west plus the padded width, so it may exceed 180
+    for a box across the 180 degree line. A box whose padded width reaches the whole circle is returned as -180 to 180.
+    """
+    if latitude_padding < 0 or longitude_padding < 0:
+        raise ValueError(f"Padding must not be negative, not {latitude_padding=} and {longitude_padding=}.")
+    north, west, south, east = box
+    north = min(90.0, north + latitude_padding)
+    south = max(-90.0, south - latitude_padding)
+
+    _, width = _arc(west, east)
+    padded_width = width + 2.0 * longitude_padding
+    if padded_width >= GLOBE - TOLERANCE:
+        return (north, -180.0, south, 180.0)
+    padded_west = (west - longitude_padding + 180.0) % GLOBE - 180.0
+    return (north, round(padded_west, LONGITUDE_DECIMALS), south, round(padded_west + padded_width, LONGITUDE_DECIMALS))
+
+
 def box_from_preset(config: Any) -> LatLonBox | None:
     """Return the box of an earthkit-plots preset domain configured in plain latitude and longitude, or None for any other preset.
 

@@ -14,6 +14,7 @@ import {
   PRESET_DOMAINS,
   boxHandles,
   clampBboxLatitudeForMercator,
+  cutsOutDomain,
   detectMode,
   isAutoDomain,
   isBboxTokens,
@@ -40,7 +41,9 @@ describe('tokenize / isBboxTokens', () => {
 
   it('treats exactly four integer tokens as a bbox', () => {
     expect(isBboxTokens(['-10', '30', '35', '60'])).toBe(true)
-    expect(isBboxTokens(['-10', '30', '35.5', '60'])).toBe(false) // whole degrees only
+    expect(isBboxTokens(['-10.25', '30', '35.5', '60'])).toBe(true) // decimal degrees
+    expect(isBboxTokens(['-10.', '.5', '35', '60'])).toBe(true)
+    expect(isBboxTokens(['-10', '30', '1e1', '60'])).toBe(false)
     expect(isBboxTokens(['10', '20', '30'])).toBe(false) // too few
     expect(isBboxTokens(['Europe', 'Africa', 'Asia', 'Oceania'])).toBe(false) // 4 names ≠ bbox
     expect(isBboxTokens(['10', '20', 'x', '40'])).toBe(false)
@@ -58,8 +61,13 @@ describe('bbox round-trip', () => {
     expect(parseBbox('')).toBeNull()
   })
 
-  it('serializes a bbox, rounding to whole degrees', () => {
-    expect(serializeBbox([-9.59999, 30.0, 35.2, 60])).toBe('-10,30,35,60')
+  it('parses a decimal bbox', () => {
+    expect(parseBbox('-10.25,35.5,30,60')).toEqual([-10.25, 35.5, 30, 60])
+  })
+
+  it('serializes a bbox, snapping to quarter degrees', () => {
+    expect(serializeBbox([-9.59999, 30.0, 35.2, 60])).toBe('-9.5,30,35.25,60')
+    expect(serializeBbox([-0.1, 0.12, 9.874, 49.99])).toBe('0,0,9.75,50')
   })
 
   it('round-trips parse(serialize)', () => {
@@ -143,6 +151,20 @@ describe('isAutoDomain', () => {
     expect(isAutoDomain(' Auto ')).toBe(true)
     expect(isAutoDomain('auto,Germany')).toBe(false)
     expect(isAutoDomain('')).toBe(false)
+  })
+})
+
+describe('cutsOutDomain', () => {
+  it('is false for an empty value and the whole-area values', () => {
+    for (const value of ['', ' ', 'auto', 'Global', 'datadefined']) {
+      expect(cutsOutDomain(value)).toBe(false)
+    }
+  })
+
+  it('is true for names and boxes', () => {
+    expect(cutsOutDomain('Central Europe')).toBe(true)
+    expect(cutsOutDomain('Germany,France')).toBe(true)
+    expect(cutsOutDomain('-10,35,30,70')).toBe(true)
   })
 })
 

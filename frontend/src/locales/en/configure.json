@@ -30,6 +30,9 @@
     "jinjaReservedReference": "'{{name}}' clashes with a Jinja filter or function and cannot be used as a variable — choose a different name."
   },
   "page": {
+    "dropOpen": "Drop to open this workflow",
+    "dropReplace": "Drop to replace the current workflow",
+    "dropSetAside": "Unsaved changes are set aside",
     "notFoundTitle": "The requested workflow was not found.",
     "loadFailedTitle": "Failed to load workflow. Please try again later.",
     "notFoundDescription": "It may have been deleted or the link is no longer valid.",
@@ -54,7 +57,7 @@
     "fileTooLargeTitle": "File too large",
     "fileTooLargeDescription": "Workflow files must be smaller than 1 MB.",
     "invalidConfigTitle": "Invalid workflow file",
-    "invalidConfigDescription": "File must contain a valid workflow with a \"blocks\" property.",
+    "invalidConfigDescription": "The file is not a workflow exported from Forecast-in-a-Box.",
     "parseFailed": "Failed to parse workflow file",
     "readFailed": "Failed to read file",
     "readUnknownError": "Unknown read error",
@@ -98,11 +101,18 @@
     }
   },
   "blockActions": {
+    "more": "More block actions",
     "duplicate": "Duplicate",
-    "duplicateWithChildren": "Duplicate with children",
-    "saveAsPreset": "Save config as preset",
+    "duplicateWithDownstream": "Duplicate with downstream blocks",
     "deleteBlock": "Delete block",
-    "comingSoonPreset": "Coming soon: Saving configurations as presets will be available soon."
+    "replaceWith": "Replace with",
+    "checking": "Checking which blocks fit...",
+    "noReplacement": "No other block fits here",
+    "replaced": "Replaced {{from}} with {{to}}",
+    "keptOptions_one": "Kept {{kept}} of {{count}} option",
+    "keptOptions_other": "Kept {{kept}} of {{count}} options",
+    "undoStale": "Can't undo the replace: the block has changed since.",
+    "undoStaleHint": "Use Undo in the header instead."
   },
   "layout": {
     "hideBlockPalette": "Hide block palette",
@@ -120,6 +130,7 @@
     "emptyDescription": "Pick a block on the canvas to configure it, or start here.",
     "addSource": "Add a source",
     "startFromPreset": "Open a workflow",
+    "dropHint": "or drop a workflow file here",
     "inputConnections": "Input connections",
     "configuration": "Configuration",
     "noConfigOptions": "No configuration options",
@@ -210,6 +221,7 @@
     "cancel": "Cancel",
     "delete": "Delete",
     "moreCount": "+{{count}} more",
+    "isDefault": "default",
     "outputHandle": "Output"
   },
   "review": {

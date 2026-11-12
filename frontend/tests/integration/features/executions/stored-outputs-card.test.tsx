@@ -32,11 +32,18 @@ import {
   createRoute,
   createRouter,
 } from '@tanstack/react-router'
-import { listMockLenses, resetLensState } from '@tests/../mocks/data/lens.data'
+import {
+  injectMockLens,
+  listMockLenses,
+  resetLensState,
+} from '@tests/../mocks/data/lens.data'
 import { resetJobsState, setMockGribDir } from '@tests/../mocks/data/job.data'
 import type { JobStatus, RunOutputs } from '@/api/types/job.types'
+import type { LensInstanceDetailResponse } from '@/api/types/lens.types'
 import { StoredOutputsCard } from '@/features/executions/components/StoredOutputsCard'
+import { useExecutionHoverStore } from '@/features/executions/stores/executionHoverStore'
 import { lensOwner } from '@/features/visualise/lens-owners'
+import { showToast } from '@/lib/toast'
 import i18n from '@/lib/i18n'
 import { useConfigStore } from '@/stores/configStore'
 
@@ -108,7 +115,23 @@ async function renderCard(
 beforeEach(() => {
   resetJobsState()
   resetLensState()
+  useExecutionHoverStore.getState().resetExecutionSelection()
 })
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
+
+/** A running server on the job-completed-001 GRIB folder. */
+function runningLens(id: string): LensInstanceDetailResponse {
+  return {
+    lens_instance_id: id,
+    status: 'running',
+    lens_name: 'skinnyWMS',
+    lens_params: { local_path: '/data/output/job-completed-001_1' },
+    ports: [54300],
+  }
+}
 
 describe('StoredOutputsCard', () => {
   it('renders one row per sink block and resolves the directory from the payload', async () => {
@@ -122,6 +145,38 @@ describe('StoredOutputsCard', () => {
     expect(
       screen.getByText('Folder shared with other runs').elements(),
     ).toHaveLength(0)
+  })
+
+  it('rings the selected sink and fades the others while a block is selected', async () => {
+    const { screen } = await renderCard({
+      ...outputsWithMarkers,
+      'task-out-grib-b': {
+        mime_type: GRIB_DIR_MIME,
+        original_block: 'block_sink_2',
+        is_available: true,
+      },
+    })
+    const row = (title: string) =>
+      screen.getByText(title).element().closest('li')
+    await expect.element(screen.getByText('block_sink_2')).toBeVisible()
+    for (const title of ['block_sink_1', 'block_sink_2']) {
+      expect(row(title)?.className).not.toContain('opacity-40')
+      expect(row(title)?.className).not.toContain('ring-2')
+    }
+
+    useExecutionHoverStore.getState().setSelectedBlockId('block_sink_2')
+    await expect
+      .poll(() => row('block_sink_1')?.className)
+      .toContain('opacity-40')
+    expect(row('block_sink_1')?.className).not.toContain('ring-2')
+    expect(row('block_sink_2')?.className).toContain('ring-2')
+    expect(row('block_sink_2')?.className).not.toContain('opacity-40')
+
+    useExecutionHoverStore.getState().setSelectedBlockId(null)
+    await expect
+      .poll(() => row('block_sink_1')?.className)
+      .not.toContain('opacity-40')
+    expect(row('block_sink_2')?.className).not.toContain('ring-2')
   })
 
   it('lists markers whose mime also carries fiab-fetchable', async () => {
@@ -255,6 +310,37 @@ describe('StoredOutputsCard', () => {
       .element(screen.getByRole('button', { name: /start wms server/i }))
       .toBeVisible()
     await expect.poll(() => listMockLenses()).toHaveLength(0)
+  })
+
+  it('adopts a server already running on its folder', async () => {
+    // A fresh mount: the server was started elsewhere or before a reload.
+    injectMockLens(runningLens('lens-earlier'))
+    const { screen } = await renderCard(outputsWithMarkers)
+    await expect
+      .element(screen.getByRole('button', { name: /copy wms url/i }))
+      .toBeVisible()
+    await expect
+      .element(screen.getByRole('button', { name: /start wms server/i }))
+      .not.toBeInTheDocument()
+  })
+
+  it('stops adopted duplicates one by one without a failure toast', async () => {
+    const error = vi.spyOn(showToast, 'error')
+    injectMockLens(runningLens('lens-1'))
+    injectMockLens(runningLens('lens-2'))
+    const { screen } = await renderCard(outputsWithMarkers)
+    const stopButton = screen.getByRole('button', { name: /stop wms server/i })
+
+    await stopButton.click()
+    await expect.poll(() => listMockLenses()).toHaveLength(1)
+    // The second server takes over the row.
+    await expect.element(stopButton).toBeEnabled()
+    await stopButton.click()
+    await expect
+      .element(screen.getByRole('button', { name: /start wms server/i }))
+      .toBeVisible()
+    await expect.poll(() => listMockLenses()).toHaveLength(0)
+    expect(error).not.toHaveBeenCalled()
   })
 
   it('Visualise opens /visualise with the output pinned as a single view', async () => {

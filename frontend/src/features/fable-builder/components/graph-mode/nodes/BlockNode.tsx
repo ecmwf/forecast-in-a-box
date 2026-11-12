@@ -19,7 +19,6 @@ import type {
   BlockConfigurationOption,
   BlockValidationState,
 } from '@/api/types/fable.types'
-import type { ValueLabel } from '@/features/fable-builder/hooks/useConfigValueLabels'
 import { AddNodeButton } from '@/features/fable-builder/components/graph-mode/AddNodeButton'
 import { useNodeDimensions } from '@/features/fable-builder/hooks/useNodeDimensions'
 import { useConfigValueLabels } from '@/features/fable-builder/hooks/useConfigValueLabels'
@@ -41,14 +40,16 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { BlockActionMenu } from '@/features/fable-builder/components/shared/BlockActionMenu'
+import {
+  BlockActionMenu,
+  BlockContextMenu,
+} from '@/features/fable-builder/components/shared/BlockActionMenu'
 import { BlockErrorOverlay } from '@/features/fable-builder/components/graph-mode/nodes/BlockErrorOverlay'
-import { parseGlyphSegments } from '@/features/fable-builder/utils/glyph-display'
 import { TOUR, tourAttr } from '@/features/tutorials/anchors'
 import { cn } from '@/lib/utils'
 import { BlockName } from '@/features/fable-builder/components/shared/BlockName'
-import { ValueLabelHint } from '@/features/fable-builder/components/shared/ValueLabelHint'
-import { TooltipProvider } from '@/components/ui/tooltip'
+import { BlockValueChips } from '@/features/fable-builder/components/graph-mode/nodes/BlockValueChips'
+import { blockValueEntries } from '@/features/fable-builder/utils/block-values'
 
 export type FableNode = Node<FableNodeData>
 
@@ -118,14 +119,10 @@ export const BlockNode = memo(function ({
     openMobileConfig(id)
   }
 
-  const configuredEntries = Object.entries(
+  const valueEntries = blockValueEntries(
     instance.configuration_values,
-  ).filter(([, value]) => value)
-  const configSummary = configuredEntries.slice(0, 3)
-
-  // Count only configured (non-empty) values — empty keys aren't shown as
-  // badges, so they must not inflate the "+N more" count.
-  const remainingConfigCount = configuredEntries.length - configSummary.length
+    factory.configuration_options,
+  )
 
   // Last-known restrictions; validationState is null mid-edit.
   const restrictionsRef = useRef<Record<string, string>>({})
@@ -136,9 +133,9 @@ export const BlockNode = memo(function ({
     restrictionsRef.current = blockState?.configurationRestrictions ?? {}
   }
   const valueLabels = useConfigValueLabels(
-    Object.fromEntries(configSummary.map(([key, v]) => [key, String(v)])),
+    Object.fromEntries(valueEntries.map(({ key, value }) => [key, value])),
     Object.fromEntries(
-      configSummary.map(([key]) => [
+      valueEntries.map(({ key }) => [
         key,
         (restrictionsRef.current[key] as string | undefined) ??
           (
@@ -150,224 +147,193 @@ export const BlockNode = memo(function ({
   )
 
   return (
-    <div
-      ref={containerRef}
-      role="button"
-      tabIndex={0}
-      onClick={handleClick}
-      onKeyDown={(e) => e.key === 'Enter' && handleClick()}
-      data-block-kind={factory.kind}
-      {...tourAttr(TOUR.configure.block)}
-      className={cn(
-        'relative w-70 rounded-2xl border bg-card shadow-sm',
-        'cursor-pointer transition-all duration-200',
-        // Hover: subtle border hint (distinct from full selection)
-        !isSelected &&
-          !hasErrors &&
-          'hover:shadow-md hover:ring-1 hover:ring-primary/20',
-        // Selected: blue ring only — a scale would shift handles, kinking edges.
-        isSelected &&
-          'shadow-[0_0_0_2.5px_rgba(18,69,222,1),0_20px_40px_-5px_rgba(18,69,222,0.2)]',
-        // Error (unselected): red ring
-        hasErrors &&
-          !isSelected &&
-          'shadow-[0_0_0_2px_rgba(220,38,38,1),0_15px_35px_-5px_rgba(220,38,38,0.15)]',
-      )}
-    >
-      {/* Overlay clips the bar to the card radius — a 6px bar can't render it itself. */}
+    <BlockContextMenu instanceId={id} catalogue={catalogue}>
       <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]"
+        ref={containerRef}
+        role="button"
+        tabIndex={0}
+        onClick={handleClick}
+        onKeyDown={(e) => e.key === 'Enter' && handleClick()}
+        data-block-kind={factory.kind}
+        {...tourAttr(TOUR.configure.block)}
+        className={cn(
+          'relative w-70 rounded-2xl border bg-card shadow-sm',
+          'cursor-pointer transition-all duration-200',
+          // Hover: subtle border hint (distinct from full selection)
+          !isSelected &&
+            !hasErrors &&
+            'hover:shadow-md hover:ring-1 hover:ring-primary/20',
+          // Selected: blue ring only — a scale would shift handles, kinking edges.
+          isSelected &&
+            'shadow-[0_0_0_2.5px_rgba(18,69,222,1),0_20px_40px_-5px_rgba(18,69,222,0.2)]',
+          // Error (unselected): red ring
+          hasErrors &&
+            !isSelected &&
+            'shadow-[0_0_0_2px_rgba(220,38,38,1),0_15px_35px_-5px_rgba(220,38,38,0.15)]',
+        )}
       >
-        <div className={cn('h-1.5 w-full opacity-80', metadata.topBarColor)} />
-      </div>
-
-      <div className="px-5 pt-6.5 pb-5">
-        <div className="mb-3 flex items-start justify-between">
-          <div className="flex items-center gap-2">
-            <IconComponent className={cn('h-5 w-5', metadata.color)} />
-            <span className="text-sm font-semibold tracking-wider text-muted-foreground uppercase">
-              {metadata.label}
-            </span>
-          </div>
-          <div className="flex items-center gap-1">
-            {/* Settings button - mobile only */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="nodrag h-7 w-7 text-muted-foreground hover:text-primary lg:hidden"
-              onClick={handleOpenConfig}
-              aria-label={t('blockNode.configureBlock')}
-            >
-              <Settings className="h-4 w-4" />
-            </Button>
-
-            <AlertDialog>
-              <AlertDialogTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="nodrag h-7 w-7 text-muted-foreground hover:text-danger"
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                }
-              >
-                <Trash2 className="h-4 w-4" />
-              </AlertDialogTrigger>
-              <AlertDialogContent onClick={(e) => e.stopPropagation()}>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>
-                    {t('blockNode.deleteBlock')}
-                  </AlertDialogTitle>
-                  <AlertDialogDescription>
-                    {t('blockNode.deleteConfirm', { title: label })}
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>{t('blockNode.cancel')}</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDelete}>
-                    {t('blockNode.delete')}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-
-            <BlockActionMenu
-              instanceId={id}
-              triggerClassName="nodrag h-7 w-7"
-              stopPropagation
-            />
-          </div>
+        {/* Overlay clips the bar to the card radius — a 6px bar can't render it itself. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]"
+        >
+          <div
+            className={cn('h-1.5 w-full opacity-80', metadata.topBarColor)}
+          />
         </div>
 
-        <H3 className="mb-1 text-lg font-semibold text-foreground">
-          <BlockName name={label} />
-        </H3>
-
-        <P className="mb-4 line-clamp-2 text-muted-foreground">
-          {factory.description}
-        </P>
-
-        {configSummary.length > 0 && (
-          <TooltipProvider delay={120}>
-            <div className="flex flex-wrap gap-1.5">
-              {configSummary.map(([key, value]) => {
-                const valueLabel = valueLabels[key] as ValueLabel | undefined
-                const stringValue = valueLabel?.compact ?? String(value)
-                const truncated =
-                  stringValue.length > 15
-                    ? `${stringValue.slice(0, 15)}...`
-                    : stringValue
-                const segments = parseGlyphSegments(truncated)
-                const hasGlyphs = segments.some((s) => s.isGlyph)
-                return (
-                  <ValueLabelHint key={key} label={valueLabel}>
-                    <span
-                      className={cn(
-                        'rounded-md border px-2 py-0.5 text-xs font-bold',
-                        metadata.bgColor,
-                        metadata.borderColor,
-                        metadata.color,
-                      )}
-                    >
-                      {hasGlyphs
-                        ? segments.map((seg, i) =>
-                            seg.isGlyph ? (
-                              <span
-                                key={i}
-                                className="rounded-md bg-primary/15 px-0.5 font-mono text-primary"
-                              >
-                                {seg.text}
-                              </span>
-                            ) : (
-                              <span key={i}>{seg.text}</span>
-                            ),
-                          )
-                        : truncated}
-                    </span>
-                  </ValueLabelHint>
-                )
-              })}
-              {remainingConfigCount > 0 && (
-                <span className="rounded-md border bg-muted px-2 py-0.5 text-xs font-bold text-muted-foreground">
-                  {t('blockNode.moreCount', { count: remainingConfigCount })}
-                </span>
-              )}
+        <div className="px-5 pt-6.5 pb-5">
+          <div className="mb-3 flex items-start justify-between">
+            <div className="flex items-center gap-2">
+              <IconComponent className={cn('h-5 w-5', metadata.color)} />
+              <span className="text-sm font-semibold tracking-wider text-muted-foreground uppercase">
+                {metadata.label}
+              </span>
             </div>
-          </TooltipProvider>
+            <div className="flex items-center gap-1">
+              {/* Settings button - mobile only */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="nodrag h-7 w-7 text-muted-foreground hover:text-primary lg:hidden"
+                onClick={handleOpenConfig}
+                aria-label={t('blockNode.configureBlock')}
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+
+              <AlertDialog>
+                <AlertDialogTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="nodrag h-7 w-7 text-muted-foreground hover:text-danger"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  }
+                >
+                  <Trash2 className="h-4 w-4" />
+                </AlertDialogTrigger>
+                <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>
+                      {t('blockNode.deleteBlock')}
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {t('blockNode.deleteConfirm', { title: label })}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>
+                      {t('blockNode.cancel')}
+                    </AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDelete}>
+                      {t('blockNode.delete')}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
+              <BlockActionMenu
+                instanceId={id}
+                catalogue={catalogue}
+                // nopan: the menu opens on mouse-down, which canvas panning would take.
+                triggerClassName="nodrag nopan h-7 w-7"
+                stopPropagation
+              />
+            </div>
+          </div>
+
+          <H3 className="mb-1 text-lg font-semibold text-foreground">
+            <BlockName name={label} />
+          </H3>
+
+          <P className="mb-4 line-clamp-2 text-muted-foreground">
+            {factory.description}
+          </P>
+
+          <BlockValueChips
+            entries={valueEntries}
+            labels={valueLabels}
+            choiceClassName={cn(
+              metadata.bgColor,
+              metadata.borderColor,
+              metadata.color,
+            )}
+          />
+        </div>
+        <BlockErrorOverlay errors={errors} />
+
+        {factory.inputs.map((inputName, index) => {
+          const percent = ((index + 1) / (factory.inputs.length + 1)) * 100
+
+          return (
+            <Handle
+              key={inputName}
+              type="target"
+              position={inputPosition}
+              id={inputName}
+              title={inputName}
+              className={cn(
+                'h-5! w-5! rounded-full! border-4! bg-card!',
+                isHorizontalLayout ? '-left-2.5!' : '-top-2.5!',
+                inputPosition === Position.Right && '-right-2.5! left-auto!',
+                inputPosition === Position.Bottom && 'top-auto! -bottom-2.5!',
+                'border-foreground/30!',
+                'transition-all hover:scale-110',
+                inputHandleDroppable && 'dnd-droppable',
+              )}
+              style={
+                isHorizontalLayout
+                  ? { top: `${percent}%`, transform: 'translateY(-50%)' }
+                  : { left: `${percent}%`, transform: 'translateX(-50%)' }
+              }
+            />
+          )
+        })}
+
+        {factory.kind !== 'sink' && (
+          <AddNodeButton
+            sourceBlockId={id}
+            possibleExpansions={possibleExpansions}
+            catalogue={catalogue}
+          >
+            {/* Output handle doubles as the add-block control: click opens the
+              menu, drag draws a connection. */}
+            <Handle
+              type="source"
+              position={outputPosition}
+              id="output"
+              title={t('blockNode.outputHandle')}
+              onClick={(e) => e.stopPropagation()}
+              data-block-kind={factory.kind}
+              {...tourAttr(TOUR.configure.addDownstream)}
+              className={cn(
+                'flex! h-5! w-5! cursor-pointer! items-center justify-center rounded-full! border-4! bg-card!',
+                'border-foreground/30! hover:border-primary!',
+                isHorizontalLayout ? '-right-2.5!' : '-bottom-2.5!',
+                outputPosition === Position.Left && 'right-auto! -left-2.5!',
+                outputPosition === Position.Top && '-top-2.5! bottom-auto!',
+                'transition-all hover:scale-110',
+                outputHandleDroppable && 'dnd-droppable',
+              )}
+              style={
+                isHorizontalLayout
+                  ? { top: '50%', transform: 'translateY(-50%)' }
+                  : { left: '50%', transform: 'translateX(-50%)' }
+              }
+            >
+              <Plus
+                className={cn(
+                  'h-2.5 w-2.5',
+                  hasErrors ? 'text-danger' : 'text-muted-foreground',
+                )}
+              />
+            </Handle>
+          </AddNodeButton>
         )}
       </div>
-      <BlockErrorOverlay errors={errors} />
-
-      {factory.inputs.map((inputName, index) => {
-        const percent = ((index + 1) / (factory.inputs.length + 1)) * 100
-
-        return (
-          <Handle
-            key={inputName}
-            type="target"
-            position={inputPosition}
-            id={inputName}
-            title={inputName}
-            className={cn(
-              'h-5! w-5! rounded-full! border-4! bg-card!',
-              isHorizontalLayout ? '-left-2.5!' : '-top-2.5!',
-              inputPosition === Position.Right && '-right-2.5! left-auto!',
-              inputPosition === Position.Bottom && 'top-auto! -bottom-2.5!',
-              'border-foreground/30!',
-              'transition-all hover:scale-110',
-              inputHandleDroppable && 'dnd-droppable',
-            )}
-            style={
-              isHorizontalLayout
-                ? { top: `${percent}%`, transform: 'translateY(-50%)' }
-                : { left: `${percent}%`, transform: 'translateX(-50%)' }
-            }
-          />
-        )
-      })}
-
-      {factory.kind !== 'sink' && (
-        <AddNodeButton
-          sourceBlockId={id}
-          possibleExpansions={possibleExpansions}
-          catalogue={catalogue}
-        >
-          {/* Output handle doubles as the add-block control: click opens the
-              menu, drag draws a connection. */}
-          <Handle
-            type="source"
-            position={outputPosition}
-            id="output"
-            title={t('blockNode.outputHandle')}
-            onClick={(e) => e.stopPropagation()}
-            data-block-kind={factory.kind}
-            {...tourAttr(TOUR.configure.addDownstream)}
-            className={cn(
-              'flex! h-5! w-5! cursor-pointer! items-center justify-center rounded-full! border-4! bg-card!',
-              'border-foreground/30! hover:border-primary!',
-              isHorizontalLayout ? '-right-2.5!' : '-bottom-2.5!',
-              outputPosition === Position.Left && 'right-auto! -left-2.5!',
-              outputPosition === Position.Top && '-top-2.5! bottom-auto!',
-              'transition-all hover:scale-110',
-              outputHandleDroppable && 'dnd-droppable',
-            )}
-            style={
-              isHorizontalLayout
-                ? { top: '50%', transform: 'translateY(-50%)' }
-                : { left: '50%', transform: 'translateX(-50%)' }
-            }
-          >
-            <Plus
-              className={cn(
-                'h-2.5 w-2.5',
-                hasErrors ? 'text-danger' : 'text-muted-foreground',
-              )}
-            />
-          </Handle>
-        </AddNodeButton>
-      )}
-    </div>
+    </BlockContextMenu>
   )
 })

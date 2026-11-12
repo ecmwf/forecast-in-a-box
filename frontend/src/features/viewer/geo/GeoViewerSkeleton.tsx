@@ -11,10 +11,16 @@
 /**
  * Viewer-shaped loading placeholder — real layout in pulsing blocks, so
  * content fills in instead of swapping a spinner. Serves the Suspense
- * fallback and capabilities loading; must stay OpenLayers-free.
+ * fallback, capabilities loading and a starting lens (with the startup
+ * pill); must stay OpenLayers-free.
  */
 
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import {
+  StartupStatusPill,
+  lensStartupSteps,
+} from '../components/StartupStatusPill'
 import { geoPanelStyleVars, readGeoPanelWidths } from './useGeoPanelWidths'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
@@ -40,7 +46,15 @@ function SidebarSkeleton({ side }: { side: 'left' | 'right' }) {
   )
 }
 
-export function GeoViewerSkeleton({ label }: { label: string }) {
+export function GeoViewerSkeleton({
+  label,
+  lensStarting = false,
+}: {
+  label: string
+  /** The lens server is starting: shows its startup steps over the map. */
+  lensStarting?: boolean
+}) {
+  const { t } = useTranslation('visualise')
   // Same persisted widths as the live viewer, so panels don't jump on load.
   const [panelVars] = useState(() => geoPanelStyleVars(readGeoPanelWidths()))
   return (
@@ -60,9 +74,17 @@ export function GeoViewerSkeleton({ label }: { label: string }) {
         <SidebarSkeleton side="left" />
         <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden rounded-md border border-border bg-muted/20">
           <Skeleton className="absolute inset-0 rounded-none bg-muted/50" />
-          <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
-            {label}
-          </div>
+          {lensStarting ? (
+            <StartupStatusPill
+              steps={lensStartupSteps(t)}
+              activeIndex={0}
+              hint={t('startup.firstStartHint')}
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
+              {label}
+            </div>
+          )}
         </div>
         <SidebarSkeleton side="right" />
       </div>

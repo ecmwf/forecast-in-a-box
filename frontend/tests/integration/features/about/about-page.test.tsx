@@ -16,8 +16,14 @@ describe('AboutPage', () => {
   it('lists every partner', async () => {
     const screen = await renderWithRouter(<AboutPage />)
 
-    // FMI ships a light and a dark logo; only CSS hides one of them.
-    for (const name of ['ECMWF', 'MetNorway', 'FMI', 'DestinE']) {
+    // FMI and the wordmark ship light and dark copies; CSS hides one.
+    for (const name of [
+      'ECMWF',
+      'MetNorway',
+      'FMI',
+      'European Union',
+      'DestinE',
+    ]) {
       await expect
         .element(screen.getByRole('img', { name, exact: true }).first())
         .toBeInTheDocument()

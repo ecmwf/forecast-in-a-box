@@ -107,6 +107,7 @@
     "about": "About",
     "logoEcmwf": "ECMWF",
     "logoDestinationEarth": "Destination Earth",
+    "logoEu": "European Union",
     "memberStates": "Flags of the ECMWF member and co-operating states"
   },
   "userMenu": {
@@ -210,7 +211,7 @@
   "geoDomain": {
     "placeholder": "Select an area…",
     "autoLabel": "Auto",
-    "autoHint": "Plot everything the data covers",
+    "autoHint": "Use the area the data covers",
     "empty": "No area selected",
     "tabPresets": "Presets",
     "tabCountries": "Countries",
@@ -228,7 +229,32 @@
     "clear": "Clear",
     "clearHint": "Clear (or press Delete)",
     "boxSummary": "Box: {{west}}, {{south}}, {{east}}, {{north}}",
-    "advancedHint": "Enter a region, comma-separated countries, a bounding box in whole degrees (west,south,east,north), or a ${variable}."
+    "advancedHint": "Enter a region, comma-separated countries, a bounding box in degrees (west,south,east,north), or a ${variable}."
+  },
+  "grid": {
+    "placeholder": "Select a grid…",
+    "search": "Search or type a grid",
+    "keep": "Keep input grid",
+    "latlon": "{{resolution}} lat/lon",
+    "degrees": "{{value}}°",
+    "pair": "{{dx}}° × {{dy}}°",
+    "spacing": "~{{km}} km",
+    "points": "{{count}} points",
+    "pointsApprox": "~{{count}} points",
+    "pointsGlobal": "Point counts are for the whole globe, before the domain cut-out",
+    "groupCustom": "Your entry",
+    "groupLatlon": "Regular lat/lon",
+    "groupOctahedral": "Octahedral Gaussian",
+    "groupReduced": "Reduced Gaussian",
+    "groupRegular": "Regular Gaussian",
+    "error": {
+      "notGrid": "Not a grid. Use a resolution such as 0.25, a pair such as 0.25/0.5, a Gaussian grid such as O96, or auto.",
+      "tooManyParts": "Use at most two resolutions: west-east/south-north.",
+      "notPositive": "{{resolution}} is not a positive number of degrees.",
+      "tooFine": "{{resolution}} is finer than the minimum of {{min}}°.",
+      "gaussianNumber": "The Gaussian grid number must be one of {{numbers}}.",
+      "leadingZeros": "Write the Gaussian grid number without leading zeros, as in O96."
+    }
   },
   "notificationBanner": {
     "dismiss": "Dismiss notification"

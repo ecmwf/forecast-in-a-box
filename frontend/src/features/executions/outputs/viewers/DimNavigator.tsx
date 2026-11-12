@@ -17,7 +17,7 @@ import {
   Play,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { dimLine, orderDims } from '../dims'
+import { dimLine, dimNeighbor, orderDims } from '../dims'
 import { DimOptionsPopup } from '../DimOptionsPopup'
 import { StepTimeline } from './StepTimeline'
 import { kbdBadge, viewerHeaderBtn } from './viewerHeaderBtn'
@@ -87,7 +87,7 @@ export function DimNavigator({
 
   return (
     <div
-      role="toolbar"
+      role="group"
       aria-label={t('outputs.viewer.dimensions')}
       className="flex shrink-0 flex-wrap items-center justify-center gap-x-6 gap-y-1 border-t border-white/10 bg-neutral-950 px-4 py-1.5 text-white"
       onClick={(e) => e.stopPropagation()}
@@ -114,6 +114,11 @@ export function DimNavigator({
             points={stepPoints}
             current={item}
             onSelect={onSelect}
+            onVertical={(direction) => {
+              const target =
+                slowKey && dimNeighbor(items, item, slowKey, direction)
+              if (target) onSelect(target)
+            }}
           />
           <span className="min-w-16 shrink-0 text-right font-mono text-sm tabular-nums">
             {format.value('step', String(stepOf(stepPoints, item)), 'compact')}

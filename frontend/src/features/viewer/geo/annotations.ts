@@ -25,6 +25,14 @@ import VectorLayer from 'ol/layer/Vector'
 import VectorSource from 'ol/source/Vector'
 import { Fill, Stroke, Style, Text } from 'ol/style'
 import CircleStyle from 'ol/style/Circle'
+import {
+  CALLOUT_LABEL,
+  PIN_BADGE_FONT,
+  PIN_LABEL_GAP,
+  pinLabelText,
+  pinRadius,
+  pinStrokeWidth,
+} from '../vector-styles'
 import type { RefObject } from 'react'
 import type OlMap from 'ol/Map'
 import type { FeatureLike } from 'ol/Feature'
@@ -32,8 +40,6 @@ import type { SourceSlot } from './layer-pairing'
 
 /** Above data stacks and context overlays, below nothing that matters. */
 const ANNOTATION_Z = 1600
-/** On-map label truncation — full text lives in the sidebar and export. */
-const LABEL_MAX_CHARS = 36
 
 /** Curated pin palette — legible on both basemaps, themes, and exports. */
 export const ANNOTATION_COLORS = {
@@ -105,20 +111,21 @@ function pinStyles(
   highlighted: boolean,
 ) {
   const fill = ANNOTATION_COLORS[color]
-  const label =
-    text.length > LABEL_MAX_CHARS ? `${text.slice(0, LABEL_MAX_CHARS)}…` : text
-  // Wider badges ("L1", "ABCD") grow the disc so the text stays inside.
-  const radius = (highlighted ? 13 : 10) + Math.max(0, badge.length - 2) * 3.5
+  const label = pinLabelText(text)
+  const radius = pinRadius(badge, highlighted)
   const styles = [
     new Style({
       image: new CircleStyle({
         radius,
         fill: new Fill({ color: fill }),
-        stroke: new Stroke({ color: 'white', width: highlighted ? 3 : 2 }),
+        stroke: new Stroke({
+          color: 'white',
+          width: pinStrokeWidth(highlighted),
+        }),
       }),
       text: new Text({
         text: badge,
-        font: 'bold 11px system-ui, sans-serif',
+        font: PIN_BADGE_FONT,
         fill: new Fill({ color: 'white' }),
       }),
     }),
@@ -128,14 +135,14 @@ function pinStyles(
       new Style({
         text: new Text({
           text: label,
-          font: '12px system-ui, sans-serif',
+          font: CALLOUT_LABEL.font,
           textAlign: 'left',
           // Clear the (possibly grown) disc.
-          offsetX: radius + 4,
-          fill: new Fill({ color: 'rgba(15, 23, 42, 0.95)' }),
-          backgroundFill: new Fill({ color: 'rgba(255, 255, 255, 0.92)' }),
-          backgroundStroke: new Stroke({ color: 'rgba(0, 0, 0, 0.15)' }),
-          padding: [3, 5, 2, 5],
+          offsetX: radius + PIN_LABEL_GAP,
+          fill: new Fill({ color: CALLOUT_LABEL.color }),
+          backgroundFill: new Fill({ color: CALLOUT_LABEL.background }),
+          backgroundStroke: new Stroke({ color: CALLOUT_LABEL.border }),
+          padding: [...CALLOUT_LABEL.padding],
         }),
       }),
     )

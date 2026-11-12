@@ -56,7 +56,7 @@ const mockPlugin: PluginInfo = {
 
 describe('Plugin Detail Page', () => {
   describe('Plugin Header', () => {
-    it('renders plugin name, author, and version', async () => {
+    it('renders plugin name and author, with the version as a labelled value', async () => {
       const screen = await renderWithRouter(
         <PluginDetailPage plugin={mockPlugin} catalogue={mockCatalogue} />,
       )
@@ -64,16 +64,64 @@ describe('Plugin Detail Page', () => {
       await expect
         .element(screen.getByRole('heading', { name: 'ECMWF Plugin' }))
         .toBeVisible()
-      // Author and version are combined in a single text element
-      await expect.element(screen.getByText('ECMWF · v0.0.1')).toBeVisible()
+      await expect
+        .element(screen.getByText('ECMWF', { exact: true }))
+        .toBeVisible()
+      await expect
+        .element(screen.getByText('Version', { exact: true }))
+        .toBeVisible()
+      await expect
+        .element(screen.getByText('v0.0.1', { exact: true }))
+        .toBeVisible()
     })
 
-    it('renders plugin status badge', async () => {
+    it('shows the version an update brings', async () => {
+      const outdated: PluginInfo = {
+        ...mockPlugin,
+        latestVersion: '0.0.2',
+        hasUpdate: true,
+      }
+      const screen = await renderWithRouter(
+        <PluginDetailPage plugin={outdated} catalogue={mockCatalogue} />,
+      )
+
+      await expect.element(screen.getByText('→ v0.0.2')).toBeVisible()
+    })
+
+    it('renders the status as plain text', async () => {
       const screen = await renderWithRouter(
         <PluginDetailPage plugin={mockPlugin} catalogue={mockCatalogue} />,
       )
 
+      await expect
+        .element(screen.getByText('Status', { exact: true }))
+        .toBeVisible()
       await expect.element(screen.getByText('Loaded')).toBeVisible()
+    })
+
+    it('keeps the diagnostics out of the status hover', async () => {
+      const warned: PluginInfo = {
+        ...mockPlugin,
+        errorDetail: [
+          {
+            source: 'load',
+            detail: "version mismatch: DB has '0.0.0'",
+            severity: 'warning',
+          },
+        ],
+        errorSeverity: 'warning',
+      }
+      const screen = await renderWithRouter(
+        <PluginDetailPage plugin={warned} catalogue={mockCatalogue} />,
+      )
+
+      const status = screen.getByText('Warning', { exact: true })
+      await expect.element(status).toBeVisible()
+      // No tooltip to open: the box below lists the diagnostic.
+      expect(
+        status.element().closest('[data-slot="tooltip-trigger"]'),
+      ).toBeNull()
+      await expect.element(screen.getByText(/version mismatch/)).toBeVisible()
     })
 
     it('shows a Disabled badge for a loaded-but-disabled plugin', async () => {

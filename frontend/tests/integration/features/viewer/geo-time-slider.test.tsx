@@ -16,6 +16,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { render } from 'vitest-browser-react'
+import { useState } from 'react'
 import { I18nextProvider } from 'react-i18next'
 import type { SourceSlot } from '@/features/viewer/geo/layer-pairing'
 import { GeoTimeSlider } from '@/features/viewer/geo/GeoTimeSlider'
@@ -134,5 +135,105 @@ describe('GeoTimeSlider solo link-mode leftovers', () => {
     const independent = await renderSlider(6, [], [], 'independent')
     expect(independent.getByRole('slider').elements().length).toBeGreaterThan(0)
     expect(independent.container.textContent).not.toContain('B offset')
+  })
+})
+
+/** Stateful host: the slider's index lives here, shown for assertions. */
+function KeyedSlider({ playKey = true }: { playKey?: boolean }) {
+  const [index, setIndex] = useState(0)
+  const epochs = Array.from({ length: 4 }, (_, i) => T0 + i * HOUR)
+  const available = epochs.map(() => true)
+  const axis = { epochs, index: 0, onChange: noop }
+  return (
+    <I18nextProvider i18n={i18n}>
+      <span data-testid="index">{index}</span>
+      <input aria-label="Search" />
+      <GeoTimeSlider
+        hasB={false}
+        timeline={{
+          epochs,
+          availability: { a: available, b: available },
+          intersectionCount: epochs.length,
+        }}
+        failures={{ a: epochs.map(() => []), b: epochs.map(() => []) }}
+        index={index}
+        onChange={setIndex}
+        linkMode="exact"
+        onLinkModeChange={noop}
+        offsetMs={0}
+        onOffsetChange={noop}
+        offsetMeta={{
+          minMs: 0,
+          maxMs: 0,
+          stepMs: HOUR,
+          alignStartsMs: null,
+          alignEndsMs: null,
+        }}
+        independent={{ a: axis, b: axis }}
+        clip={null}
+        onClipChange={noop}
+        hoverTimes={() => null}
+        playKey={playKey}
+      />
+    </I18nextProvider>
+  )
+}
+
+function press(key: string, target: Element = document.body) {
+  const event = new KeyboardEvent('keydown', {
+    key,
+    code: key === ' ' ? 'Space' : '',
+    bubbles: true,
+    cancelable: true,
+  })
+  target.dispatchEvent(event)
+  return event
+}
+
+describe('GeoTimeSlider keys', () => {
+  it('steps with , and . like the transport buttons, wrapping around', async () => {
+    const screen = await render(<KeyedSlider />)
+    const index = screen.getByTestId('index')
+    press('.')
+    await expect.element(index).toHaveTextContent('1')
+    press(',')
+    await expect.element(index).toHaveTextContent('0')
+    press(',')
+    await expect.element(index).toHaveTextContent('3')
+  })
+
+  it('plays and pauses with Space', async () => {
+    const screen = await render(<KeyedSlider />)
+    press(' ')
+    await expect
+      .element(screen.getByRole('button', { name: /^Pause time/ }))
+      .toBeVisible()
+    press(' ')
+    await expect
+      .element(screen.getByRole('button', { name: /^Play time/ }))
+      .toBeVisible()
+  })
+
+  it('leaves Space to flicker mode', async () => {
+    const screen = await render(<KeyedSlider playKey={false} />)
+    press(' ')
+    await expect
+      .element(screen.getByRole('button', { name: /^Play time/ }))
+      .toBeVisible()
+  })
+
+  it('keeps working on a focused slider, but not in a text field', async () => {
+    const screen = await render(<KeyedSlider />)
+    const index = screen.getByTestId('index')
+    const range = document.querySelector('input[type="range"]')
+    expect(range).not.toBeNull()
+    ;(range as HTMLElement).focus()
+    press('.', range as Element)
+    await expect.element(index).toHaveTextContent('1')
+    const search = screen.getByRole('textbox', { name: 'Search' })
+    ;(search.element() as HTMLElement).focus()
+    const typed = press('.', search.element())
+    expect(typed.defaultPrevented).toBe(false)
+    await expect.element(index).toHaveTextContent('1')
   })
 })

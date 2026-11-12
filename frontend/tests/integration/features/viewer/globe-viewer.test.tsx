@@ -32,12 +32,37 @@ vi.mock(
   async () => (await import('./globe-engine-mock')).engineEntryMock,
 )
 
+const PINS = JSON.stringify({
+  type: 'FeatureCollection',
+  features: [
+    {
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [-20, 55] },
+      properties: { label: '1', text: 'Deep low', color: 'blue', source: null },
+    },
+  ],
+})
+
+const QUAKES = JSON.stringify({
+  type: 'FeatureCollection',
+  features: [
+    {
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [140, 36] },
+      properties: { mag: 4.6, place: 'Honshu', felt: null },
+    },
+  ],
+})
+
 describe('GeoViewer 3D globe', () => {
   let removeSizing = () => {}
   beforeEach(() => {
     removeSizing = injectMapSizing()
   })
-  afterEach(() => removeSizing())
+  afterEach(() => {
+    removeSizing()
+    engineCalls.overlayAt = () => null
+  })
 
   it('bends into the globe with the active stack and flattens back', async () => {
     const portA = registerServer()
@@ -257,6 +282,90 @@ describe('GeoViewer 3D globe', () => {
     await expect
       .element(globe.getByText('A · Run A does not serve this projection'))
       .toBeVisible()
+  })
+
+  it('draws imported pins on the globe, edits a clicked one, and turns to a located one', async () => {
+    const screen = await render(
+      <Harness
+        portA={registerServer()}
+        initialViewState={{
+          projection: 'globe',
+          camera: { lon: 12, lat: 48, zoom: 2 },
+        }}
+      />,
+    )
+    await expect.element(screen.getByTestId('globe-canvas')).toBeInTheDocument()
+    const input = document.querySelector<HTMLInputElement>(
+      'input[aria-label="Import annotations (GeoJSON)"]',
+    )
+    await userEvent.upload(
+      input!,
+      new File([PINS], 'pins.geojson', { type: 'application/geo+json' }),
+    )
+    await expect
+      .poll(() => engineCalls.vectors.at(-1)?.pins.map((p) => p.note))
+      .toEqual(['Deep low'])
+
+    const pin = engineCalls.vectors.at(-1)!.pins[0]
+    engineCalls.events?.onPinClick?.(pin.id)
+    await expect
+      .element(screen.getByRole('dialog').getByText('Edit annotation'))
+      .toBeVisible()
+    await userEvent.keyboard('{Escape}')
+    await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument()
+
+    // Unstyled, the globe overlay covers the sidebar: click the row directly.
+    const row = screen
+      .getByRole('button', { name: 'Deep low', exact: true })
+      .element() as HTMLElement
+    row.click()
+    await expect
+      .poll(() => engineCalls.camera())
+      .toMatchObject({ lon: -20, lat: 55 })
+  })
+
+  it('shows a hovered GeoJSON feature its properties on the globe', async () => {
+    const screen = await render(
+      <Harness
+        portA={registerServer()}
+        initialViewState={{
+          projection: 'globe',
+          camera: { lon: 140, lat: 36, zoom: 2 },
+        }}
+      />,
+    )
+    await expect.element(screen.getByTestId('globe-canvas')).toBeInTheDocument()
+    const input = document.querySelector<HTMLInputElement>(
+      'input[aria-label="Add GeoJSON"]',
+    )
+    await userEvent.upload(
+      input!,
+      new File([QUAKES], 'quakes.geojson', { type: 'application/geo+json' }),
+    )
+    await expect
+      .poll(() =>
+        engineCalls.vectors
+          .at(-1)
+          ?.overlays.features.map((f) => f.properties?.index),
+      )
+      .toEqual([0])
+
+    const panel = document.querySelector('[data-globe-panel="a"]')!
+    const move = () =>
+      panel.dispatchEvent(
+        new PointerEvent('pointermove', { bubbles: true, clientX: 50 }),
+      )
+    engineCalls.overlayAt = () => 0
+    move()
+    const cells = () =>
+      Array.from(panel.querySelectorAll('td'), (td) => td.textContent)
+    await expect
+      .poll(cells)
+      .toEqual(['mag', '4.6', 'place', 'Honshu', 'felt', '—'])
+
+    engineCalls.overlayAt = () => null
+    move()
+    await expect.poll(cells).toEqual([])
   })
 
   it('restores straight onto the globe and reports its camera', async () => {
