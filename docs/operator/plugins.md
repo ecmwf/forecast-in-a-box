@@ -20,7 +20,7 @@ method = "localSingle"
 
 ## Default plugins
 
-To install plugins automatically on a fresh installation, list their ids under `external.default_plugins`:
+To install plugins automatically on a fresh installation, list their IDs under `external.default_plugins`:
 
 ```toml
 [external]
