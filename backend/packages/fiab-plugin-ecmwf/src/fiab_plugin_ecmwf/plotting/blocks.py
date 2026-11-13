@@ -61,7 +61,8 @@ PLOT_FORMAT_TO_MIME: dict[str, str] = {
 }
 
 # NOTE the eckitlib pin is a hotfix due to proj in newer eckits clashing with pyproj, leading to a segfault
-PLOT_ENVIRONMENT: list[str] = ["earthkit-plots<1.0.0", "earthkit-regrid<1.0.0", "matplotlib<3.11", "eckitlib<=2.2.0.27"]
+# NOTE the pint pin is a hotfix: pint 0.26.2 no longer parses '.' as multiplication, which earthkit-plots<1.0 uses for units
+PLOT_ENVIRONMENT: list[str] = ["earthkit-plots<1.0.0", "earthkit-regrid<1.0.0", "matplotlib<3.11", "eckitlib<=2.2.0.27", "pint<0.26.2"]
 
 DEFAULT_PLOT_STYLE = "ECMWF"
 
