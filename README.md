@@ -20,7 +20,7 @@
 ## Overview
 Forecast-in-a-Box (FiaB) is a prototype piloted by ECMWF, through an effort jointly funded by [Destination Earth](https://destination-earth.eu/).
 It is an open-source software package for running AI-driven weather models end-to-end on a single machine.
-FiaB brings together ECMWF’s open-source software stack and AI models — such as ANEMOI, EarthKit, AIFS, PProc — from initial conditions, to the execution of AI-driven models, post-processing (products), and visualisation.
+FiaB brings together ECMWF’s open-source software stack and AI models — such as Anemoi and EarthKit — from initial conditions, to the execution of AI-driven models, post-processing (products), and visualisation.
 
 For more information about the project, please read: [AI-driven solutions for the Digital Twin Engine](https://destine.ecmwf.int/news/forecast-in-a-box-portable-ai-forecasting-workflows-within-the-destine-digital-twin-engine/).
 
