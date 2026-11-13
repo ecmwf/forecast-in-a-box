@@ -93,6 +93,10 @@ class AnemoiCheckpointConfiguration(FiabCoreBaseModel):
     is_ensemble_model: bool | None = Field(
         default=None, description="Whether this model can be run as an ensemble, which has implications for how the model is invoked"
     )
+    runner_options: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Additional anemoi-inference run configuration options passed through to the runner, e.g. typed_variables, patch_metadata, use_grib_paramid or allow_nans",
+    )
 
 
 class AnemoiCheckpoint(FiabCoreBaseModel):
