@@ -1,7 +1,7 @@
-name: E2E Test -- installs released backend, runs a forecast with actual small model on dummy data
+name: E2E Test -- installs released backend, runs forecasts with the small demo models on opendata
 
 # DA BIG TEST
-# launches the backend, downloads a model, executes full blown forecast job, ensures success
+# launches the backend, downloads the demo models, executes full blown forecast jobs, ensures success
 # not executed regularly, this is too much dakka
 
 on:
@@ -13,12 +13,15 @@ jobs:
     name: Run the bigtest
     # runs-on: [self-hosted, macOS, "ARM64"] # err code 143 -- may have been runner being broken at the time
     runs-on: ["Linux", "platform-builder-docker-xl"]
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - uses: extractions/setup-just@v3
       - working-directory: backend/tests/largeE2E
         name: Run the bigtest
+        env:
+          # see case_checkpointMatrix.py for the checkpoints and input sources of the demo preset
+          FIAB_E2E_CHECKPOINTS: demo
         run: |
           set -euo pipefail
           just install
