@@ -1,14 +1,14 @@
-# Plugins
+# Plugins (Developer)
 
-This document describes the Plugin system, means of extending Forecast-in-a-Box with custom products and data sources.
-It is intended for developers, and describes what a python package must satisfy to be a well-behaved plugin, and how to setup a local development environment.
+This document describes the Plugin system, as a means of extending Forecast-in-a-Box with custom products and data sources.
+It is intended for Developers (with technical proficiency), and describes what a python package must satisfy to be a well-behaved plugin, and how to setup a local development environment.
 
-There is also a [operator-focused document](../../operator/plugins.md) about plugins, which describes how to configure or troubleshoot a plugin installation.
+Please also refer to [Plugins (Operator)](../../operator/plugins.md), for how to configure or troubleshoot a plugin installation.
 
 ## Plugin Package
 
 ### Core Contract
-A plugin is a regular wheel tightly bound to the `fiab-core` [package](../../../backend/packages/fiab-core).
+A plugin is a regular wheel tightly bound to the [fiab-core](../../../backend/packages/fiab-core) package.
 Notably, the `fiab-core` prescribes a Python contract -- each plugin wheel/package *must* expose at the top module a field called `plugin` which is an instance of the dataclass `Plugin` from `fiab-core`'s `plugin.py` submodule.
 
 This is only inspected at runtime -- nothing prevents you from installing an invalid plugin.
@@ -31,7 +31,7 @@ The same for an already installed plugin with incompatible constraint.
 ## Local Development
 It is assumed that for development, you have a repository containing your plugin as a python project.
 You can then use for the backend both a production-install (using the `fiab.sh` script) or a development-install (using the `just dev` command).
-Consult the [launching](./launching.md) doc for more detail.
+Consult the [Launching](launching.md) document for more detail.
 
 Either way, you need to have the following in your `config.toml` something like this:
 ```
@@ -65,7 +65,7 @@ This is only consulted on first run (see `entrypoint.warmup` and `entrypoint.boo
 it is a list of ids, not a full plugin specification, and it is never rewritten by the backend at runtime.
 
 ## Troubleshooting
-If things go very wrong, you can wipe the `venv` and the database (in `.fiab/job.db`) (or use the `reinstall`, consult [launching.md](./launching.md)).
+If things go very wrong, you can wipe the `venv` and the database (in `.fiab/job.db`) (or use the `reinstall`, consult [Launching](./launching.md)).
 The config file itself does not need any editing -- it only ever contains plugin *stores* and, optionally, the
 ids of default plugins to auto-install on first run, never the install record of a concrete plugin.
 Next run of `just dev`/`fiab.sh` would re-create the db and venv in a pristine state.

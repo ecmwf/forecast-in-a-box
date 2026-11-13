@@ -27,7 +27,7 @@ a cluster, but system-wise all relationships and other boundaries remain the sam
 
 ```mermaid
 C4Context
-    title Container diagram of the Forecast in a Box system, deployed locally
+    title Container diagram of the Forecast-in-a-Box system, deployed locally
 
     Person(user, "Meteorologists")
     Person(tech, "Support", "Operator, developer")
