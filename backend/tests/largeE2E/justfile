@@ -19,9 +19,9 @@ start:
 
 # Runs every case_* scenario against whatever backend is reachable (default http://localhost:8000,
 # override with FIAB_E2E_BASE_URL) -- this is the only recipe a developer running their own `just
-# dev` needs.
-run:
-    uvx --with httpx python run_scenarios.py
+# dev` needs. Pass scenario names to run only those, eg `just run checkpointMatrix`.
+run *cases:
+    uvx --with httpx python run_scenarios.py {{cases}}
 
 # Stops the backend started by `just start`.
 stop:
