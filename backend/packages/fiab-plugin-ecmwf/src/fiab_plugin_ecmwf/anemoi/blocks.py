@@ -298,7 +298,7 @@ class AnemoiSource(Source, AnemoiBaseBlock):
             title="Input Source",
             description="Source of the initial conditions",
             value_type=OpenEnumType(list(get_available_input_sources())),
-            default_value="opendata",
+            default_value="opendata:ecmwf:lowres",
         ),
         LEAD_TIME: BlockConfigurationOption(
             title="Lead time",
@@ -375,7 +375,7 @@ class AnemoiInputSource(Source, AnemoiBaseBlock):
             title="Input Source",
             description="Source of the initial conditions",
             value_type=OpenEnumType(list(get_available_input_sources())),
-            default_value="opendata",
+            default_value="opendata:ecmwf:lowres",
         ),
         BASE_TIME: BlockConfigurationOption(
             title="Base time",
