@@ -41,6 +41,11 @@ from forecastbox.domain.experiment.scheduling.runtime import (
 )
 from forecastbox.domain.gateway.service import ensure_gateway, launch_gateway, shutdown_processes
 from forecastbox.domain.lens.manager import shutdown_all_lens_instances
+from forecastbox.domain.maintenance.garbage_collector import (
+    garbage_collector_entrypoint,
+    garbage_collector_status,
+    garbage_collector_stop_request,
+)
 from forecastbox.domain.notification.service import init_broadcaster
 from forecastbox.domain.plugin.store import submit_initialize_stores
 from forecastbox.domain.plugin.submit import submit_load_all as submit_load_plugins
@@ -123,6 +128,16 @@ def _register_scheduler() -> None:
     )
 
 
+def _register_garbage_collector() -> None:
+    execution_manager.register_thread(
+        ConcurrentThreads.DatabaseGarbageCollector,
+        garbage_collector_entrypoint,
+        status_provider=garbage_collector_status,
+        stop_request=garbage_collector_stop_request,
+        stage=2,
+    )
+
+
 def _start_execution_runtime() -> None:
     try:
         _discover_dispatchers()
@@ -143,6 +158,7 @@ def _start_execution_runtime() -> None:
             stage=0,
         )
         _register_scheduler()
+        _register_garbage_collector()
         execution_manager.start(timeout=config.backend.concurrency.startup_timeout_seconds)
     except BaseException:
         # NOTE partial registration may have happened above -- make sure it's cleaned up, since

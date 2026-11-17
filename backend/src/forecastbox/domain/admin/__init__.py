@@ -11,7 +11,8 @@
 As such, it is tightly coupled with the fiab.sh launcher -- make sure updates to either
 are done in concert, and that the coupling does not leak to other parts of the code.
 
-No dependence on or by any other domain."""
+Depended on by no domain.
+Depends on Maintenance domain -- directly calls into it from the `routes/admin.py`."""
 
 import dataclasses
 import logging

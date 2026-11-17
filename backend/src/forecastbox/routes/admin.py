@@ -10,7 +10,7 @@
 """
 Admin routes — /admin/*. Corresponds to the `domain.admin` submodule.
 
-Contains many varied utility routes related to user management, releases, versioning.
+Contains many varied utility routes related to user management, releases, versioning, and triggering the periodic database maintenance.
 """
 
 import logging
@@ -25,6 +25,8 @@ from pydantic import UUID4
 from forecastbox.domain.admin import Release, get_local_release, get_most_recent_release, get_pylock, mark_release, save_pylock
 from forecastbox.domain.auth.db import delete_user_by_id, get_user_by_id, list_users, patch_user_by_id, update_user_by_id
 from forecastbox.domain.auth.users import UserRead, UserUpdate, current_active_user
+from forecastbox.domain.maintenance.exceptions import CleanupNotRunning
+from forecastbox.domain.maintenance.garbage_collector import trigger_cleanup
 from forecastbox.utility.config import ROUTE_PREFIX, BackendSettings, CascadeSettings, ExternalServicesSettings, config
 from forecastbox.utility.pydantic import FiabBaseModel
 from forecastbox.utility.rsjf import ExportedSchemas, FormDefinition, from_pydantic
@@ -201,3 +203,14 @@ config_response = ConfigResponse(
 async def get_ui_config() -> ConfigResponse:
     """Config for the frontend to properly configure itself. Contains no internal or sensitive data"""
     return config_response
+
+
+@router.post("/triggerCleanup")
+async def trigger_cleanup_endpoint(admin: UserRead | None = Depends(get_admin_user)) -> None:
+    """Wake the periodic database maintenance thread to run now. Returns once the run is
+    requested, not when it completes; observe completion in GET /status under
+    concurrency.threads.database-garbage-collector. Requires admin access."""
+    try:
+        trigger_cleanup()
+    except CleanupNotRunning as e:
+        raise HTTPException(status_code=409, detail=str(e))
