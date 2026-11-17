@@ -12,6 +12,8 @@ long-lived thread that periodically (or on admin trigger) runs a read-only
 summary query and exposes the result in its status. Real garbage collection
 (retention, deletion, cascades) is not implemented yet.
 
-Depends on the Blueprint domain (storage summary query). Depended on by no
-other domain; registered by the entrypoint, triggered by `routes/admin.py`.
+Depends on the Blueprint domain (storage summary query).
+Depended on by Admin domain (direct calls from `routes/admin.py`)
+
+Self-invokes via long running thread, registered in the entrypoint.
 """
