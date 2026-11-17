@@ -8,6 +8,7 @@
 # nor does it submit to any jurisdiction.
 
 
+import itertools
 import logging
 import math
 import re
@@ -145,7 +146,13 @@ def _classical_row_points(number: int) -> Sequence[int]:
     # mir is an optional runtime dependency, so it is imported when the row counts are needed
     import mir  # type: ignore[unresolved-import]
 
-    return tuple(mir.Grid(f"N{number}").catalog["pl"])
+    grid = mir.Grid(f"N{number}")
+    catalog = grid.catalog
+    if "pl" in catalog:
+        return tuple(catalog["pl"])
+    # newer mir versions report just the grid spec in the catalog, so the row counts are derived from the point latitudes
+    latitudes, _ = grid.to_latlons()
+    return tuple(sum(1 for _ in rows) for _, rows in itertools.groupby(latitudes))
 
 
 def grid_spacing(grid: object, box: LatLonBox) -> tuple[float, float] | None:
