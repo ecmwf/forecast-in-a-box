@@ -2,6 +2,7 @@
 # /// script
 # dependencies = [
 #    "ecmwf-opendata",
+#    "requests",
 #    "beautifulsoup4",
 #    "qubed>=0.3.1,<0.4.4",
 #    "pymetkit>=1.21.0.28",
@@ -45,7 +46,7 @@ def crawl(url: str, model: str, datacubes: dict) -> None:
     soup = BeautifulSoup(r.text, "html.parser")
     for link in soup.find_all("a"):
         href = link.get("href")
-        if href is not None and href != url and href.startswith(url):
+        if isinstance(href, str) and href != url and href.startswith(url):
             if href.endswith("/"):
                 crawl(href, model, datacubes)
             else:
