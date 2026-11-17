@@ -15,8 +15,8 @@ import threading
 import time
 from collections import deque
 from collections.abc import Callable
-from concurrent.futures import Future
-from dataclasses import dataclass
+from concurrent.futures import CancelledError, Future
+from dataclasses import dataclass, field
 from functools import partial
 from queue import Empty, Full, Queue
 from typing import Any, NewType, cast
@@ -122,11 +122,23 @@ class _QueuedEvent:
     receipt: Future[DispatchResult]
 
 
+@dataclass
+class _Aggregation:
+    remaining: int
+    failed: list[str] = field(default_factory=list)
+    lock: threading.Lock = field(default_factory=threading.Lock)
+
+
 _SENTINEL = object()
 
 
 class EventDispatcher:
-    """Owns registration, queueing, and dispatch for one process-local runtime."""
+    """Owns registration, queueing, and dispatch for one process-local runtime.
+
+    Dequeue order is FIFO and the handlers of one event are submitted in registration order. The
+    dispatcher thread never waits for handlers: handler execution and completion order across events
+    is not guaranteed, and a receipt resolves from the pool thread that finishes the last handler.
+    """
 
     def __init__(self, manager: ExecutionManager, settings: DispatcherSettings) -> None:
         self.manager = manager
@@ -201,8 +213,13 @@ class EventDispatcher:
             self._in_flight_handlers += len(registrations)
             self._dispatched += len(registrations)
 
-        failures: list[str] = []
-        futures: list[tuple[str, Future[object]]] = []
+        if not registrations:
+            with self._lock:
+                self._completed += 1
+            queued.receipt.set_result(DispatchResult(event.name, (), ()))
+            return
+
+        aggregation = _Aggregation(remaining=len(registrations))
         for registration in registrations:
             try:
                 handler_task = partial(registration.handler, event)
@@ -211,27 +228,47 @@ class EventDispatcher:
                     TaskName(f"dispatch:{registration.handler_id}"),
                     handler_task,
                 )
-                futures.append((registration.handler_id, cast(Future[object], future)))
             except BaseException as error:
-                failures.append(registration.handler_id)
-                with self._lock:
-                    self._aggregate_failures.append(f"{registration.handler_id}: {error!r}")
+                failed_future: Future[object] = Future()
+                failed_future.set_exception(error)
+                self._handler_done(queued, registrations, aggregation, registration.handler_id, failed_future)
+                continue
+            cast(Future[object], future).add_done_callback(
+                partial(self._handler_done, queued, registrations, aggregation, registration.handler_id)
+            )
 
-        for handler_id, future in futures:
-            try:
-                future.result()
-            except BaseException as error:
-                failures.append(handler_id)
-                with self._lock:
-                    self._aggregate_failures.append(f"{handler_id}: {error!r}")
-
-        result = DispatchResult(event.name, tuple(registration.handler_id for registration in registrations), tuple(failures))
+    def _handler_done(
+        self,
+        queued: _QueuedEvent,
+        registrations: tuple[DispatcherRegistration, ...],
+        aggregation: "_Aggregation",
+        handler_id: str,
+        future: Future[object],
+    ) -> None:
+        error: BaseException | None = None
+        if future.cancelled():
+            error = CancelledError()
+        else:
+            error = future.exception()
+        if error is not None:
+            with self._lock:
+                self._aggregate_failures.append(f"{handler_id}: {error!r}")
+        with aggregation.lock:
+            if error is not None:
+                aggregation.failed.append(handler_id)
+            aggregation.remaining -= 1
+            last = aggregation.remaining == 0
+            failures = tuple(aggregation.failed)
+        if not last:
+            return
+        result = DispatchResult(queued.event.name, tuple(registration.handler_id for registration in registrations), failures)
         with self._lock:
             self._in_flight_handlers -= len(registrations)
             if failures:
                 self._failed += 1
             else:
                 self._completed += 1
+        # NOTE receipt callbacks run arbitrary code, hence no lock is held here
         if failures:
             queued.receipt.set_exception(AggregateDispatchError(result))
         else:
@@ -263,6 +300,19 @@ class EventDispatcher:
                         break
                     continue
                 self._dispatch(cast(_QueuedEvent, item))
+            finally:
+                self._queue.task_done()
+        while True:
+            try:
+                leftover = self._queue.get_nowait()
+            except Empty:
+                break
+            try:
+                if leftover is not _SENTINEL:
+                    queued_left = cast(_QueuedEvent, leftover)
+                    queued_left.receipt.set_exception(DispatcherClosed("event dispatcher stopped before dispatch"))
+                    with self._lock:
+                        self._queue_failures.append(f"event {queued_left.event.name} not dispatched before stop")
             finally:
                 self._queue.task_done()
         with self._lock:

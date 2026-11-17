@@ -30,12 +30,42 @@ from pydantic import ValidationError
 from forecastbox.domain.plugin.compatibility import check_environment_baseline, install_plugin_compatibly
 from forecastbox.domain.plugin.db import delete_plugin_state, get_all_plugin_states_by_id, get_plugin_state, upsert_plugin_state
 from forecastbox.domain.plugin.errors import PluginError, PluginErrors
+from forecastbox.domain.plugin.events import (
+    PLUGIN_TEMPLATES_CHANGED,
+    PLUGIN_TEMPLATES_REMOVED,
+    PluginTemplatesChangedEvent,
+    PluginTemplatesRemovedEvent,
+)
+from forecastbox.domain.plugin.exceptions import PluginTemplateIngestFailed
+from forecastbox.domain.plugin.notifications import notify_failure
 from forecastbox.domain.plugin.settings import PluginSettings
 from forecastbox.domain.plugin.state import publish_bulk_snapshot, publish_single_snapshot, publish_unloaded
-from forecastbox.domain.plugin.template_ingest import ingest_plugin_templates, unload_plugin_templates
+from forecastbox.utility.dispatcher import Event, EventName, submit_event
 from forecastbox.utility.packages import try_import, try_version
 
 logger = logging.getLogger(__name__)
+
+TEMPLATE_DISPATCH_TIMEOUT_SECONDS = 600.0
+
+
+def _emit_and_wait(name: EventName, payload: PluginTemplatesChangedEvent | PluginTemplatesRemovedEvent) -> None:
+    """Emit a template event and block until all consumers handled it; raises on
+    dispatch rejection, handler failure, or timeout."""
+    receipt = submit_event(Event(name=name, payload=payload))
+    receipt.result(timeout=TEMPLATE_DISPATCH_TIMEOUT_SECONDS)
+
+
+def _request_template_ingest(plugin_id: PluginCompositeId) -> str | None:
+    """Emit PluginTemplatesChangedEvent and wait; on failure notify clients and
+    return the error text, otherwise return None."""
+    plugin_id_str = PluginCompositeId.to_str(plugin_id)
+    try:
+        _emit_and_wait(PLUGIN_TEMPLATES_CHANGED, PluginTemplatesChangedEvent(plugin_id=plugin_id))
+    except Exception as e:
+        logger.exception(f"template ingestion of plugin {plugin_id_str} failed")
+        notify_failure(f"Template ingestion of plugin {plugin_id_str}", repr(e))
+        return f"{plugin_id_str}: {e!r}"
+    return None
 
 
 def _load_single(plugin: PluginSettings) -> Either[Plugin, str]:  # type: ignore[invalid-argument]
@@ -87,8 +117,9 @@ def _version_from_install(installed: dict[str, str], module_name: str) -> str | 
 
 def load_plugins() -> None:
     """Initial bulk load: install/import every persisted, enabled plugin (from the plugin_state
-    database table), publish the complete catalogue in one atomic snapshot, then run template
-    ingestion for each successfully loaded plugin.
+    database table), publish the complete catalogue in one atomic snapshot, then request template
+    ingestion for each successfully loaded plugin, one at a time. Failures are notified per plugin
+    and, after all plugins were processed, raised as one PluginTemplateIngestFailed.
     """
     logger.info("starting initial plugin load")
     check_environment_baseline()
@@ -125,6 +156,7 @@ def load_plugins() -> None:
                     installed_versions = result.t or {}
 
         if install_error is not None:
+            # TODO if a load/install fails, we want a notification as well
             logger.error(f"install failed for {pluginKey}: {install_error}")
             upsert_plugin_state(
                 plugin_id=plugin_id_str,
@@ -180,6 +212,7 @@ def load_plugins() -> None:
                     logger.warning(f"plugin {pluginKey}: {mismatch_msg}")
                     errors[pluginKey] = PluginErrors([PluginError(source="load", severity="warning", detail=mismatch_msg)])
         else:
+            # TODO if a load/install fails, we want a notification as well
             logger.debug(f"plugin {pluginKey} loaded with success: False")
             errors[pluginKey] = PluginErrors([PluginError(source="load", severity="error", detail=plugin_result.e)])  # type: ignore[arg-type]
 
@@ -188,8 +221,13 @@ def load_plugins() -> None:
     if not publish_bulk_snapshot(lookup, errors):
         raise ValueError("failed to acquire the shared lock")
 
-    for pluginKey, plugin_result in lookup.items():
-        ingest_plugin_templates(pluginKey, plugin_result)
+    ingest_errors: list[str] = []
+    for pluginKey in lookup:
+        error = _request_template_ingest(pluginKey)
+        if error is not None:
+            ingest_errors.append(error)
+    if ingest_errors:
+        raise PluginTemplateIngestFailed("; ".join(ingest_errors))
 
     logger.info("global plugin loading finished")
 
@@ -234,6 +272,7 @@ def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, i
     if result.t is not None:
         new_errs: PluginErrors = PluginErrors([version_mismatch_err]) if version_mismatch_err is not None else PluginErrors([])
     else:
+        # TODO if a load/install fails, we want a notification as well
         load_err = PluginError(source="load", severity="error", detail=result.e)  # type: ignore[arg-type]
         new_errs = PluginErrors([load_err, version_mismatch_err] if version_mismatch_err is not None else [load_err])
     if not publish_single_snapshot(pluginId, result.t, new_errs):
@@ -256,28 +295,30 @@ def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, i
             plugin_errors=PluginErrors([]),
         )
     if result.t is not None:
-        ingest_plugin_templates(pluginId, result.t)
+        error = _request_template_ingest(pluginId)
+        if error is not None:
+            raise PluginTemplateIngestFailed(error)
     logger.debug(f"single plugin loading finished: {pluginId}")
 
 
 def unload_single(plugin_id: PluginCompositeId) -> None:
-    """Remove a plugin's in-memory catalogue/error entries and soft-delete its templates.
+    """Request removal of a plugin's templates, then remove its in-memory catalogue/error entries.
 
-    Synchronous primitive shared by the plugin-settings disable path and uninstall.
+    Synchronous primitive shared by the plugin-settings disable path and uninstall. If the
+    template removal dispatch fails, the plugin stays published and the exception propagates.
     """
+    _emit_and_wait(PLUGIN_TEMPLATES_REMOVED, PluginTemplatesRemovedEvent(plugin_id=plugin_id))
     if not publish_unloaded(plugin_id):
         logger.error("failed to mark plugin as unloaded! Will still be available")
         # we raise to mark this future as failed
         raise TimeoutError("failed to mark plugin as unloaded due to lock acquisition")
-    # DB write outside the lock: remove blueprint templates
-    unload_plugin_templates(plugin_id)
 
 
 def uninstall_plugin_sync(plugin_id: PluginCompositeId) -> None:
-    """Delete a plugin's DB state and unload its in-memory catalogue/templates. Runs
+    """Unload a plugin's in-memory catalogue/templates, then delete its DB state. Runs
     synchronously on a ``PluginManagement`` worker, so direct (not pool-bridged) DB access
     is correct here. The caller is responsible for verifying the plugin is actually
     installed beforehand.
     """
-    delete_plugin_state(plugin_id=PluginCompositeId.to_str(plugin_id))
     unload_single(plugin_id)
+    delete_plugin_state(plugin_id=PluginCompositeId.to_str(plugin_id))

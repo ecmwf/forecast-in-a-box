@@ -7,7 +7,7 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Unit tests for _ingest_plugin_templates -- in particular that reserved tag keys are
+"""Unit tests for ingest_plugin_templates -- in particular that reserved tag keys are
 flagged and combined with validate_expand_sync errors, rather than raising or being
 checked separately."""
 
@@ -16,16 +16,18 @@ from unittest.mock import MagicMock
 
 import pytest
 from fiab_core.fable import PluginCompositeId, PluginId, PluginStoreId
+from pyrsistent import pmap
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-import forecastbox.domain.blueprint.service as blueprint_service
+import forecastbox.domain.blueprint.template_ingest as blueprint_service
 import forecastbox.domain.plugin.db as plugin_db
 import forecastbox.schemata.jobs as _jobs_module
 from forecastbox.domain.blueprint.service import CORE_VERSION_MISMATCH_TAG_KEY, BlueprintBuilder, BlueprintValidationExpansion
+from forecastbox.domain.blueprint.template_ingest import ingest_plugin_templates
 from forecastbox.domain.plugin.db import get_plugin_state, upsert_plugin_state
-from forecastbox.domain.plugin.template_ingest import ingest_plugin_templates
+from forecastbox.domain.plugin.state import PluginManager
 from forecastbox.schemata.jobs import Base
 
 _PLUGIN_ID = PluginCompositeId(store=PluginStoreId("myStore"), local=PluginId("myPlugin"))
@@ -83,9 +85,9 @@ def test_ingest_plugin_templates_reserved_tag_recorded_as_template_error(
 ) -> None:
     upsert_plugin_state(plugin_id=_PLUGIN_ID_STR, version="1.0", pip_source="src", module_name="mod")
     _patch_validation_ok(monkeypatch)
-    plugin = _make_plugin(tags=[CORE_VERSION_MISMATCH_TAG_KEY])
+    monkeypatch.setattr(PluginManager, "plugins", pmap({_PLUGIN_ID: _make_plugin(tags=[CORE_VERSION_MISMATCH_TAG_KEY])}))
 
-    ingest_plugin_templates(_PLUGIN_ID, plugin)
+    ingest_plugin_templates(_PLUGIN_ID)
 
     state = get_plugin_state(_PLUGIN_ID_STR)
     assert state is not None
@@ -96,9 +98,9 @@ def test_ingest_plugin_templates_reserved_tag_recorded_as_template_error(
 def test_ingest_plugin_templates_normal_tag_not_flagged(mem_session_maker: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch) -> None:
     upsert_plugin_state(plugin_id=_PLUGIN_ID_STR, version="1.0", pip_source="src", module_name="mod")
     _patch_validation_ok(monkeypatch)
-    plugin = _make_plugin(tags=["normal-tag"])
+    monkeypatch.setattr(PluginManager, "plugins", pmap({_PLUGIN_ID: _make_plugin(tags=["normal-tag"])}))
 
-    ingest_plugin_templates(_PLUGIN_ID, plugin)
+    ingest_plugin_templates(_PLUGIN_ID)
 
     state = get_plugin_state(_PLUGIN_ID_STR)
     assert state is not None

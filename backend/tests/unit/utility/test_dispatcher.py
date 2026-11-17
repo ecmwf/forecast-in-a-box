@@ -9,6 +9,7 @@
 
 """Unit tests for the protocol-based dispatch matching in utility/dispatcher.py."""
 
+import threading
 from concurrent.futures import Future
 from typing import Callable, cast
 
@@ -16,6 +17,9 @@ import pytest
 
 from forecastbox.utility.config import ConcurrentPools, DispatcherSettings
 from forecastbox.utility.dispatcher import (
+    _SENTINEL,
+    AggregateDispatchError,
+    DispatcherClosed,
     DispatcherRegistration,
     DispatcherRegistrationError,
     Event,
@@ -118,3 +122,92 @@ def test_dispatch_records_failed_handlers() -> None:
 
     with pytest.raises(Exception):
         receipt.result(timeout=1)
+
+
+class _PendingManager:
+    """Returns pending futures the test completes by hand."""
+
+    def __init__(self, raise_for: set[str] | None = None) -> None:
+        self.futures: list[Future] = []
+        self.raise_for = raise_for or set()
+
+    def _submit_monitored_receipt(self, pool_name: object, task_name: object, task: Callable[[], object]) -> Future:
+        if str(task_name) in self.raise_for:
+            raise RuntimeError("submit refused")
+        future: Future = Future()
+        self.futures.append(future)
+        return future
+
+
+def _pending_dispatcher(manager: _PendingManager, n: int = 3) -> tuple[EventDispatcher, Future]:
+    dispatcher = EventDispatcher(cast(object, manager), DispatcherSettings())  # ty: ignore[invalid-argument-type]
+    for i in range(n):
+        dispatcher.register(
+            DispatcherRegistration(
+                handler_id=f"h{i}", handler_type=_Matching, pool_name=ConcurrentPools.General, handler=lambda event: None
+            )
+        )
+    dispatcher.freeze()
+    dispatcher._state = "running"
+    receipt = dispatcher.submit(Event(name=EventName("x"), payload=_Matching()))
+    dispatcher._dispatch(cast(_QueuedEvent, dispatcher._queue.get_nowait()))
+    return dispatcher, receipt
+
+
+def test_dispatch_does_not_wait_for_pending_handlers() -> None:
+    manager = _PendingManager()
+    _, receipt = _pending_dispatcher(manager)
+    assert len(manager.futures) == 3
+    assert not receipt.done()
+
+
+def test_receipt_resolves_once_after_all_complete_in_any_order() -> None:
+    manager = _PendingManager()
+    dispatcher, receipt = _pending_dispatcher(manager)
+    manager.futures[2].set_result(None)
+    manager.futures[0].set_result(None)
+    assert not receipt.done()
+    manager.futures[1].set_result(None)
+    result = receipt.result(timeout=0)
+    assert result.matched_handlers == ("h0", "h1", "h2")
+    assert result.succeeded
+    assert dispatcher.status().completed == 1
+
+
+def test_one_failing_handler_yields_aggregate_error() -> None:
+    manager = _PendingManager()
+    dispatcher, receipt = _pending_dispatcher(manager)
+    manager.futures[0].set_result(None)
+    manager.futures[1].set_exception(ValueError("bad"))
+    manager.futures[2].set_result(None)
+    with pytest.raises(AggregateDispatchError) as info:
+        receipt.result(timeout=0)
+    assert info.value.result.failed_handlers == ("h1",)
+    assert dispatcher.status().failed == 1
+    assert dispatcher.status().in_flight_handlers == 0
+
+
+def test_submission_failure_counts_as_failed_handler() -> None:
+    manager = _PendingManager(raise_for={"dispatch:h1"})
+    _, receipt = _pending_dispatcher(manager)
+    assert not receipt.done()
+    for future in manager.futures:
+        future.set_result(None)
+    with pytest.raises(AggregateDispatchError) as info:
+        receipt.result(timeout=0)
+    assert info.value.result.failed_handlers == ("h1",)
+
+
+def test_queued_envelopes_fail_with_closed_when_entrypoint_exits() -> None:
+    dispatcher = _dispatcher()
+    dispatcher.freeze()
+    dispatcher._state = "running"
+    dispatcher._queue.put_nowait(_SENTINEL)
+    receipt = dispatcher.submit(Event(name=EventName("x"), payload=_Matching()))
+    stop = threading.Event()
+    stop.set()
+    # drain deadline already passed -> the loop stops at the sentinel without dispatching the envelope behind it
+    dispatcher._drain_deadline = 0.0
+    dispatcher.entrypoint(stop)
+    with pytest.raises(DispatcherClosed):
+        receipt.result(timeout=0)
