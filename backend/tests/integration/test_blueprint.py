@@ -2155,3 +2155,50 @@ def test_blueprint_artifact_execute(tmpdir: Any, backend_client_user: httpx.Clie
     resolved = resolve_resp.json()["elements"]
     assert len(resolved) == 1
     assert resolved[0]["display"] == "Small Test Checkpoint"
+
+
+def test_plugin_disable_removes_templates_and_enable_restores(
+    backend_client_user: httpx.Client, backend_client_admin: httpx.Client
+) -> None:
+    """Disabling the plugin removes its templates from the blueprint list; re-enabling brings them back."""
+    from .conftest import testPluginId
+
+    def plugin_template_names() -> list[str]:
+        # NOTE filter by source, since earlier tests create enough blueprints to push templates off the first page
+        response = backend_client_user.get("/blueprint/list", params={"source": "plugin_template"}, timeout=10)
+        assert response.is_success, response.text
+        return [b.get("display_name") for b in response.json()["blueprints"]]
+
+    def wait_plugins_ok() -> None:
+        def do_action() -> dict:
+            resp = backend_client_user.get("/status", timeout=10)
+            assert resp.is_success
+            return resp.json()
+
+        def verify_ok(data: dict) -> dict | None:
+            return data if data.get("plugins") == "ok" else None
+
+        retry_until(do_action, verify_ok, attempts=30, sleep=1.0, error_msg="Plugins did not reach 'ok' status")
+
+    def set_enabled(enabled: bool) -> None:
+        response = backend_client_admin.post(
+            "/plugin/settings",
+            json={"pluginCompositeId": testPluginId.model_dump(), "isEnabled": enabled},
+            timeout=10,
+        )
+        assert response.status_code in (200, 202), f"Unexpected status from /plugin/settings: {response.status_code} {response.text}"
+        wait_plugins_ok()
+
+    assert "testBasic" in plugin_template_names()
+    try:
+        set_enabled(False)
+        assert plugin_template_names() == [], f"templates should be gone after disable, got: {plugin_template_names()}"
+    finally:
+        set_enabled(True)
+
+    def do_list() -> list[str]:
+        return plugin_template_names()
+
+    retry_until(
+        do_list, lambda names: names if "testBasic" in names else None, attempts=30, sleep=1.0, error_msg="templates did not return"
+    )

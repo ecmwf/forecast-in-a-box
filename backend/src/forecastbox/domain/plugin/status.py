@@ -31,6 +31,9 @@ def status_brief() -> str:
 
 
 def plugins_ready() -> bool:
+    """True once plugin-management startup succeeded and all required template dispatches completed
+    without failure: the initial load stays in progress until every template receipt resolved, and
+    any dispatch failure sets ``updater_error``."""
     return status_brief() == "ok"
 
 

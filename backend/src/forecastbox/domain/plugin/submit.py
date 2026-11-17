@@ -25,7 +25,8 @@ is recorded both in the domain-facing error/notification surface (``updater_erro
 ``PluginGlobalErrorEvent``) and in the execution manager's own bounded monitored-failure
 history (by re-raising after recording). Per-plugin install/load outcomes represented as
 ``PluginErrors`` are not managed-operation failures; they are normal completions handled
-entirely inside ``domain.plugin.loading``.
+entirely inside ``domain.plugin.loading``. Template ingestion failures are notified per
+plugin by the loading code and recorded as one concatenated ``updater_error``.
 """
 
 import logging
@@ -38,7 +39,6 @@ from packaging.version import Version
 
 from forecastbox.domain.plugin.db import get_plugin_state
 from forecastbox.domain.plugin.events import (
-    PluginGlobalErrorEvent,
     PluginInstalledEvent,
     PluginSettingsAppliedEvent,
     PluginSuccessNotification,
@@ -46,37 +46,15 @@ from forecastbox.domain.plugin.events import (
     PluginUnloadedEvent,
     PluginUpdatedEvent,
 )
-from forecastbox.domain.plugin.exceptions import PluginEnvironmentAlreadyBroken
+from forecastbox.domain.plugin.exceptions import PluginEnvironmentAlreadyBroken, PluginTemplateIngestFailed
 from forecastbox.domain.plugin.loading import load_plugins as _load_plugins
 from forecastbox.domain.plugin.loading import uninstall_plugin_sync, unload_single, update_single
+from forecastbox.domain.plugin.notifications import notify_failure, notify_success
 from forecastbox.domain.plugin.settings import PluginSettings
 from forecastbox.domain.plugin.state import PluginManager, finish_ok, finish_with_error, release_reservation, reserve_operation
 from forecastbox.utility.concurrency.manager import ConcurrentPools, SubmissionRejected, TaskName, execution_manager
-from forecastbox.utility.dispatcher import Event, EventName, submit_event
 
 logger = logging.getLogger(__name__)
-
-
-def _notify_failure(trigger: str, message: str) -> None:
-    try:
-        submit_event(
-            Event(
-                name=EventName("plugin.global_error"),
-                payload=PluginGlobalErrorEvent(trigger=trigger, error=message),
-            )
-        )
-    except Exception as e:
-        logger.exception(f"failed to submit plugin global-error notification for {trigger!r}: {repr(e)}")
-
-
-def _notify_success(payload: PluginSuccessNotification) -> None:
-    notification = payload.as_client_notification()
-    suffix = notification.sourceDomainEvent[len("plugin") :]
-    event_name = "plugin." + suffix[:1].lower() + suffix[1:]
-    try:
-        submit_event(Event(name=EventName(event_name), payload=payload))
-    except Exception as e:
-        logger.exception(f"failed to submit plugin success notification {event_name!r}: {repr(e)}")
 
 
 def _run_managed(trigger: str, worker: Callable[[], None], on_success: PluginSuccessNotification | None = None) -> None:
@@ -93,17 +71,22 @@ def _run_managed(trigger: str, worker: Callable[[], None], on_success: PluginSuc
         # NOTE this exception is handled separately for cleaner logging -- no need for the full trace
         logger.error(f"{trigger} refused: {e}")
         finish_with_error(str(e))
-        _notify_failure(trigger, str(e))
+        notify_failure(trigger, str(e))
+        raise
+    except PluginTemplateIngestFailed as e:
+        # NOTE every failing plugin has already been notified individually
+        logger.error(f"{trigger} failed: {e}")
+        finish_with_error(str(e))
         raise
     except Exception as e:
         logger.exception(f"{trigger} failed with {repr(e)}")
         finish_with_error(repr(e))
-        _notify_failure(trigger, repr(e))
+        notify_failure(trigger, repr(e))
         raise
     else:
         finish_ok()
         if on_success is not None:
-            _notify_success(on_success)
+            notify_success(on_success)
 
 
 def _run_load_all() -> None:

@@ -31,3 +31,12 @@ class PluginEnvironmentAlreadyBroken(Exception):
     fails in the existing active environment -- signals that no pip activity should be
     carried further, and that user should be notified.
     """
+
+
+class PluginTemplatesUnavailable(Exception):
+    """Raised by domain.plugin.service when template data is requested for a plugin that is not
+    published or has no plugin_state row."""
+
+
+class PluginTemplateIngestFailed(Exception):
+    """Raised after the failure has already been reported to clients."""

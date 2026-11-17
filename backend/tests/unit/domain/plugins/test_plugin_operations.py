@@ -23,6 +23,7 @@ import pytest
 from fiab_core.fable import PluginCompositeId, PluginId, PluginStoreId
 from pyrsistent import pmap
 
+import forecastbox.domain.plugin.notifications as notifications_module
 import forecastbox.domain.plugin.submit as submit_module
 from forecastbox.domain.plugin.errors import PluginErrors
 from forecastbox.domain.plugin.events import (
@@ -32,6 +33,7 @@ from forecastbox.domain.plugin.events import (
     PluginUnloadedEvent,
     PluginUpdatedEvent,
 )
+from forecastbox.domain.plugin.exceptions import PluginTemplateIngestFailed
 from forecastbox.domain.plugin.state import PluginManager
 from forecastbox.domain.plugin.status import plugins_ready
 from forecastbox.utility.concurrency.manager import ConcurrentPools, SubmissionRejected
@@ -106,7 +108,7 @@ def test_run_managed_records_error_notifies_and_reraises_on_unexpected_exception
     def _boom() -> None:
         raise RuntimeError("worker exploded")
 
-    with patch.object(submit_module, "_notify_failure") as mock_notify:
+    with patch.object(submit_module, "notify_failure") as mock_notify:
         with pytest.raises(RuntimeError):
             submit_module._run_managed("Some trigger", _boom)
 
@@ -127,8 +129,8 @@ def test_run_managed_finishes_ok_on_normal_completion() -> None:
 
 def test_notify_success_derives_event_name_from_payload() -> None:
     payload = PluginSettingsAppliedEvent(plugin_id="store/plugin")
-    with patch.object(submit_module, "submit_event") as mock_submit_event:
-        submit_module._notify_success(payload)
+    with patch.object(notifications_module, "submit_event") as mock_submit_event:
+        notifications_module.notify_success(payload)
     mock_submit_event.assert_called_once()
     (event,) = mock_submit_event.call_args.args
     assert event.name == "plugin.settingsApplied"
@@ -138,7 +140,7 @@ def test_notify_success_derives_event_name_from_payload() -> None:
 def test_run_managed_notifies_success_when_on_success_given() -> None:
     PluginManager.operation_in_progress = True
     payload = PluginUninstalledEvent(plugin_id="store/plugin")
-    with patch.object(submit_module, "_notify_success") as mock_notify:
+    with patch.object(submit_module, "notify_success") as mock_notify:
         submit_module._run_managed("trigger", lambda: None, payload)
     mock_notify.assert_called_once_with(payload)
 
@@ -150,7 +152,7 @@ def test_run_managed_does_not_notify_success_on_failure() -> None:
     def _boom() -> None:
         raise RuntimeError("boom")
 
-    with patch.object(submit_module, "_notify_success") as mock_notify:
+    with patch.object(submit_module, "notify_success") as mock_notify:
         with pytest.raises(RuntimeError):
             submit_module._run_managed("trigger", _boom, payload)
     mock_notify.assert_not_called()
@@ -243,7 +245,7 @@ async def test_submit_update_single_emits_installed_event_when_plugin_not_yet_lo
             task()
 
         mock_submit.side_effect = _run
-        with patch.object(submit_module, "update_single"), patch.object(submit_module, "_notify_success") as mock_notify:
+        with patch.object(submit_module, "update_single"), patch.object(submit_module, "notify_success") as mock_notify:
             await submit_module.submit_update_single(_PLUGIN_ID, install=True, version=None)
     mock_notify.assert_called_once()
     (payload,) = mock_notify.call_args.args
@@ -262,7 +264,7 @@ async def test_submit_update_single_emits_updated_event_when_plugin_already_load
             task()
 
         mock_submit.side_effect = _run
-        with patch.object(submit_module, "update_single"), patch.object(submit_module, "_notify_success") as mock_notify:
+        with patch.object(submit_module, "update_single"), patch.object(submit_module, "notify_success") as mock_notify:
             await submit_module.submit_update_single(_PLUGIN_ID, install=True, version=None)
     mock_notify.assert_called_once()
     (payload,) = mock_notify.call_args.args
@@ -281,7 +283,7 @@ async def test_submit_update_single_emits_settings_applied_event_when_not_instal
             task()
 
         mock_submit.side_effect = _run
-        with patch.object(submit_module, "update_single"), patch.object(submit_module, "_notify_success") as mock_notify:
+        with patch.object(submit_module, "update_single"), patch.object(submit_module, "notify_success") as mock_notify:
             await submit_module.submit_update_single(_PLUGIN_ID, install=False, version=None)
     mock_notify.assert_called_once()
     (payload,) = mock_notify.call_args.args
@@ -305,7 +307,7 @@ async def test_submit_unload_single_available_after_prior_update_failure() -> No
             task()
 
         mock_submit.side_effect = _run
-        with patch.object(submit_module, "_notify_success") as mock_notify:
+        with patch.object(submit_module, "notify_success") as mock_notify:
             await submit_module.submit_unload_single(_PLUGIN_ID)
     mock_unload_single.assert_called_once_with(_PLUGIN_ID)
     mock_submit.assert_called_once()
@@ -336,7 +338,7 @@ async def test_submit_uninstall_single_uses_plugin_management_pool_and_task_name
             task()
 
         mock_submit.side_effect = _run
-        with patch.object(submit_module, "_notify_success") as mock_notify:
+        with patch.object(submit_module, "notify_success") as mock_notify:
             await submit_module.submit_uninstall_single(_PLUGIN_ID)
     mock_uninstall_sync.assert_called_once_with(_PLUGIN_ID)
     mock_submit.assert_called_once()
@@ -364,3 +366,16 @@ async def test_submit_uninstall_single_raises_when_not_installed() -> None:
     with _patch_get_plugin_state(None):
         with pytest.raises(ValueError, match="not installed"):
             await submit_module.submit_uninstall_single(_PLUGIN_ID)
+
+
+def test_run_managed_template_ingest_failed_sets_error_without_notifying() -> None:
+    PluginManager.operation_in_progress = True
+
+    def _boom() -> None:
+        raise PluginTemplateIngestFailed("a: boom; b: bang")
+
+    with patch.object(submit_module, "notify_failure") as mock_notify:
+        with pytest.raises(PluginTemplateIngestFailed):
+            submit_module._run_managed("trigger", _boom)
+    mock_notify.assert_not_called()
+    assert PluginManager.updater_error == "a: boom; b: bang"
