@@ -346,8 +346,6 @@ class TestRegridGaussianBoundingBox:
         _assert_values_match_analytic(result)
 
     def test_classical_row_points_are_read_from_mir(self) -> None:
-        runtime._classical_row_points.cache_clear()
-
         rows = runtime._classical_row_points(96)
 
         assert len(rows) == 192
