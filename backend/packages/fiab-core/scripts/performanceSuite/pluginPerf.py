@@ -1,4 +1,14 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "fiab-core",
+#     "pymetkit",
+# ]
+#
+# [tool.uv.sources]
+# fiab-core = { path = "../../", editable = true }
+# ///
 #
 # (C) Copyright 2026- ECMWF.
 #

@@ -2,18 +2,21 @@ val:
     #!/usr/bin/env bash
     set -euo pipefail
     uv run ty check src/
-    if [ "${RELEASE:-}" == "1" ] ; then
-        # NOTE these withs are required because during release, we do *not* use the big ambient venv
-        # NOTE we cannot just `uv run --with <reqs> ty check`, because ty would not see them then
-        uv pip install -r requirements.scripts.txt
-        uv run ty check scripts/
-        uv pip uninstall -r requirements.scripts.txt
-    else
-        uv run ty check scripts/
-    fi
+    # NOTE each script declares its requirements via PEP 723 inline metadata, and is checked against its own
+    # script environment, so that this works independently of the ambient venv
+    check() {
+        # first argument is the script defining the environment, the rest are the paths to check
+        uv sync -q --script "$1"
+        uv run ty check --python "$(uv python find --script "$1")" --extra-search-path src "${@:2}"
+    }
+    for script in scripts/*.py ; do
+        check "$script" "$script"
+    done
+    # NOTE pluginProf declares a superset of the requirements of the other modules of the suite
+    check scripts/performanceSuite/pluginProf.py scripts/performanceSuite/
     uv run pytest tests/unit
-    uv run python scripts/parse_test_artifacts_catalog.py ../../../install/artifacts.json
-    uv run python scripts/run_types_conformance.py tests/conformance
+    uv run --script scripts/parse_test_artifacts_catalog.py ../../../install/artifacts.json
+    uv run --script scripts/run_types_conformance.py tests/conformance
 
 build:
     python -m build --installer uv .
