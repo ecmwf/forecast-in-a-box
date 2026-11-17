@@ -20,7 +20,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any, cast
 
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import case, func, or_, select, update
 
 import forecastbox.schemata.jobs as _jobs_module
 from forecastbox.domain.blueprint.exceptions import BlueprintAccessDenied, BlueprintNotFound, BlueprintVersionConflict
@@ -262,6 +262,36 @@ def list_blueprints(
                 query = query.limit(limit)
             result = session.execute(query)
             return [BlueprintLatest(blueprint=_to_blueprint_record(r[0]), created_at=r[1]) for r in result.all()]
+
+    return dbRetry(function)
+
+
+@dataclass(frozen=True, eq=True, slots=True)
+class BlueprintStorageSummary:
+    total_rows: int
+    deleted_rows: int
+    distinct_blueprints: int
+
+
+def summarize_blueprint_storage() -> BlueprintStorageSummary:
+    """Return row counts of the blueprint table, for periodic maintenance reporting. Read-only.
+
+    Internal, non-user-facing query: no auth context is applied.
+    """
+
+    def function(i: int) -> BlueprintStorageSummary:
+        with _jobs_module.sync_session_maker() as session:
+            query = select(
+                func.count(),
+                func.sum(case((Blueprint.is_deleted.is_(True), 1), else_=0)),
+                func.count(func.distinct(Blueprint.blueprint_id)),
+            )
+            row = session.execute(query).one()
+            return BlueprintStorageSummary(
+                total_rows=row[0] or 0,
+                deleted_rows=row[1] or 0,
+                distinct_blueprints=row[2] or 0,
+            )
 
     return dbRetry(function)
 
