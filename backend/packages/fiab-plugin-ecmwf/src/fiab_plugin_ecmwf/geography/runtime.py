@@ -13,7 +13,6 @@ import math
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
-from functools import lru_cache
 from typing import TYPE_CHECKING, cast
 
 from .extent import LatLonBox, box_from_preset, boxes_from_geometry, pad_box, union_boxes
@@ -141,7 +140,6 @@ def _numeric_increments(grid: object) -> tuple[float, float] | None:
     return west_east, south_north
 
 
-@lru_cache(maxsize=32)
 def _classical_row_points(number: int) -> Sequence[int]:
     """Return the points of each latitude row of the classical reduced Gaussian grid N<number>, from the north pole to the south pole."""
     # mir is an optional runtime dependency, so it is imported when the row counts are needed
