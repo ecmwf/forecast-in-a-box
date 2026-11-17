@@ -80,7 +80,7 @@ def _patch_validation_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
-def testingest_plugin_templates_reserved_tag_recorded_as_template_error(
+def test_ingest_plugin_templates_reserved_tag_recorded_as_template_error(
     mem_session_maker: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     upsert_plugin_state(plugin_id=_PLUGIN_ID_STR, version="1.0", pip_source="src", module_name="mod")
@@ -95,7 +95,7 @@ def testingest_plugin_templates_reserved_tag_recorded_as_template_error(
     assert CORE_VERSION_MISMATCH_TAG_KEY in state.template_errors["my_template"]
 
 
-def testingest_plugin_templates_normal_tag_not_flagged(mem_session_maker: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch) -> None:
+def test_ingest_plugin_templates_normal_tag_not_flagged(mem_session_maker: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch) -> None:
     upsert_plugin_state(plugin_id=_PLUGIN_ID_STR, version="1.0", pip_source="src", module_name="mod")
     _patch_validation_ok(monkeypatch)
     monkeypatch.setattr(PluginManager, "plugins", pmap({_PLUGIN_ID: _make_plugin(tags=["normal-tag"])}))

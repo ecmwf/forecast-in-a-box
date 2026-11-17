@@ -11,9 +11,9 @@
 Manages the Blueprint domain -- user-created entities that capture computation intents.
 Used to create Runs and Experiments.
 
-Depends on the Glyph domain, to resolve and validate Glyphs.
+Depends on the Glyph domain, to resolve and validate Glyphs, and remap during template ingest.
 Depends on the Plugin domain, to determine fiab-core compatibility and retrieve plugin factories for validation.
 Depended on by Run and Experiment domains.
 
-Consumes plugin template events via `dispatchers.py` (`template_ingest.py`).
+Loosely coupled by Plugin domain -- consumes template events ingested by it.
 """

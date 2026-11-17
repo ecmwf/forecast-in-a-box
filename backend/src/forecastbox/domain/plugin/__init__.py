@@ -8,8 +8,5 @@ install error) is recorded in the ``plugin_state`` DB table via ``domain/plugin/
 Depends on the Notification domain for event contracts.
 Depended on by Blueprint and Run domains -- they need to extract individual plugin validations and compilers, and to validate fiab-core version.
 
-Loosely coupled to Blueprint: emits `PluginTemplatesChangedEvent`/`PluginTemplatesRemovedEvent` (see
-`events.py`), handled by `domain/blueprint/dispatchers.py`; the plugin domain never imports blueprint.
-`service.py` is the entry point other domains (blueprint) use for template ingestion data, and
-`notifications.py` holds the client notification helpers for managed operations.
+Loosely coupled to Plugin domain -- emits template events which are then consumed by it.
 """
