@@ -12,10 +12,11 @@ Types pertaining to Forecast As BLock Expression (Fable): blocks
 """
 
 import abc
+from enum import Enum
 from typing import Annotated, Any, Literal, NewType
 
 from earthkit.workflows.fluent import Action
-from pydantic import BeforeValidator, ConfigDict, Field, PlainSerializer, WithJsonSchema
+from pydantic import BeforeValidator, ConfigDict, Field, PlainSerializer, WithJsonSchema, model_validator
 from qubed import Qube
 from typing_extensions import Self
 
@@ -135,30 +136,42 @@ class QubedOutput(FiabCoreBaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+def is_textual(mime_type: str) -> bool:
+    # we check the starts with because of encoding, extension, etc
+    return mime_type.startswith("text/plain")
+
+
+class UrlDataFormat(str, Enum):
+    """Format of the data stored at the url that a textual output represents."""
+
+    gribdir = "gribdir"
+    zarr = "zarr"
+
+
 class RawOutput(FiabCoreBaseModel):
     # use for final outputs that are not expected to be expanded by blocks except for
     # some general purpose like 'dump to file'. If a browser could be capable of directly
     # processing, ie, its a known media object, set the mime_type
     type_fqn: str = "typing.Any"
     mime_type: str = "application/octet-stream"
+    """Standard mime type, optionally with standard parameters such as charset. Parameters starting with `fiab-` are forbidden."""
+    fetchable: bool = False
+    """If true, the output value is a path to data (a file or a directory tree) that can be fetched as a zip. Requires text/plain mime type."""
+    url_dataformat: UrlDataFormat | None = Field(
+        default=None,
+        description="If the mime type is text/plain and the value represents an url, this describes the format of the data stored at that url.",
+    )
 
-
-def is_textual(mime_type: str) -> bool:
-    # we check the starts with because of encoding, extension, etc
-    return mime_type.startswith("text/plain")
-
-
-def get_fetchable_mime(format_name: str) -> str:
-    """Mime type of a textual output whose value is a path to data (a file or a directory tree) that can be fetched as a zip."""
-    return f"text/plain; fiab-format={format_name}; fiab-fetchable=1"
-
-
-def is_fetchable_mime(mime_type: str) -> bool:
-    """Whether the mime type is text/plain with the `fiab-fetchable=1` extension."""
-    if not is_textual(mime_type):
-        return False
-    params = [part.strip() for part in mime_type.split(";")[1:]]
-    return "fiab-fetchable=1" in params
+    @model_validator(mode="after")
+    def _check_mime_consistency(self) -> Self:
+        for param in self.mime_type.split(";")[1:]:
+            if param.strip().lower().startswith("fiab-"):
+                raise ValueError(f"mime type parameters starting with 'fiab-' are not allowed: {self.mime_type!r}")
+        if self.fetchable and not is_textual(self.mime_type):
+            raise ValueError(f"fetchable output requires text/plain mime type, got {self.mime_type!r}")
+        if self.url_dataformat is not None and not is_textual(self.mime_type):
+            raise ValueError(f"url_dataformat requires text/plain mime type, got {self.mime_type!r}")
+        return self
 
 
 class NoOutput(FiabCoreBaseModel):

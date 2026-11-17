@@ -23,7 +23,7 @@ from fiab_core.fable import (
     ConfigurationOptionRestriction,
     NoOutput,
     RawOutput,
-    get_fetchable_mime,
+    UrlDataFormat,
 )
 from fiab_core.plugin import BlockValidation, Error, Plugin
 from fiab_core.types import ArtifactType, ClosedEnumType, FableType, FloatType, IntType, NoneType, StringType, UnionType, parse
@@ -144,7 +144,10 @@ def validator(factory_id: BlockFactoryId, instance: BlockInstance, inputs: dict[
     if factory_id in ("sink_file",):
         return BlockValidation(Either.ok(RawOutput(type_fqn="bytes", mime_type="text/plain")), restrictions)
     elif factory_id in ("sink_filetree",):
-        return BlockValidation(Either.ok(RawOutput(type_fqn="bytes", mime_type=get_fetchable_mime("gribdir"))), restrictions)
+        return BlockValidation(
+            Either.ok(RawOutput(type_fqn="bytes", mime_type="text/plain", fetchable=True, url_dataformat=UrlDataFormat.gribdir)),
+            restrictions,
+        )
     elif factory_id in ("sink_image",):
         return BlockValidation(Either.ok(RawOutput(type_fqn="bytes", mime_type="image/png")), restrictions)
     elif factory_id in ("source_sleep", "source_text", "source_filesize"):

@@ -136,8 +136,8 @@ def compile_builder(blueprint: BlueprintBuilder, glyph_values: dict[str, str]) -
     block_outputs: dict[BlockInstanceId, BlockInstanceOutput] = {}
     # Maps any produced cascade TaskId → TaskDetail.
     task_detail: dict[TaskId, TaskDetail] = {}
-    # Maps sink block ids to mime type used in RunOutputs (only relevant for external outputs).
-    block_to_mime: dict[BlockInstanceId, str] = {}
+    # Maps sink block ids to their raw output, used in RunOutputs (only relevant for external outputs).
+    block_to_output: dict[BlockInstanceId, RawOutput] = {}
     # Maps any produced cascade TaskId -> builder metadata of its node (display name, dimensions).
     task_builder: dict[TaskId, BuilderMetadata] = {}
     sink_tasks: set[TaskId] = set()
@@ -199,7 +199,7 @@ def compile_builder(blueprint: BlueprintBuilder, glyph_values: dict[str, str]) -
 
             block_output = block_outputs.get(blockId)
             if not isinstance(block_output, NoOutput):
-                block_to_mime[blockId] = block_output.mime_type if isinstance(block_output, RawOutput) else "application/octet-stream"
+                block_to_output[blockId] = block_output if isinstance(block_output, RawOutput) else RawOutput()
 
             graph += block_graph
 
@@ -219,7 +219,9 @@ def compile_builder(blueprint: BlueprintBuilder, glyph_values: dict[str, str]) -
     run_outputs: dict[TaskId, RunOutputCharacteristic] = {
         task_id: RunOutputCharacteristic(
             original_block=task_detail[task_id].block,
-            mime_type=block_to_mime[task_detail[task_id].block],
+            mime_type=block_to_output[task_detail[task_id].block].mime_type,
+            fetchable=block_to_output[task_detail[task_id].block].fetchable,
+            url_dataformat=block_to_output[task_detail[task_id].block].url_dataformat,
             display_name=task_builder[task_id].display_name,
             dimension_kvs=task_builder[task_id].dimension_kvs,
         )

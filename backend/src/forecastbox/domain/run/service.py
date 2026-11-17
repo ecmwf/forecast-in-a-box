@@ -105,8 +105,8 @@ class ExecuteResult(FiabBaseModel):
     """Attempt number; always 1 on a fresh execution."""
 
 
-def get_mime_of_output(execution: RunRecord, dataset_id: DatasetId) -> Either[str, str]:  # type: ignore[invalid-argument]
-    """Return the declared mime type for a run output task."""
+def get_characteristic_of_output(execution: RunRecord, dataset_id: DatasetId) -> Either[RunOutputCharacteristic, str]:  # type: ignore[invalid-argument]
+    """Return the declared characteristic for a run output task."""
     raw_outputs = execution.outputs
     if raw_outputs is None:
         return Either.error(f"Run {execution.run_id!r} has no recorded outputs yet")
@@ -120,7 +120,7 @@ def get_mime_of_output(execution: RunRecord, dataset_id: DatasetId) -> Either[st
     characteristic = outputs.outputs.get(task_id)
     if characteristic is None:
         return Either.error(f"Output {task_id!r} not found for run {execution.run_id!r}")
-    return Either.ok(characteristic.mime_type)
+    return Either.ok(characteristic)
 
 
 async def get_blueprint_for_execution(blueprint_id: BlueprintId, blueprint_version: int | None) -> BlueprintRecord | None:

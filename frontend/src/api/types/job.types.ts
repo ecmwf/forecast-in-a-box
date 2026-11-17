@@ -40,16 +40,28 @@ export const JobExecuteResponseSchema = z.object({
 })
 
 /** routes/run.py: RunOutputDetail; the #798 labels are absent on older runs. */
-export const RunOutputMetadataSchema = z.object({
-  mime_type: z.string(),
-  display_name: z.string().nullish().catch(null),
-  dimension_kvs: z
-    .array(z.tuple([z.string(), z.string()]))
-    .nullish()
-    .catch(null),
-  original_block: z.string(),
-  is_available: z.boolean(),
-})
+export const RunOutputMetadataSchema = z
+  .object({
+    mime_type: z.string(),
+    fetchable: z.boolean().default(false),
+    url_dataformat: z.enum(['gribdir', 'zarr']).nullish().catch(null),
+    display_name: z.string().nullish().catch(null),
+    dimension_kvs: z
+      .array(z.tuple([z.string(), z.string()]))
+      .nullish()
+      .catch(null),
+    original_block: z.string(),
+    is_available: z.boolean(),
+  })
+  // Interim: fold the structured fields back into the legacy long mime
+  // (`text/plain; fiab-format=...; fiab-fetchable=1`) the output adapters key on.
+  .transform(({ fetchable, url_dataformat, ...rest }) => ({
+    ...rest,
+    mime_type:
+      rest.mime_type +
+      (url_dataformat ? `; fiab-format=${url_dataformat}` : '') +
+      (fetchable ? '; fiab-fetchable=1' : ''),
+  }))
 
 /** routes/run.py: RunOutputsResponse — backend wraps the dict in `{ outputs: ... }`;
  * we flatten on parse so consumers can access `details.outputs[taskId]` directly. */

@@ -23,7 +23,7 @@ from typing import Annotated, Literal, cast
 from cascade.low.core import DatasetId, TaskId
 from fastapi import APIRouter, Depends, Response
 from fastapi.exceptions import HTTPException
-from fiab_core.fable import BlockInstanceId, is_fetchable_mime
+from fiab_core.fable import BlockInstanceId
 from pydantic import Field
 
 from forecastbox.domain.auth.users import get_auth_context
@@ -90,6 +90,8 @@ class RunCreateResponse(FiabBaseModel):
 
 class RunOutputDetail(FiabBaseModel):
     mime_type: str
+    fetchable: bool = False
+    url_dataformat: Literal["gribdir", "zarr"] | None = None
     display_name: str | None = None
     dimension_kvs: list[tuple[str, str]] | None = None
     original_block: BlockInstanceId
@@ -186,6 +188,8 @@ def _to_run_detail(domain_detail: service.RunDetail) -> RunDetailResponse:
             outputs={
                 task_id: RunOutputDetail(
                     mime_type=char.mime_type,
+                    fetchable=char.fetchable,
+                    url_dataformat=char.url_dataformat.value if char.url_dataformat is not None else None,
                     display_name=char.display_name,
                     dimension_kvs=char.dimension_kvs,
                     original_block=char.original_block,
@@ -261,16 +265,16 @@ async def _retrieve_output_bytes(execution: db.RunRecord, spec: RunLookup, datas
         except Exception:
             pass  # fall through to cascade
 
-    mime_result = service.get_mime_of_output(execution, dataset)
-    if mime_result.t is None:
-        raise HTTPException(500, f"Result mime lookup failed: {mime_result.e}")
+    char_result = service.get_characteristic_of_output(execution, dataset)
+    if char_result.t is None:
+        raise HTTPException(500, f"Result mime lookup failed: {char_result.e}")
     try:
         decoded = await execution_manager.awaitable_submit(
             ConcurrentPools.General, TaskName("run.output.retrieve"), partial(retrieve_output_bytes, execution.cascade_job_id, dataset)
         )
     except RunOutputRetrievalFailed as e:
         raise HTTPException(500, str(e))
-    return decoded, mime_result.t
+    return decoded, char_result.t.mime_type
 
 
 # ---------------------------------------------------------------------------
@@ -525,14 +529,14 @@ async def get_run_output_zipped(
     execution = await _resolve_run_record(spec, auth_context)
     if execution.cascade_job_id is None:
         raise HTTPException(status_code=409, detail=f"Run {spec.run_id!r} has not been submitted to cascade yet.")
-    mime_result = service.get_mime_of_output(execution, DatasetId(task=TaskId(dataset_id), output="0"))
-    if mime_result.t is None:
-        raise HTTPException(500, f"Result mime lookup failed: {mime_result.e}")
-    if not is_fetchable_mime(mime_result.t):
-        raise HTTPException(400, f"Output {dataset_id!r} of mime type {mime_result.t!r} is not fetchable as a zip.")
+    char_result = service.get_characteristic_of_output(execution, DatasetId(task=TaskId(dataset_id), output="0"))
+    if char_result.t is None:
+        raise HTTPException(500, f"Result mime lookup failed: {char_result.e}")
+    if not char_result.t.fetchable:
+        raise HTTPException(400, f"Output {dataset_id!r} of mime type {char_result.t.mime_type!r} is not fetchable as a zip.")
     decoded, _ = await _retrieve_output_bytes(execution, spec, dataset_id)
     try:
-        path_str = decoded.decode(get_encoding(mime_result.t)).strip()
+        path_str = decoded.decode(get_encoding(char_result.t.mime_type)).strip()
     except Exception as e:
         raise HTTPException(500, f"Output path decoding failed: {e}")
     if path_str.startswith("file://"):
