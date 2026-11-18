@@ -14,7 +14,7 @@ from forecastbox.domain.run.db import RunRecord
 from forecastbox.domain.run.exceptions import RunConcurrencyIssue, RunNotFound
 
 
-def test_get_mime_of_output_returns_declared_mime() -> None:
+def test_get_characteristic_of_output_returns_declared_mime() -> None:
     execution = cast(
         RunRecord,
         SimpleNamespace(
@@ -30,13 +30,14 @@ def test_get_mime_of_output_returns_declared_mime() -> None:
         ),
     )
 
-    result = service.get_mime_of_output(execution, DatasetId(task=TaskId("task-a"), output="0"))
+    result = service.get_characteristic_of_output(execution, DatasetId(task=TaskId("task-a"), output="0"))
 
-    assert result.t == "text/plain"
+    assert result.t is not None
+    assert result.t.mime_type == "text/plain"
     assert result.e is None
 
 
-def test_get_mime_of_output_rejects_unknown_task() -> None:
+def test_get_characteristic_of_output_rejects_unknown_task() -> None:
     execution = cast(
         RunRecord,
         SimpleNamespace(
@@ -52,7 +53,7 @@ def test_get_mime_of_output_rejects_unknown_task() -> None:
         ),
     )
 
-    result = service.get_mime_of_output(execution, DatasetId(task=TaskId("task-b"), output="0"))
+    result = service.get_characteristic_of_output(execution, DatasetId(task=TaskId("task-b"), output="0"))
 
     assert result.t is None
     assert result.e is not None

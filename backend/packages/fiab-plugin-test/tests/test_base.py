@@ -21,7 +21,6 @@ from fiab_core.fable import (
     BlockInstanceId,
     ConfigurationOptionId,
     RawOutput,
-    is_fetchable_mime,
 )
 
 from fiab_plugin_test import _get_checkpoint_enum_type, catalogue, compiler, validator
@@ -277,7 +276,8 @@ def test_validator_sink_filetree_is_fetchable() -> None:
     validation = validator(BlockFactoryId("sink_filetree"), BlockInstance(configuration_values={}, input_ids={}), {})
     output = validation.result.t
     assert isinstance(output, RawOutput)
-    assert is_fetchable_mime(output.mime_type)
+    assert output.fetchable
+    assert output.mime_type == "text/plain"
 
 
 # ---------------------------------------------------------------------------

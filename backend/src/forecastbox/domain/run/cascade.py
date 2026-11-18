@@ -26,7 +26,7 @@ from cascade.gateway.api import (
 from cascade.gateway.client import request_response
 from cascade.low.core import DatasetId, JobInstance, JobInstanceRich, TaskId
 from cascade.low.func import assert_never
-from fiab_core.fable import BlockInstanceId
+from fiab_core.fable import BlockInstanceId, UrlDataFormat
 from pydantic import Field
 
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
@@ -93,6 +93,8 @@ stored_output_max_length = 10 * 1024**2
 
 class RunOutputCharacteristic(FiabBaseModel):
     mime_type: str = "application/octet-stream"
+    fetchable: bool = False
+    url_dataformat: UrlDataFormat | None = None
     display_name: str | None = None
     dimension_kvs: list[tuple[str, str]] | None = None
     original_block: BlockInstanceId

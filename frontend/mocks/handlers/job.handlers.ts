@@ -92,8 +92,13 @@ export function mockRunLogArchive(
   return zipSync(files)
 }
 
+type WireOutputMetadata = RunOutputMetadata & {
+  fetchable: boolean
+  url_dataformat: string | null
+}
+
 type JobExecutionDetailWire = Omit<JobExecutionDetail, 'outputs'> & {
-  outputs: { outputs: Record<string, RunOutputMetadata> } | null
+  outputs: { outputs: Record<string, WireOutputMetadata> } | null
 }
 
 /**
@@ -105,7 +110,31 @@ type JobExecutionDetailWire = Omit<JobExecutionDetail, 'outputs'> & {
 function toWireDetail(detail: JobExecutionDetail): JobExecutionDetailWire {
   return {
     ...detail,
-    outputs: detail.outputs === null ? null : { outputs: detail.outputs },
+    outputs:
+      detail.outputs === null
+        ? null
+        : {
+            outputs: Object.fromEntries(
+              Object.entries(detail.outputs).map(([id, meta]) => [
+                id,
+                toWireOutput(meta),
+              ]),
+            ),
+          },
+  }
+}
+
+/** Splits the legacy long mime of seed data into the structured wire fields. */
+function toWireOutput(meta: RunOutputMetadata): WireOutputMetadata {
+  const [base, ...params] = meta.mime_type.split(';').map((p) => p.trim())
+  const param = (key: string) =>
+    params.find((p) => p.startsWith(`${key}=`))?.slice(key.length + 1)
+  const format = param('fiab-format')
+  return {
+    ...meta,
+    mime_type: base,
+    fetchable: param('fiab-fetchable') === '1',
+    url_dataformat: format ?? null,
   }
 }
 
@@ -282,7 +311,7 @@ export const jobHandlers = [
     const blob = mockBlobForMime(stored.mime_type, executionId)
     return new HttpResponse(blob, {
       headers: {
-        'Content-Type': stored.mime_type,
+        'Content-Type': stored.mime_type.split(';')[0].trim(),
         'Content-Length': String(blob.size),
       },
     })

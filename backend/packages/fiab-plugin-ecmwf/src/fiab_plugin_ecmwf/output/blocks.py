@@ -23,7 +23,7 @@ from fiab_core.fable import (
     ConfigurationOptionRestriction,
     QubedOutput,
     RawOutput,
-    get_fetchable_mime,
+    UrlDataFormat,
 )
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import BlockInstanceRich, Sink
@@ -46,8 +46,6 @@ GRIB_ALIASES = {
     "stepRange": STEP,
     "level": LEVEL,
 }
-
-GRIB_MIME = get_fetchable_mime("gribdir")
 
 PLOT_FORMAT_TO_MIME: dict[str, str] = {
     "png": "image/png",
@@ -72,7 +70,7 @@ class ZarrSink(Sink):
         self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
     ) -> BlockInstanceOutput:
         _extract_dataset(inputs, "dataset")
-        return RawOutput(type_fqn="bytes", mime_type=get_fetchable_mime("zarr"))
+        return RawOutput(type_fqn="bytes", mime_type="text/plain", fetchable=True, url_dataformat=UrlDataFormat.zarr)
 
     def compile(
         self,
@@ -124,7 +122,7 @@ class GribSink(Sink):
         dirname = os.path.dirname(path)
         if len(self._find_template_values(dirname)) != 0:
             raise ValueError("Invalid filepath: directory path can not contain template values")
-        return RawOutput(type_fqn="bytes", mime_type=GRIB_MIME)
+        return RawOutput(type_fqn="bytes", mime_type="text/plain", fetchable=True, url_dataformat=UrlDataFormat.gribdir)
 
     def compile(
         self,
