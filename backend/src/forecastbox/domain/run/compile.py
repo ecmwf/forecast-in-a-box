@@ -222,6 +222,7 @@ def compile_builder(blueprint: BlueprintBuilder, glyph_values: dict[str, str]) -
             mime_type=block_to_output[task_detail[task_id].block].mime_type,
             fetchable=block_to_output[task_detail[task_id].block].fetchable,
             url_dataformat=block_to_output[task_detail[task_id].block].url_dataformat,
+            skinnywms_issue=block_to_output[task_detail[task_id].block].skinnywms_issue,
             display_name=task_builder[task_id].display_name,
             dimension_kvs=task_builder[task_id].dimension_kvs,
         )

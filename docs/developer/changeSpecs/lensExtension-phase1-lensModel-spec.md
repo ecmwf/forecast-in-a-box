@@ -53,8 +53,8 @@ or directory. Phase 2 leans on these guarantees heavily, so establishing them he
 skinnyWMS, is deliberate: the resolution logic is shared.
 
 **Applicability validation.** Before starting, a lens validates that the output's
-declared type is one it can serve, using the `fiab-core` helpers from the output
-contract task. Asking for a WMS view of a text output should fail cleanly at start.
+declared type is one it can serve, using the structured `RawOutput` fields from the
+output contract task. Asking for a WMS view of a text output should fail cleanly at start.
 
 **Capability metadata in discovery.** `/lens/supported` currently returns a name, a start
 route, and a parameter description. It should grow enough metadata for a client to

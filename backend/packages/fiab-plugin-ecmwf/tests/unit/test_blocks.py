@@ -37,11 +37,14 @@ from fiab_plugin_ecmwf.blocks import OperationalForecastSource, Select
 from fiab_plugin_ecmwf.constants import (
     DIMENSION,
     ENSEMBLE,
+    LEVEL,
     PARAM,
+    QUANTILE,
     STEP,
+    TYPE,
     VALUES,
 )
-from fiab_plugin_ecmwf.output.blocks import GribSink, ZarrSink
+from fiab_plugin_ecmwf.output.blocks import GribSink, ZarrSink, skinnywms_issue
 from fiab_plugin_ecmwf.plotting.blocks import PLOT_ENVIRONMENT, MapPlotSink
 from fiab_plugin_ecmwf.products.blocks import EnsembleStatistics
 from fiab_plugin_ecmwf.qubed_utils import axes, collapse, contains
@@ -410,6 +413,7 @@ class TestGribSink:
             restrictions={},
         )
         assert isinstance(output, RawOutput)
+        assert output.skinnywms_issue is not None and ENSEMBLE in output.skinnywms_issue
 
     def test_from_ensemble_statistics(
         self,
@@ -432,6 +436,22 @@ class TestGribSink:
             restrictions={},
         )
         assert isinstance(output, RawOutput)
+        assert output.skinnywms_issue is None
+
+    @pytest.mark.parametrize(
+        "datacube, expected",
+        [
+            ({PARAM: ["2t", "msl"], STEP: [0, 6], LEVEL: [500, 850]}, None),
+            ({PARAM: ["2t"], STEP: [0, 6], ENSEMBLE: [3]}, None),
+            ({PARAM: ["2t"], STEP: [0, 6], ENSEMBLE: [1, 2]}, "offending dimension: number"),
+            ({PARAM: ["2t"], TYPE: ["em", "es"]}, "offending dimension: type"),
+            ({PARAM: ["2t"], QUANTILE: ["0:4", "1:4"]}, "offending dimension: quantile"),
+            ({PARAM: ["2t"], "date": ["20260101", "20260102"], "time": ["0000"]}, "offending dimension: date"),
+            ({PARAM: ["2t"], ENSEMBLE: [1, 2], "time": ["0000", "1200"]}, "offending dimension: number, time"),
+        ],
+    )
+    def test_skinnywms_issue(self, datacube: dict[str, list[object]], expected: str | None) -> None:
+        assert skinnywms_issue(QubedOutput(dataqube=Qube.from_datacube(datacube))) == expected
 
     @pytest.mark.parametrize(
         "filepath",

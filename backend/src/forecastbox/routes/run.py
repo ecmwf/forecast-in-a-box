@@ -92,6 +92,7 @@ class RunOutputDetail(FiabBaseModel):
     mime_type: str
     fetchable: bool = False
     url_dataformat: Literal["gribdir", "zarr"] | None = None
+    skinnywms_issue: str | None = None
     display_name: str | None = None
     dimension_kvs: list[tuple[str, str]] | None = None
     original_block: BlockInstanceId
@@ -190,6 +191,7 @@ def _to_run_detail(domain_detail: service.RunDetail) -> RunDetailResponse:
                     mime_type=char.mime_type,
                     fetchable=char.fetchable,
                     url_dataformat=char.url_dataformat.value if char.url_dataformat is not None else None,
+                    skinnywms_issue=char.skinnywms_issue,
                     display_name=char.display_name,
                     dimension_kvs=char.dimension_kvs,
                     original_block=char.original_block,

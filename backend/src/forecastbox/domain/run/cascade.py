@@ -95,6 +95,7 @@ class RunOutputCharacteristic(FiabBaseModel):
     mime_type: str = "application/octet-stream"
     fetchable: bool = False
     url_dataformat: UrlDataFormat | None = None
+    skinnywms_issue: str | None = None
     display_name: str | None = None
     dimension_kvs: list[tuple[str, str]] | None = None
     original_block: BlockInstanceId

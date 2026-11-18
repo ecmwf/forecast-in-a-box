@@ -161,6 +161,10 @@ class RawOutput(FiabCoreBaseModel):
         default=None,
         description="If the mime type is text/plain and the value represents an url, this describes the format of the data stored at that url.",
     )
+    skinnywms_issue: str | None = Field(
+        default=None,
+        description="If set, the data at the url is known to be displayed incorrectly by skinnyWMS, and this holds the explanation.",
+    )
 
     @model_validator(mode="after")
     def _check_mime_consistency(self) -> Self:

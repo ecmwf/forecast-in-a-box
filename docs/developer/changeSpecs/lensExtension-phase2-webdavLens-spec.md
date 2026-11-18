@@ -119,7 +119,7 @@ manual steps.
   where the lens lives, and the model that phase 1 generalised.
 - `backend/src/forecastbox/routes/run.py`, `backend/src/forecastbox/domain/run/` --
   output identity, run access control.
-- `backend/packages/fiab-core/src/fiab_core/fable.py` -- output type predicates, for
+- `backend/packages/fiab-core/src/fiab_core/fable.py` -- structured output format fields, for
   deciding which outputs this lens applies to.
 - `backend/development.md` for backend conventions and the test suites.
 
