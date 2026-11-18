@@ -541,6 +541,19 @@ test_prepare_val_venv() {
     # UV_PROJECT_ENVIRONMENT points to buildVenv (intentional, see script comment)
     assert_contains "prepareValVenv: UV_PROJECT_ENVIRONMENT contains buildVenv" "buildVenv" "$output"
     assert_contains "prepareValVenv: UV_NO_PROJECT=1" "UV_NO_PROJECT=1" "$output"
+    assert_not_contains "prepareValVenv: no pyproject, no dev group install" "-r -" "$calls"
+
+    # with a pyproject declaring a dev group, its requirements are installed
+    : > "$calls_file"
+    printf '[dependency-groups]\ndev = ["ty==0.0.2", "foo-bar", {include-group = "x"}]\n' > "$tmpdir/pyproject.toml"
+    (
+        cd "$tmpdir"
+        export PATH="$MOCKS_DIR:$PATH"
+        export MOCK_CALLS_FILE="$calls_file"
+        export SCRIPT_DIR="$SCRIPT_DIR"
+        source "$SCRIPT_DIR/prepareValVenv.sh"
+    )
+    assert_contains "prepareValVenv: dev group installed" "uv pip install -r -" "$(cat "$calls_file")"
 
     rm -rf "$tmpdir"
 }

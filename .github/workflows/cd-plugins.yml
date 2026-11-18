@@ -67,7 +67,7 @@ jobs:
           source $REPO_ROOT/scripts/cicd/tearDownVenv.sh
           whl=$(ls dist/*whl)
           source $REPO_ROOT/scripts/cicd/prepareValVenv.sh "$whl"[runtime]
-          RELEASE=1 just test
+          just test
           source $REPO_ROOT/scripts/cicd/tearDownVenv.sh
           mv dist/* ../packagesDist
           popd
