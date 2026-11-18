@@ -353,36 +353,29 @@ class EventDispatcher:
 _dispatcher = EventDispatcher(execution_manager, config.backend.dispatcher)
 
 
-def _current_dispatcher() -> EventDispatcher:
-    global _dispatcher
-    if _dispatcher.manager is not execution_manager:
-        _dispatcher = EventDispatcher(execution_manager, config.backend.dispatcher)
-    return _dispatcher
-
-
 def register_dispatcher(registration: DispatcherRegistration) -> None:
-    _current_dispatcher().register(registration)
+    _dispatcher.register(registration)
 
 
 def freeze_registration() -> None:
-    _current_dispatcher().freeze()
+    _dispatcher.freeze()
 
 
 def submit_event(event: Event) -> Future[DispatchResult]:
-    return _current_dispatcher().submit(event)
+    return _dispatcher.submit(event)
 
 
 async def async_submit_event(event: Event) -> DispatchResult:
-    return await _current_dispatcher().async_submit(event)
+    return await _dispatcher.async_submit(event)
 
 
 def event_dispatcher_entrypoint(stop_event: threading.Event) -> None:
-    _current_dispatcher().entrypoint(stop_event)
+    _dispatcher.entrypoint(stop_event)
 
 
 def stop_request(timeout: float) -> None:
-    _current_dispatcher().request_stop(timeout)
+    _dispatcher.request_stop(timeout)
 
 
 def status() -> DispatcherStatus:
-    return _current_dispatcher().status()
+    return _dispatcher.status()

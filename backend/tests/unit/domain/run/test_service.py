@@ -457,4 +457,4 @@ async def test_gateway_start_and_artifact_delete_routing(monkeypatch: pytest.Mon
     monkeypatch.setattr(execution_manager, "awaitable_submit", _recording)
     await gateway_route.start_gateway()
     await artifacts_route.delete_model_endpoint(cast(CompositeArtifactId, object()))
-    assert calls == [(ConcurrentPools.General, "gateway.start"), (ConcurrentPools.General, "artifact.delete")]
+    assert calls == [(ConcurrentPools.General, "gateway.start"), (ConcurrentPools.ArtifactIo, "artifact.delete")]

@@ -101,10 +101,11 @@ def test_catalogue_view_returns_snapshot_of_published_plugins() -> None:
     assert result == {_PLUGIN_ID: "fake-catalogue"}
 
 
-def test_catalogue_view_returns_false_when_lock_not_acquired() -> None:
+def test_catalogue_view_is_lock_free() -> None:
+    PluginManager.plugins = pmap()
     busy_lock = PluginManager.lock
     busy_lock.acquire()
     try:
-        assert catalogue_view() is False
+        assert catalogue_view() == {}
     finally:
         busy_lock.release()

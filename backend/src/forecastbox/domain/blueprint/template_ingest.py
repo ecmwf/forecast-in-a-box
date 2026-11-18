@@ -7,10 +7,13 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Blueprint-side reaction to plugin template events.
+"""Blueprint-side ingestion and removal of plugin blueprint templates.
 
-Runs on a ``ConcurrentPools.General`` worker via ``dispatchers.py``, calls jobs-DB helpers
-directly. Obtains plugin data and persists ingestion results through ``domain.plugin.service``.
+The two public functions are registered by the entrypoint as the plugin domain's template hooks
+(see ``domain.plugin.template_hooks``), and run synchronously on the caller's thread -- the
+``ConcurrentPools.PluginManagement`` worker in the backend, the main thread in warmup. They call
+jobs-DB helpers directly. Plugin data is obtained and ingestion results are persisted through
+``domain.plugin.service``.
 """
 
 import logging

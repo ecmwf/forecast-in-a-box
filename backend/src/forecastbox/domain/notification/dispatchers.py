@@ -8,7 +8,7 @@
 # nor does it submit to any jurisdiction.
 
 """Registers the notification domain's dispatcher handler, auto-discovered by
-`entrypoint.app._discover_dispatchers`.
+`entrypoint.initializers._discover_dispatchers`.
 
 Matches on the `ClientNotificationSource` protocol rather than any concrete event type or name --
 any domain's event that implements `as_client_notification` gets converted and forwarded to the

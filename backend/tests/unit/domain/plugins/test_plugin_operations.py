@@ -36,7 +36,8 @@ from forecastbox.domain.plugin.events import (
 from forecastbox.domain.plugin.exceptions import PluginTemplateIngestFailed
 from forecastbox.domain.plugin.state import PluginManager
 from forecastbox.domain.plugin.status import plugins_ready
-from forecastbox.utility.concurrency.manager import ConcurrentPools, SubmissionRejected
+from forecastbox.utility.concurrency.manager import SubmissionRejected
+from forecastbox.utility.config import ConcurrentPools
 
 _PLUGIN_ID = PluginCompositeId(store=PluginStoreId("store"), local=PluginId("plugin"))
 
@@ -59,9 +60,8 @@ def _reset_plugin_state() -> Generator[None, None, None]:
 # ---------------------------------------------------------------------------
 
 
-def test_submit_load_all_uses_submit_after_not_delayed_thread() -> None:
+def test_submit_load_all_uses_submit_after() -> None:
     catalog_future: Future[None] = Future()
-    assert not hasattr(submit_module, "delayed_thread")
     with patch.object(submit_module.execution_manager, "submit_after") as mock_submit_after:
         submit_module.submit_load_all(catalog_future)
     mock_submit_after.assert_called_once()

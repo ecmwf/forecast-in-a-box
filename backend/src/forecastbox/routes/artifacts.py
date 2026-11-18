@@ -77,7 +77,10 @@ async def delete_model_endpoint(composite_id: CompositeArtifactId, admin: UserRe
     """Delete a locally available ML model."""
     try:
         result = await execution_manager.awaitable_submit(
-            ConcurrentPools.General, TaskName("artifact.delete"), partial(delete_model, composite_id)
+            # NOTE ArtifactIo, since the delete may use the shared ssh handle, see domain.artifact.manager
+            ConcurrentPools.ArtifactIo,
+            TaskName("artifact.delete"),
+            partial(delete_model, composite_id),
         )
     except TimeoutError:
         raise HTTPException(status_code=503, detail="Corresponding internal component is busy")

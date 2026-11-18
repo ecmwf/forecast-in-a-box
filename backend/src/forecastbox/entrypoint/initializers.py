@@ -13,6 +13,14 @@
 The order below matters: `initialize()` runs the steps top to bottom, and `shutdown()` unwinds
 them bottom to top -- but only the ones that actually started. See
 `forecastbox.utility.initializer` for the exact semantics.
+
+*NOTE* when making changes here, make sure warmup (`entrypoint/warmup.py`, invoked by
+`scripts/fiab.sh warmup`) is unaffected. Warmup reuses selected startup steps (schema creation,
+provider and hook registration via `register_providers`, catalog and store initialization) but
+deliberately runs without the execution runtime: no pools, no event dispatcher, no managed
+threads, no FastAPI loop. Any wiring that domain code needs during plugin install/load must
+therefore be registered in `register_providers`, which both call, and must not rely on the
+dispatcher or pools. Warmup has been broken this way before.
 """
 
 import asyncio
@@ -23,6 +31,8 @@ import pkgutil
 import threading
 from collections.abc import Callable, Sequence
 from concurrent.futures import Future
+from dataclasses import dataclass, field
+from functools import partial
 from typing import TypeVar
 
 from fiab_core.artifacts import ArtifactsProvider
@@ -32,8 +42,8 @@ import forecastbox.domain
 import forecastbox.schemata
 from forecastbox.domain.artifact.base import get_artifact_local_path
 from forecastbox.domain.artifact.manager import ArtifactManager, submit_refresh_catalog
+from forecastbox.domain.blueprint.template_ingest import ingest_plugin_templates, remove_plugin_templates
 from forecastbox.domain.experiment.scheduling.runtime import (
-    SCHEDULER_STOP_TIMEOUT_SECONDS,
     arm_start_gate,
     scheduler_entrypoint,
     scheduler_status,
@@ -46,11 +56,12 @@ from forecastbox.domain.maintenance.garbage_collector import (
     garbage_collector_status,
     garbage_collector_stop_request,
 )
-from forecastbox.domain.notification.service import init_broadcaster
+from forecastbox.domain.notification.service import init_broadcaster, stop_broadcaster
 from forecastbox.domain.plugin.store import submit_initialize_stores
 from forecastbox.domain.plugin.submit import submit_load_all as submit_load_plugins
-from forecastbox.utility.concurrency.manager import ConcurrentPools, TaskName, execution_manager
-from forecastbox.utility.config import ConcurrentThreads, config
+from forecastbox.domain.plugin.template_hooks import TemplateHooks, register_template_hooks
+from forecastbox.utility.concurrency.manager import TaskName, execution_manager
+from forecastbox.utility.config import ConcurrentPools, ConcurrentThreads, config
 from forecastbox.utility.dispatcher import (
     DispatcherRegistration,
     event_dispatcher_entrypoint,
@@ -115,10 +126,10 @@ def _discover_dispatchers() -> None:
     freeze_registration()
 
 
-def _register_scheduler() -> None:
+def _register_scheduler(scheduler_gate: Future[None]) -> None:
     if not config.backend.allow_scheduler:
         return
-    arm_start_gate(SchedulerPrerequisitesMet)
+    arm_start_gate(scheduler_gate)
     execution_manager.register_thread(
         ConcurrentThreads.Scheduler,
         scheduler_entrypoint,
@@ -138,7 +149,7 @@ def _register_garbage_collector() -> None:
     )
 
 
-def _start_execution_runtime() -> None:
+def _start_execution_runtime(scheduler_gate: Future[None]) -> None:
     try:
         _discover_dispatchers()
         for pool_name, settings in config.backend.concurrency.pools.items():
@@ -157,7 +168,7 @@ def _start_execution_runtime() -> None:
             stop_request=dispatcher_stop_request,
             stage=0,
         )
-        _register_scheduler()
+        _register_scheduler(scheduler_gate)
         _register_garbage_collector()
         execution_manager.start(timeout=config.backend.concurrency.startup_timeout_seconds)
     except BaseException:
@@ -167,8 +178,23 @@ def _start_execution_runtime() -> None:
         raise
 
 
+def _stop_execution_threads() -> None:
+    incomplete = execution_manager.stop_threads(timeout=config.backend.concurrency.shutdown_timeout_seconds)
+    if incomplete:
+        logger.warning(f"managed threads did not stop in time: {[thread.value for thread in incomplete]}")
+
+
 def _stop_execution_runtime() -> None:
-    execution_manager.shutdown(timeout=config.backend.concurrency.shutdown_timeout_seconds)
+    # TODO improve the duration of execution pool drainage on shutdown -- long running tasks (eg run
+    # submission waiting for artifacts) may exhaust the shutdown budget, which delays stopping the
+    # gateway and lens processes.
+    status = execution_manager.shutdown(timeout=config.backend.concurrency.shutdown_timeout_seconds)
+    if not status.complete:
+        incomplete_threads = [thread.value for thread in status.incomplete_threads]
+        incomplete_pools = [pool.value for pool in status.incomplete_pools]
+        logger.warning(f"execution runtime shutdown incomplete: {incomplete_threads=}, {incomplete_pools=}")
+    else:
+        logger.debug("execution runtime shut down")
 
 
 def _start_broadcaster() -> None:
@@ -179,31 +205,41 @@ def _start_artifact_stores() -> None:
     submit_initialize_stores()
 
 
-def register_fiabcore_providers() -> None:
+def register_providers() -> None:
+    """Register the providers and hooks that domain code needs during plugin install/load.
+
+    Shared by the backend lifespan and by warmup -- see the module docstring NOTE."""
     ArtifactsProvider.register_get_artifacts_lookup(lambda: ArtifactManager.catalog)
     ArtifactsProvider.register_get_artifact_local_path(lambda composite_id: get_artifact_local_path(composite_id, config.backend.data_path))
     MetkitParamResolver.register_param_id_to_shortname(param_id_to_shortname)
     MetkitParamResolver.register_shortname_to_param_id(shortname_to_param_id)
+    register_template_hooks(TemplateHooks(on_changed=ingest_plugin_templates, on_removed=remove_plugin_templates))
 
 
-# The two barriers below let independent `Initializer` steps be gated on one another
-# without coupling their domain functions together (see `submit_load_all`, which is
-# unaware that its `start_after` future ultimately traces back to the artifact catalog
-# refresh, and the scheduler, which is unaware of the plugin catalog at all).
-#
-# Each barrier is acked with the *same outcome* as the upstream step it is attached to,
-# via `_forward_to_barrier`: a successful upstream resolves the barrier with `None`, a
-# failed (or cancelled) upstream resolves the barrier with that same failure. This way,
-# a step gated on a barrier observes a failure early (and can choose to log-and-skip, as
-# the scheduler does) rather than blocking forever or failing later on some
-# unrelated `None` value.
-#
-# TODO rework into better alignment with execution manager / initializers after concurrency migration concluded
-# In particular, we dont want to consume a thread by awaiting on a future, we want sequential task graphs
-ArtifactsCatalogInitialized: Future[None] = Future()
-PluginsCatalogInitialized: Future[None] = Future()
-SchedulerPrerequisitesMet: Future[None] = Future()
 _T = TypeVar("_T")
+
+
+@dataclass(frozen=True, eq=True, slots=True)
+class StartupBarriers:
+    """Futures that let independent `Initializer` steps be gated on one another without
+    coupling their domain functions together (see `submit_load_all`, which is unaware that its
+    `start_after` future ultimately traces back to the artifact catalog refresh, and the
+    scheduler, which is unaware of the plugin catalog at all).
+
+    Each barrier is acked with the *same outcome* as the upstream step it is attached to, via
+    `_forward_to_barrier`: a successful upstream resolves the barrier with `None`, a failed (or
+    cancelled) upstream resolves the barrier with that same failure. This way, a step gated on a
+    barrier observes a failure early (and can choose to log-and-skip, as the scheduler does) rather
+    than blocking forever or failing later on some unrelated `None` value.
+
+    NOTE the barriers are deliberately entrypoint-local glue rather than an execution manager
+    feature. They resolve via done-callbacks and do not occupy any thread while waiting.
+    """
+
+    artifacts_catalog_initialized: Future[None] = field(default_factory=Future)
+    plugins_catalog_initialized: Future[None] = field(default_factory=Future)
+    gateway_initialized: Future[None] = field(default_factory=Future)
+    scheduler_prerequisites_met: Future[None] = field(default_factory=Future)
 
 
 def _forward_to_barrier(barrier: Future[None]) -> Callable[[Future[_T]], None]:
@@ -253,18 +289,14 @@ def _forward_all_to_barrier(barrier: Future[None], upstreams: Sequence[Future[No
         upstream.add_done_callback(_on_done)
 
 
-def _start_artifact_manager() -> None:
+def _start_artifact_manager(barriers: StartupBarriers) -> None:
     catalog_ready = submit_refresh_catalog()
-    catalog_ready.add_done_callback(_forward_to_barrier(ArtifactsCatalogInitialized))
+    catalog_ready.add_done_callback(_forward_to_barrier(barriers.artifacts_catalog_initialized))
 
 
-def _start_plugin_catalog() -> None:
-    plugins_ready = submit_load_plugins(start_after=ArtifactsCatalogInitialized)
-    plugins_ready.add_done_callback(_forward_to_barrier(PluginsCatalogInitialized))
-
-
-GatewayInitialized: Future[None] = Future()
-_forward_all_to_barrier(SchedulerPrerequisitesMet, [PluginsCatalogInitialized, GatewayInitialized])
+def _start_plugin_catalog(barriers: StartupBarriers) -> None:
+    plugins_ready = submit_load_plugins(start_after=barriers.artifacts_catalog_initialized)
+    plugins_ready.add_done_callback(_forward_to_barrier(barriers.plugins_catalog_initialized))
 
 
 def _run_gateway_startup() -> None:
@@ -272,13 +304,9 @@ def _run_gateway_startup() -> None:
     ensure_gateway()
 
 
-def _start_gateway() -> None:
+def _start_gateway(barriers: StartupBarriers) -> None:
     startup = execution_manager.submit_unmonitored(ConcurrentPools.General, TaskName("gateway.start"), _run_gateway_startup)
-    startup.add_done_callback(_forward_to_barrier(GatewayInitialized))
-
-
-def _stop_scheduler() -> None:
-    execution_manager.stop_thread(ConcurrentThreads.Scheduler, timeout=SCHEDULER_STOP_TIMEOUT_SECONDS)
+    startup.add_done_callback(_forward_to_barrier(barriers.gateway_initialized))
 
 
 def _stop_tunnels() -> None:
@@ -298,25 +326,31 @@ def build_initializers() -> Initializers:
 
     `initialize()` runs these top to bottom; `shutdown()` unwinds them bottom to top, only
     for the steps that actually started. See `forecastbox.utility.initializer.Initializers`.
+
+    The resulting shutdown order is: managed threads (descending stage, the event dispatcher
+    drains last), broadcaster, http pools, execution pools, then lens instances, gateway
+    processes and tunnels -- the latter only after the execution pools drained.
     """
+    barriers = StartupBarriers()
+    _forward_all_to_barrier(barriers.scheduler_prerequisites_met, [barriers.plugins_catalog_initialized, barriers.gateway_initialized])
     initializers = [
         Initializer("db_schema", start=start_db_schema),
-        Initializer("execution_runtime", start=_start_execution_runtime, stop=_stop_execution_runtime),
-        Initializer("http_pools", start=start_http_pools, stop=stop_http_pools),
+        Initializer("providers", start=register_providers),
+        Initializer("tunnels", stop=_stop_tunnels),
+        Initializer("processes", stop=_stop_processes),
+        Initializer("lens", stop=_stop_lens),
         Initializer("broadcaster", start=_start_broadcaster),
+        Initializer(
+            "execution_runtime",
+            start=partial(_start_execution_runtime, barriers.scheduler_prerequisites_met),
+            stop=_stop_execution_runtime,
+        ),
+        Initializer("http_pools", start=start_http_pools, stop=stop_http_pools),
+        Initializer("broadcaster_stop", stop=stop_broadcaster),
+        Initializer("execution_threads", stop=_stop_execution_threads),
         Initializer("artifact_stores", start=_start_artifact_stores),
-        Initializer("fiabcore_providers", start=register_fiabcore_providers),
-        Initializer("artifact_manager", start=_start_artifact_manager),
-        Initializer("plugin_catalog", start=_start_plugin_catalog),
-        Initializer("gateway", start=_start_gateway),
+        Initializer("artifact_manager", start=partial(_start_artifact_manager, barriers)),
+        Initializer("plugin_catalog", start=partial(_start_plugin_catalog, barriers)),
+        Initializer("gateway", start=partial(_start_gateway, barriers)),
     ]
-    if config.backend.allow_scheduler:
-        initializers.append(Initializer("scheduler", stop=_stop_scheduler))
-    initializers.extend(
-        [
-            Initializer("tunnels", stop=_stop_tunnels),
-            Initializer("processes", stop=_stop_processes),
-            Initializer("lens", stop=_stop_lens),
-        ]
-    )
     return Initializers(initializers)

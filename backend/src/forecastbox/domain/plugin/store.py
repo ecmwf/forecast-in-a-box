@@ -29,9 +29,9 @@ from typing_extensions import Self
 from forecastbox.domain.plugin.compatibility import get_compatible_versions
 from forecastbox.domain.plugin.settings import PluginSettings
 from forecastbox.domain.plugin.submit import submit_update_single
-from forecastbox.utility.concurrency.manager import ConcurrentPools, TaskName, execution_manager
+from forecastbox.utility.concurrency.manager import TaskName, execution_manager
 from forecastbox.utility.concurrency.synchronization import timed_acquire
-from forecastbox.utility.config import PluginStoreConfig, PluginStoreId, PluginStoresConfig, config
+from forecastbox.utility.config import ConcurrentPools, PluginStoreConfig, PluginStoreId, PluginStoresConfig, config
 from forecastbox.utility.http_pools import HttpProfile, get_sync
 from forecastbox.utility.httpx import fetch_content
 from forecastbox.utility.packages import get_package_versions

@@ -123,11 +123,11 @@ def stop_cascade_and_mark(run_id: RunId, attempt_count: int, cascade_job_id: str
 
 
 def submit_stop_cascade(run_id: RunId, attempt_count: int, cascade_job_id: str) -> None:
-    """Enqueue `stop_cascade_and_mark` on the general pool, unmonitored.
+    """Enqueue `stop_cascade_and_mark` on the general pool, monitored by the execution manager.
 
     Raises ``SubmissionRejected`` if the pool does not accept the task.
     """
-    execution_manager.submit_unmonitored(
+    execution_manager.submit_monitored(
         ConcurrentPools.General,
         TaskName("run.stop.cascade"),
         partial(stop_cascade_and_mark, run_id, attempt_count, cascade_job_id),

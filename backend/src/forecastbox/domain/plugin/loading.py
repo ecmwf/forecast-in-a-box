@@ -30,37 +30,22 @@ from pydantic import ValidationError
 from forecastbox.domain.plugin.compatibility import check_environment_baseline, install_plugin_compatibly
 from forecastbox.domain.plugin.db import delete_plugin_state, get_all_plugin_states_by_id, get_plugin_state, upsert_plugin_state
 from forecastbox.domain.plugin.errors import PluginError, PluginErrors
-from forecastbox.domain.plugin.events import (
-    PLUGIN_TEMPLATES_CHANGED,
-    PLUGIN_TEMPLATES_REMOVED,
-    PluginTemplatesChangedEvent,
-    PluginTemplatesRemovedEvent,
-)
 from forecastbox.domain.plugin.exceptions import PluginTemplateIngestFailed
 from forecastbox.domain.plugin.notifications import notify_failure
 from forecastbox.domain.plugin.settings import PluginSettings
 from forecastbox.domain.plugin.state import publish_bulk_snapshot, publish_single_snapshot, publish_unloaded
-from forecastbox.utility.dispatcher import Event, EventName, submit_event
+from forecastbox.domain.plugin.template_hooks import get_template_hooks
 from forecastbox.utility.packages import try_import, try_version
 
 logger = logging.getLogger(__name__)
 
-TEMPLATE_DISPATCH_TIMEOUT_SECONDS = 600.0
-
-
-def _emit_and_wait(name: EventName, payload: PluginTemplatesChangedEvent | PluginTemplatesRemovedEvent) -> None:
-    """Emit a template event and block until all consumers handled it; raises on
-    dispatch rejection, handler failure, or timeout."""
-    receipt = submit_event(Event(name=name, payload=payload))
-    receipt.result(timeout=TEMPLATE_DISPATCH_TIMEOUT_SECONDS)
-
 
 def _request_template_ingest(plugin_id: PluginCompositeId) -> str | None:
-    """Emit PluginTemplatesChangedEvent and wait; on failure notify clients and
+    """Run the registered template ingestion hook; on failure notify clients and
     return the error text, otherwise return None."""
     plugin_id_str = PluginCompositeId.to_str(plugin_id)
     try:
-        _emit_and_wait(PLUGIN_TEMPLATES_CHANGED, PluginTemplatesChangedEvent(plugin_id=plugin_id))
+        get_template_hooks().on_changed(plugin_id)
     except Exception as e:
         logger.exception(f"template ingestion of plugin {plugin_id_str} failed")
         notify_failure(f"Template ingestion of plugin {plugin_id_str}", repr(e))
@@ -305,9 +290,9 @@ def unload_single(plugin_id: PluginCompositeId) -> None:
     """Request removal of a plugin's templates, then remove its in-memory catalogue/error entries.
 
     Synchronous primitive shared by the plugin-settings disable path and uninstall. If the
-    template removal dispatch fails, the plugin stays published and the exception propagates.
+    template removal hook fails, the plugin stays published and the exception propagates.
     """
-    _emit_and_wait(PLUGIN_TEMPLATES_REMOVED, PluginTemplatesRemovedEvent(plugin_id=plugin_id))
+    get_template_hooks().on_removed(plugin_id)
     if not publish_unloaded(plugin_id):
         logger.error("failed to mark plugin as unloaded! Will still be available")
         # we raise to mark this future as failed

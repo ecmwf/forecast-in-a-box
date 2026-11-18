@@ -330,7 +330,7 @@ def _submit_stop_notification(event: GatewayStoppedEvent | GatewayStopFailedEven
 
 
 def submit_stop_gateway() -> None:
-    """Enqueue `stop_gateway` on the general pool, unmonitored, and return without waiting for it.
+    """Enqueue `stop_gateway` on the general pool, monitored by the execution manager, and return without waiting for it.
 
     Raises ``GatewayNotRunning`` if there is no gateway to stop, ``GatewayStopInProgress`` if
     a previously submitted stop has not finished yet, and ``SubmissionRejected`` if the pool does not
@@ -357,7 +357,7 @@ def submit_stop_gateway() -> None:
             GatewayConnectionManager.stop_lock.release()
 
     try:
-        execution_manager.submit_unmonitored(ConcurrentPools.General, TaskName("gateway.stop"), task)
+        execution_manager.submit_monitored(ConcurrentPools.General, TaskName("gateway.stop"), task)
     except BaseException:
         GatewayConnectionManager.stop_lock.release()
         raise
@@ -365,6 +365,8 @@ def submit_stop_gateway() -> None:
 
 async def shutdown_processes() -> None:
     """Terminate all running gateway processes on app shutdown."""
+    # TODO this is async but performs blocking calls (stop_gateway, up to 15s) on the event loop;
+    # acceptable at shutdown, address later.
     gateway_connection = GatewayConnectionManager.gateway_connection
     logger.debug(f"initiating graceful gateway shutdown of {gateway_connection}")
     if gateway_connection is None:

@@ -26,11 +26,6 @@ def freeze_recursively(value: object) -> object:
     return value
 
 
-def freeze_mapping(values: Mapping[Any, Any]) -> Mapping[Any, Any]:
-    """Return an immutable shallow snapshot of a mapping."""
-    return MappingProxyType(dict(values))
-
-
 def frozendc(cls: type[_T]) -> type[_T]:
     """Frozen dataclass decorator that creates immutable, slotted dataclasses.
 

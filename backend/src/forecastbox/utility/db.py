@@ -25,6 +25,9 @@ import sqlalchemy.exc
 logger = logging.getLogger(__name__)
 retries = 3
 # This lock is for jobs persistence only. The users database has a separate lock.
+# TODO investigate concurrent reads. SQLite should support concurrent readers,
+# but the first implementation deliberately serializes all access so this
+# rework does not also need to solve read/write classification and consistency.
 lock = threading.RLock()
 T = TypeVar("T")
 
@@ -69,12 +72,3 @@ def querySingle(query: Any, session_maker: Any) -> Any:
             return maybe_row if maybe_row is None else maybe_row[0]
 
     return dbRetry(func)
-
-
-def queryCount(query: Any, session: Any) -> int:
-    # TODO scalar_one
-    result = session.execute(query).scalar()
-    if result is None or not isinstance(result, int):
-        raise TypeError(result)
-    else:
-        return result

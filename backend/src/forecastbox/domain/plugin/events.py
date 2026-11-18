@@ -7,19 +7,12 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Events emitted by the Plugin domain: client-notification events, and the template events
-consumed by the blueprint domain."""
+"""Events emitted by the Plugin domain: client-notification events."""
 
 from dataclasses import dataclass
 
-from fiab_core.fable import PluginCompositeId
-
 from forecastbox.domain.notification.models import ClientNotification
 from forecastbox.utility.config import ROUTE_PREFIX
-from forecastbox.utility.dispatcher import EventName
-
-PLUGIN_TEMPLATES_CHANGED = EventName("plugin.templates.changed")
-PLUGIN_TEMPLATES_REMOVED = EventName("plugin.templates.removed")
 
 
 @dataclass(frozen=True, eq=True, slots=True)
@@ -141,21 +134,3 @@ PluginSuccessNotification = (
 """Union of all plugin-domain events that represent a successful operation completion,
 deliberately excluding ``PluginGlobalErrorEvent`` so the type system flags any attempt to
 pass a failure event where a success notification is expected."""
-
-
-@dataclass(frozen=True, eq=True, slots=True)
-class PluginTemplatesChangedEvent:
-    """Emitted by the plugin-management worker after a plugin has been published to
-    PluginManager.plugins, asking consumers to (re)ingest its blueprint templates.
-    Consumers obtain the plugin's templates and settings via domain.plugin.service."""
-
-    plugin_id: PluginCompositeId
-
-
-@dataclass(frozen=True, eq=True, slots=True)
-class PluginTemplatesRemovedEvent:
-    """Emitted by the plugin-management worker before a plugin is removed from
-    PluginManager.plugins, asking consumers to remove its blueprint templates.
-    Handling must be idempotent."""
-
-    plugin_id: PluginCompositeId

@@ -459,10 +459,7 @@ async def get_catalogue() -> dict[PluginCompositeId, BlockFactoryCatalogue]:
     """All blocks this backend is capable of evaluating within a blueprint."""
     if not plugins_ready():
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Plugins not ready")
-    catalogue = catalogue_view()
-    if isinstance(catalogue, bool):
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Plugins not ready")
-    return catalogue
+    return catalogue_view()
 
 
 @router.put("/expand")

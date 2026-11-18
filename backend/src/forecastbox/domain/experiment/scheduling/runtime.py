@@ -105,7 +105,12 @@ def _wait_for_gate(gate: Future[None], stop_event: threading.Event) -> bool:
 def scheduler_entrypoint(stop_event: threading.Event) -> None:
     gate, SchedulerRuntime.start_gate = SchedulerRuntime.start_gate, None
     logger.info("Scheduler thread started.")
+    # NOTE discard a stale wake from a previous run's stop request. The stop_event check below must follow
+    # the clear, since a stop request sets stop_event before wake
+    SchedulerRuntime.wake.clear()
     try:
+        if stop_event.is_set():
+            return
         if gate is not None and not _wait_for_gate(gate, stop_event):
             return
         while not stop_event.is_set():
@@ -146,6 +151,8 @@ def prod_scheduler() -> None:
 
 
 def status_scheduler() -> str:
+    """Brief scheduler status for the deprecated top-level ``scheduler`` field of the status route;
+    exists only for that field, see ``routes.status.StatusResponse``."""
     if not config.backend.allow_scheduler:
         return "off"
     status = SchedulerRuntime.status
