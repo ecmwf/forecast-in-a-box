@@ -150,6 +150,15 @@ def test_raw_output_fetchable() -> None:
     assert RawOutput().url_dataformat is None
 
 
+def test_raw_output_skinnywms_issue() -> None:
+    from fiab_core.fable import RawOutput, UrlDataFormat
+
+    assert RawOutput().skinnywms_issue is None
+    out = RawOutput(mime_type="text/plain", url_dataformat=UrlDataFormat.gribdir, skinnywms_issue="offending dimension: number")
+    assert out.skinnywms_issue == "offending dimension: number"
+    assert RawOutput.model_validate(out.model_dump()) == out
+
+
 def test_raw_output_validation_negative() -> None:
     import pytest
     from pydantic import ValidationError

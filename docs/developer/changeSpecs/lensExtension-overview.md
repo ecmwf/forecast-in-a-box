@@ -81,7 +81,8 @@ re-point an outstanding credential; the existing `RunLookup` helper in
 `backend/src/forecastbox/routes/run.py` already encodes attempt semantics correctly.
 
 **Output typing.** Whether a given output can back a given lens is decided from the
-output's declared mime type, via helpers owned by `fiab-core`. Lenses validate this
+output's declared format fields (`fetchable`, `url_dataformat` on `RawOutput` in
+`fiab-core`). Lenses validate this
 before starting. Callers never supply filesystem paths.
 
 **Contracts live in docstrings.** These spec documents are deleted once implemented
@@ -98,8 +99,8 @@ hardening and clarification tasks, each its own PR:
 
 - `lensExtension-phase1-configVisibility-spec.md` -- make security-relevant
   configuration discoverable for operators.
-- `lensExtension-phase1-outputContract-spec.md` -- give `fiab-core` explicit helpers for
-  interrogating output mime types, replacing implicit coupling.
+- `lensExtension-phase1-outputContract-spec.md` -- explicit output format contract in
+  `fiab-core` as structured `RawOutput` fields, replacing mime type parameters.
 - `lensExtension-phase1-tokens-spec.md` -- short-lived, lens-and-output-scoped tokens.
 - `lensExtension-phase1-lensModel-spec.md` -- generalise the lens model to two kinds,
   move skinnyWMS from arbitrary paths to output ids and onto tokens, add capability

@@ -31,12 +31,17 @@ from fiab_core.types import StringType
 
 from ..block_utils import _extract_dataset
 from ..constants import (
+    DATE,
+    ENSEMBLE,
     LEVEL,
     PARAM,
     PATH,
+    QUANTILE,
     STEP,
+    TIME,
+    TYPE,
 )
-from ..qubed_utils import dimensions
+from ..qubed_utils import axes, dimensions
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +57,18 @@ PLOT_FORMAT_TO_MIME: dict[str, str] = {
     "pdf": "application/pdf",
     "svg": "image/svg+xml",
 }
+
+SKINNYWMS_OFFENDING_DIMENSIONS: tuple[str, ...] = (ENSEMBLE, TYPE, QUANTILE, DATE, TIME)
+"""Dimensions which skinnyWMS does not distinguish, causing fields differing only in them to overwrite one another."""
+
+
+def skinnywms_issue(dataset: QubedOutput) -> str | None:
+    """Return an explanation if the dataset has more than one value in any of the skinnyWMS offending dimensions, else None."""
+    dataset_axes = axes(dataset)
+    offending = [dim for dim in SKINNYWMS_OFFENDING_DIMENSIONS if len(dataset_axes.get(dim, ())) > 1]
+    if not offending:
+        return None
+    return f"offending dimension: {', '.join(offending)}"
 
 
 class ZarrSink(Sink):
@@ -117,12 +134,18 @@ class GribSink(Sink):
     def validate(
         self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
     ) -> BlockInstanceOutput:
-        _extract_dataset(inputs, "dataset")  # check format of input and existence of dataset
+        input_dataset = _extract_dataset(inputs, "dataset")  # check format of input and existence of dataset
         path = block.config_as_str(PATH)
         dirname = os.path.dirname(path)
         if len(self._find_template_values(dirname)) != 0:
             raise ValueError("Invalid filepath: directory path can not contain template values")
-        return RawOutput(type_fqn="bytes", mime_type="text/plain", fetchable=True, url_dataformat=UrlDataFormat.gribdir)
+        return RawOutput(
+            type_fqn="bytes",
+            mime_type="text/plain",
+            fetchable=True,
+            url_dataformat=UrlDataFormat.gribdir,
+            skinnywms_issue=skinnywms_issue(input_dataset),
+        )
 
     def compile(
         self,
