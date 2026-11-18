@@ -42,7 +42,7 @@ TEMPLATES = plugin().blueprint_templates
 FACTORIES = plugin().catalogue.factories
 
 # Templates may reference real, non-test checkpoint artifacts (e.g. the AIFS template's
-# 'ecmwf:aifs-global-o48'). Register them alongside the shared dummy checkpoint so
+# 'ecmwf:aifs-global-demo'). Register them alongside the shared dummy checkpoint so
 # ArtifactType-typed options (like 'checkpoint') validate against something that knows them.
 _TEMPLATE_CHECKPOINT_IDS = {
     str(value)

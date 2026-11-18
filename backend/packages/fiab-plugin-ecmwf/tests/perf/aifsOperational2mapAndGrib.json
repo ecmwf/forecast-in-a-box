@@ -4,8 +4,8 @@
       "factory_id": "anemoiSource",
       "instance": {
         "configuration_values": {
-          "checkpoint": "ecmwf:aifs-global-o48",
-          "input_source": "opendata",
+          "checkpoint": "ecmwf:aifs-global-demo",
+          "input_source": "opendata:ecmwf:lowres",
           "lead_time": "72",
           "base_time": "2026-01-01T00:00:00",
           "number": "none"
