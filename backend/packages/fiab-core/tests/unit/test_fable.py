@@ -160,5 +160,3 @@ def test_raw_output_validation_negative() -> None:
         RawOutput(mime_type="application/octet-stream", fetchable=True)
     with pytest.raises(ValidationError):
         RawOutput(mime_type="image/png", url_dataformat=UrlDataFormat.zarr)
-    with pytest.raises(ValidationError):
-        RawOutput(mime_type="text/plain; fiab-fetchable=1")

@@ -154,7 +154,7 @@ class RawOutput(FiabCoreBaseModel):
     # processing, ie, its a known media object, set the mime_type
     type_fqn: str = "typing.Any"
     mime_type: str = "application/octet-stream"
-    """Standard mime type, optionally with standard parameters such as charset. Parameters starting with `fiab-` are forbidden."""
+    """Standard mime type, optionally with standard parameters such as charset."""
     fetchable: bool = False
     """If true, the output value is a path to data (a file or a directory tree) that can be fetched as a zip. Requires text/plain mime type."""
     url_dataformat: UrlDataFormat | None = Field(
@@ -164,9 +164,6 @@ class RawOutput(FiabCoreBaseModel):
 
     @model_validator(mode="after")
     def _check_mime_consistency(self) -> Self:
-        for param in self.mime_type.split(";")[1:]:
-            if param.strip().lower().startswith("fiab-"):
-                raise ValueError(f"mime type parameters starting with 'fiab-' are not allowed: {self.mime_type!r}")
         if self.fetchable and not is_textual(self.mime_type):
             raise ValueError(f"fetchable output requires text/plain mime type, got {self.mime_type!r}")
         if self.url_dataformat is not None and not is_textual(self.mime_type):
