@@ -57,7 +57,7 @@ def _linux_total_memory() -> int:
         return _sum_visible_gpu_memory(gpu_memory, visible, device_uuids)
 
     memory_output = _linux_query_gpu_memory()
-    if any(value.strip().casefold() in {"n/a", "not supported"} for value in memory_output):
+    if any(value.strip().strip("[]").casefold() in {"n/a", "not supported"} for value in memory_output):
         logger.warning("assuming unified memory")
         memory_unit_dividers = {"kB": 1024, "mB": 1}
         with open("/proc/meminfo", encoding="utf-8") as meminfo:
