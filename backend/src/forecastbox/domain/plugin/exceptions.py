@@ -40,3 +40,8 @@ class PluginTemplatesUnavailable(Exception):
 
 class PluginTemplateIngestFailed(Exception):
     """Raised after the failure has already been reported to clients."""
+
+
+class PluginTemplateHooksNotRegistered(Exception):
+    """Raised by domain.plugin.template_hooks when template ingestion/removal is requested before
+    the entrypoint registered the template hooks."""

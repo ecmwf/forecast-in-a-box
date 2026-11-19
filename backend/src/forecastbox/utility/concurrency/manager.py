@@ -25,7 +25,6 @@ from pydantic import BaseModel, ConfigDict, SerializeAsAny
 
 from forecastbox.utility.config import ConcurrentPools, ConcurrentThreads, config
 from forecastbox.utility.pydantic import FiabBaseModel
-from forecastbox.utility.structural import freeze_mapping
 
 T = TypeVar("T")
 TaskName = NewType("TaskName", str)
@@ -121,12 +120,14 @@ class PoolStatus(StatusModel):
     failed: int
     cancelled: int
     accepting: bool
+    healthy: bool
 
 
 class ThreadStatus(StatusModel):
     thread_name: ConcurrentThreads
     stage: int
     alive: bool
+    native_id: int | None
     ready: bool
     component_status: SerializeAsAny[BaseModel]
     started_at: float | None
@@ -282,6 +283,7 @@ class ManagedPool:
         if executor is None:
             return True
         executor.shutdown(wait=False, cancel_futures=False)
+        # TODO replace busy polling with a threading.Condition
         while True:
             with self._lock:
                 complete = not self._futures
@@ -292,7 +294,11 @@ class ManagedPool:
                 return False
             time.sleep(0.005)
 
-    def status(self) -> PoolStatus:
+    def worker_names(self) -> set[str]:
+        with self._lock:
+            return set(self._worker_names.values())
+
+    def status(self, manager_running: bool) -> PoolStatus:
         with self._lock:
             return PoolStatus(
                 pool_name=self.pool_name,
@@ -308,6 +314,7 @@ class ManagedPool:
                 failed=self._failed,
                 cancelled=self._cancelled,
                 accepting=self._accepting,
+                healthy=(not manager_running) or (self._accepting and len(self._worker_names) == self.max_workers),
             )
 
 
@@ -383,15 +390,18 @@ class ExecutionManager:
         record.stopped_at = None
 
         def run() -> None:
-            record.started_at = time.time()
+            with self._lock:
+                record.started_at = time.time()
             try:
                 record.entrypoint(stop_event)
             except BaseException as error:
-                record.uncaught_exception = repr(error)
-                record.traceback = traceback.format_exc()
+                with self._lock:
+                    record.uncaught_exception = repr(error)
+                    record.traceback = traceback.format_exc()
                 logger.exception(f"managed thread {record.thread_name} failed")
             finally:
-                record.stopped_at = time.time()
+                with self._lock:
+                    record.stopped_at = time.time()
 
         record.thread = threading.Thread(name=f"fiab-{record.thread_name.value}", target=run)
         record.thread.start()
@@ -410,22 +420,26 @@ class ExecutionManager:
             component = ComponentStatus(ready=False, health="failure", detail=repr(error))
             logger.debug(f"failed into {component=}")
             ready = False
-        alive = record.thread.is_alive() if record.thread is not None else False
-        return ThreadStatus(
-            thread_name=record.thread_name,
-            stage=record.stage,
-            alive=alive,
-            ready=ready,
-            component_status=component,
-            started_at=record.started_at,
-            stopped_at=record.stopped_at,
-            uncaught_exception=record.uncaught_exception,
-            traceback=record.traceback,
-            restart_count=record.restart_count,
-            restart_limit=record.restart_policy.max_restarts,
-        )
+        thread = record.thread
+        alive = thread.is_alive() if thread is not None else False
+        with self._lock:
+            return ThreadStatus(
+                thread_name=record.thread_name,
+                stage=record.stage,
+                alive=alive,
+                native_id=thread.native_id if thread is not None else None,
+                ready=ready,
+                component_status=component,
+                started_at=record.started_at,
+                stopped_at=record.stopped_at,
+                uncaught_exception=record.uncaught_exception,
+                traceback=record.traceback,
+                restart_count=record.restart_count,
+                restart_limit=record.restart_policy.max_restarts,
+            )
 
     def _wait_for_ready(self, record: _ThreadRecord, deadline: float) -> None:
+        # TODO replace busy polling with a threading.Condition
         while time.monotonic() < deadline:
             snapshot = self._thread_snapshot(record)
             if snapshot.ready:
@@ -494,7 +508,10 @@ class ExecutionManager:
             record.stop_event.set()
         if record.stop_request is not None:
             remaining = max(0, deadline - time.monotonic())
-            record.stop_request(remaining)
+            try:
+                record.stop_request(remaining)
+            except Exception:
+                logger.exception(f"stop request of managed thread {record.thread_name} failed")
         remaining = max(0, deadline - time.monotonic())
         thread.join(remaining)
         return not thread.is_alive()
@@ -657,16 +674,23 @@ class ExecutionManager:
             records = dict(self._threads)
             failures = tuple(self._monitored_failures)
             lifecycle = self._lifecycle
-        pool_statuses = {name: pool.status() for name, pool in pools.items()}
+        running = lifecycle is ExecutionLifecycle.running
+        pool_statuses = {name: pool.status(running) for name, pool in pools.items()}
         threads = {name: self._thread_snapshot(record) for name, record in records.items()}
         registered_names = {record.thread.name for record in records.values() if record.thread is not None}
+        for pool in pools.values():
+            registered_names |= pool.worker_names()
         unregistered = tuple(sorted(thread.name for thread in threading.enumerate() if thread.name not in registered_names))
-        healthy = lifecycle is ExecutionLifecycle.running and all(status.uncaught_exception is None for status in threads.values())
+        healthy = (
+            running
+            and all(status.uncaught_exception is None for status in threads.values())
+            and all(status.healthy for status in pool_statuses.values())
+        )
         return ExecutionStatus(
             lifecycle=lifecycle,
             healthy=healthy,
-            pools=dict(freeze_mapping(pool_statuses)),
-            threads=dict(freeze_mapping(threads)),
+            pools=pool_statuses,
+            threads=threads,
             monitored_failures=failures,
             unregistered_threads=unregistered,
         )
@@ -684,11 +708,7 @@ class ExecutionManager:
                 )
             self._lifecycle = ExecutionLifecycle.stopping
         deadline = time.monotonic() + timeout
-        incomplete_threads: list[ConcurrentThreads] = []
-        records = sorted(self._threads.values(), key=lambda item: item.stage, reverse=True)
-        for record in records:
-            if not self._stop_record(record, deadline):
-                incomplete_threads.append(record.thread_name)
+        incomplete_threads = self._stop_threads(deadline)
         incomplete_pools: list[ConcurrentPools] = []
         for pool_name, pool in self._pools.items():
             if not pool.close(deadline):
@@ -698,9 +718,26 @@ class ExecutionManager:
         return ShutdownStatus(
             lifecycle=ExecutionLifecycle.stopped,
             complete=not incomplete_threads and not incomplete_pools,
-            incomplete_threads=tuple(incomplete_threads),
+            incomplete_threads=incomplete_threads,
             incomplete_pools=tuple(incomplete_pools),
         )
+
+    def _stop_threads(self, deadline: float) -> tuple[ConcurrentThreads, ...]:
+        with self._lock:
+            records = sorted(self._threads.values(), key=lambda item: item.stage, reverse=True)
+        return tuple(record.thread_name for record in records if not self._stop_record(record, deadline))
+
+    def stop_threads(self, *, timeout: float) -> tuple[ConcurrentThreads, ...]:
+        """Stop all managed threads in descending stage order, keeping the pools available, and
+        return the threads that did not stop within ``timeout``. Moves a running manager to
+        ``stopping``, so external submissions are rejected from then on."""
+        if timeout <= 0:
+            raise ValueError("shutdown timeout must be positive")
+        with self._lock:
+            if self._lifecycle in (ExecutionLifecycle.new, ExecutionLifecycle.stopped):
+                return ()
+            self._lifecycle = ExecutionLifecycle.stopping
+        return self._stop_threads(time.monotonic() + timeout)
 
 
 class FutureCancelledError(RuntimeError):

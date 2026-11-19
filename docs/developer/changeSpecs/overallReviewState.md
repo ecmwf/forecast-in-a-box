@@ -18,11 +18,6 @@ Documented here so they are not re-investigated:
   because they require dynamic field handling, exactly as the guideline permits.
 - **schemata module** -- Only `create_db_and_tables` is declared as a function; no submodules;
   no other functions. Compliant.
-- **DB access / concurrency** -- All domain `db.py`/`global_db.py` route access through the
-  `utility/db.py` async `lock` helpers; background threads (`run/background.py`,
-  `plugin/manager.py`, `plugin/store.py`, `artifact/manager.py`, `lens/manager.py`) submit DB
-  work to the event loop and use `pyrsistent` structures with lock-protected swaps for shared
-  state. Compliant.
 - **`fiab-core`** -- No `import forecastbox`; models use `FiabCoreBaseModel`. Compliant.
 - **Builtin variable names in backend core** -- No misuse of `id`/`type`/`input` as variable
   names found in `backend/src/forecastbox`.

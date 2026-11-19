@@ -13,7 +13,6 @@ from fiab_core.fable import BlockFactoryCatalogue, PluginCompositeId
 
 from forecastbox.domain.plugin.state import PluginManager
 from forecastbox.domain.plugin.store import stores_ready
-from forecastbox.utility.concurrency.synchronization import timed_acquire
 
 
 def status_brief() -> str:
@@ -31,16 +30,13 @@ def status_brief() -> str:
 
 
 def plugins_ready() -> bool:
-    """True once plugin-management startup succeeded and all required template dispatches completed
-    without failure: the initial load stays in progress until every template receipt resolved, and
-    any dispatch failure sets ``updater_error``."""
+    """True once the initial plugin load, including template ingestion, completed without setting
+    ``updater_error``."""
     return status_brief() == "ok"
 
 
-def catalogue_view() -> dict[PluginCompositeId, BlockFactoryCatalogue] | bool:
-    with timed_acquire(PluginManager.lock, 1.0) as result:
-        if not result:
-            return False
-        else:
-            plugins = PluginManager.plugins
+def catalogue_view() -> dict[PluginCompositeId, BlockFactoryCatalogue]:
+    """Return the catalogue of every published plugin. Lock-free: a single read of the immutable
+    plugins map."""
+    plugins = PluginManager.plugins
     return {plugin_id: plugin.catalogue for plugin_id, plugin in plugins.items()}

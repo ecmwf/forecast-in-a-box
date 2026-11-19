@@ -9,10 +9,8 @@
 
 import logging
 import threading
-from collections.abc import Callable, Sequence
-from concurrent.futures import Future
 from contextlib import contextmanager
-from typing import Any, Iterator
+from typing import Iterator
 
 logger = logging.getLogger(__name__)
 
@@ -25,21 +23,3 @@ def timed_acquire(lock: threading.Lock, timeout: float) -> Iterator[bool]:
     finally:
         if result:
             lock.release()
-
-
-def delayed_thread(future: Future[Any], fn: Callable[..., Any], args: Sequence[Any] = ()) -> threading.Thread:
-    """Return a thread that waits for `future` to complete, then calls `fn(*args)`.
-
-    This temporary helper is expected to be replaced by `submit_after` in a later
-    concurrency-rework phase. If the future raised an exception, a warning is
-    logged and `fn` is called anyway so that the caller's own error handling can run.
-    """
-
-    def _target() -> None:
-        try:
-            future.result()
-        except Exception as e:
-            logger.warning(f"delayed_thread: future completed with error {repr(e)}, proceeding")
-        fn(*args)
-
-    return threading.Thread(target=_target)

@@ -20,7 +20,8 @@ from pyrsistent import pmap, pset
 import forecastbox.domain.artifact.manager as manager
 from forecastbox.domain.artifact.events import ArtifactDownloadFinishedEvent
 from forecastbox.domain.artifact.manager import ArtifactManager, submit_artifact_download, submit_refresh_catalog
-from forecastbox.utility.concurrency.manager import ConcurrentPools, SubmissionRejected, TaskName, execution_manager
+from forecastbox.utility.concurrency.manager import SubmissionRejected, TaskName, execution_manager
+from forecastbox.utility.config import ConcurrentPools
 
 
 @pytest.fixture

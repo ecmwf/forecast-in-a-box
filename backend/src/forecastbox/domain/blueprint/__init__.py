@@ -15,5 +15,5 @@ Depends on the Glyph domain, to resolve and validate Glyphs, and remap during te
 Depends on the Plugin domain, to determine fiab-core compatibility and retrieve plugin factories for validation.
 Depended on by Run and Experiment domains.
 
-Loosely coupled by Plugin domain -- consumes template events ingested by it.
+Loosely coupled by Plugin domain -- implements its template ingestion/removal hooks, which the entrypoint injects into it.
 """

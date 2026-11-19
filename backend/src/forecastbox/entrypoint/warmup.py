@@ -12,14 +12,17 @@ after the venv itself has been prepared.
 
 Contrary to `forecastbox.entrypoint.main`, no backend is started here -- neither the FastAPI app,
 nor the execution manager pools, nor the event dispatcher. Only the minimum needed for a plugin
-install is prepared (database schema, artifact catalog refreshed synchronously, plugin stores), and then each default
-plugin (per config.external.default_plugins) is installed by calling
+install is prepared (database schema, providers and plugin template hooks via
+`entrypoint.initializers.register_providers`, artifact catalog refreshed synchronously, plugin
+stores), and then each default plugin (per config.external.default_plugins) is installed by calling
 `domain.plugin.loading.update_single` directly and sequentially. That function is fully
 synchronous, accesses the jobs database through the `db.py` helpers (which take the database lock
-themselves), and emits no dispatcher events -- the notification and reservation machinery of
-`domain.plugin.submit` exists for a live backend and is deliberately unused here. The one place
-where an event loop is needed is the database schema creation, as the users database is async; a
-short-lived `asyncio.run` covers just that.
+themselves), and ingests blueprint templates inline via the registered template hooks. Client
+notification events submitted by the plugin code cannot be dispatched here; the `notify_*` helpers
+log and drop them. The notification and reservation machinery of `domain.plugin.submit` exists for
+a live backend and is deliberately unused here. The one place where an event loop is needed is the
+database schema creation, as the users database is async; a short-lived `asyncio.run` covers just
+that.
 
 Any per-plugin settings override configured in config.external.default_plugins_settings is applied
 right after that plugin's install, by calling `domain.plugin.db.upsert_plugin_state` and then
@@ -49,7 +52,7 @@ from forecastbox.domain.plugin.loading import unload_single, update_single
 from forecastbox.domain.plugin.settings import PluginSettings
 from forecastbox.domain.plugin.store import initialize_stores, resolve_plugin_from_store
 from forecastbox.entrypoint.bootstrap.config import setup_process
-from forecastbox.entrypoint.initializers import register_fiabcore_providers, start_db_schema
+from forecastbox.entrypoint.initializers import register_providers, start_db_schema
 from forecastbox.utility.config import DefaultPluginSettings, config, validate_runtime
 from forecastbox.utility.http_pools import start_http_pools, stop_http_pools
 from forecastbox.utility.packages import PackagesError
@@ -125,7 +128,7 @@ def warmup() -> None:
     logger.info(f"warmup starting for plugins {[PluginCompositeId.to_str(e) for e in plugin_ids]}")
 
     asyncio.run(start_db_schema())
-    register_fiabcore_providers()
+    register_providers()
     start_http_pools()
     try:
         refresh_catalog()

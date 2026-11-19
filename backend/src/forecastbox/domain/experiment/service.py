@@ -37,8 +37,9 @@ from forecastbox.domain.experiment.scheduling.runtime import prod_scheduler, sch
 from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.domain.run.db import RunRecord
 from forecastbox.utility.auth import AuthContext
-from forecastbox.utility.concurrency.manager import execution_manager
+from forecastbox.utility.concurrency.manager import TaskName, execution_manager
 from forecastbox.utility.concurrency.synchronization import timed_acquire
+from forecastbox.utility.config import ConcurrentPools
 from forecastbox.utility.pagination import PaginationSpec
 from forecastbox.utility.time import current_time
 
@@ -196,33 +197,20 @@ async def list_schedules(
     return experiments, total, pagination.total_pages(total)
 
 
-async def update_schedule(
+def _update_schedule_sync(
     auth_context: AuthContext,
     experiment_id: ExperimentDefinitionId,
     cron_expr: str | None,
     enabled: bool | None,
     max_acceptable_delay_hours: int | None,
     first_run_override: dt.datetime | None,
-) -> experiment_db.ExperimentLatest:
-    """Update a cron schedule experiment. Returns the updated schedule paired with its entity-level created_at.
-
-    Acquires scheduler_lock for the duration. Raises SchedulerBusy if lock
-    cannot be acquired. Raises ExperimentNotFound or ExperimentAccessDenied as
-    appropriate. Raises ValueError for an invalid cron expression or stale
-    first_run_override.
-    """
-    # TODO rework the whole update to run in a pool to not block the loop / not hold the lock for too long
+) -> None:
+    """Locked part of `update_schedule`. Runs on a pool worker and calls the jobs-DB helpers directly."""
     with timed_acquire(scheduler_lock, timeout_acquire_request) as acquired:
         if not acquired:
             raise SchedulerBusy("Scheduler is busy, please retry.")
 
-        current = cast(
-            experiment_db.ExperimentDefinitionRecord | None,
-            await execution_manager.await_jobs_db(
-                "experiment.definition.get",
-                partial(experiment_db.get_experiment_definition, experiment_id),
-            ),
-        )
+        current = experiment_db.get_experiment_definition(experiment_id)
         if current is None or current.experiment_type != "cron_schedule":
             raise ExperimentNotFound(f"Schedule {experiment_id} not found")
 
@@ -246,38 +234,57 @@ async def update_schedule(
             "enabled": new_enabled,
         }
 
-        await execution_manager.await_jobs_db(
-            "experiment.definition.upsert",
-            partial(
-                experiment_db.upsert_experiment_definition,
-                auth_context=auth_context,
-                experiment_definition_id=experiment_id,
-                blueprint_id=current.blueprint_id,
-                blueprint_version=current.blueprint_version,
-                experiment_type="cron_schedule",
-                created_by=current.created_by,
-                experiment_definition=new_experiment_definition,
-                display_name=current.display_name,
-                display_description=current.display_description,
-                tags=current.tags,
-            ),
+        experiment_db.upsert_experiment_definition(
+            auth_context=auth_context,
+            experiment_definition_id=experiment_id,
+            blueprint_id=current.blueprint_id,
+            blueprint_version=current.blueprint_version,
+            experiment_type="cron_schedule",
+            created_by=current.created_by,
+            experiment_definition=new_experiment_definition,
+            display_name=current.display_name,
+            display_description=current.display_description,
+            tags=current.tags,
         )
 
         if cron_expr is not None or enabled is not None or first_run_override is not None:
             if new_enabled:
                 next_run_at = resolve_next_run(first_run_override, new_max_delay, new_cron_expr)
-                await execution_manager.await_jobs_db(
-                    "experiment.next.upsert",
-                    partial(scheduling_db.upsert_experiment_next, experiment_id=experiment_id, scheduled_at=next_run_at),
-                )
+                scheduling_db.upsert_experiment_next(experiment_id=experiment_id, scheduled_at=next_run_at)
                 logger.debug(f"Schedule {experiment_id}: regenerated next run at {next_run_at}")
             else:
-                await execution_manager.await_jobs_db(
-                    "experiment.next.delete",
-                    partial(scheduling_db.delete_experiment_next, experiment_id),
-                )
+                scheduling_db.delete_experiment_next(experiment_id)
                 logger.debug(f"Schedule {experiment_id}: disabled, next run cleared")
         prod_scheduler()
+
+
+async def update_schedule(
+    auth_context: AuthContext,
+    experiment_id: ExperimentDefinitionId,
+    cron_expr: str | None,
+    enabled: bool | None,
+    max_acceptable_delay_hours: int | None,
+    first_run_override: dt.datetime | None,
+) -> experiment_db.ExperimentLatest:
+    """Update a cron schedule experiment. Returns the updated schedule paired with its entity-level created_at.
+
+    Acquires scheduler_lock for the duration of the update, on a General pool worker. Raises
+    SchedulerBusy if lock cannot be acquired. Raises ExperimentNotFound or ExperimentAccessDenied as
+    appropriate. Raises ValueError for an invalid cron expression or stale first_run_override.
+    """
+    await execution_manager.awaitable_submit(
+        ConcurrentPools.General,
+        TaskName("experiment.schedule.update"),
+        partial(
+            _update_schedule_sync,
+            auth_context,
+            experiment_id,
+            cron_expr,
+            enabled,
+            max_acceptable_delay_hours,
+            first_run_override,
+        ),
+    )
 
     updated = list(
         cast(
@@ -294,25 +301,27 @@ async def update_schedule(
     return updated[0]
 
 
-async def delete_schedule(auth_context: AuthContext, experiment_id: ExperimentDefinitionId) -> None:
-    """Soft-delete a cron schedule experiment and clear its next run.
-
-    Acquires scheduler_lock for the duration. Raises SchedulerBusy if lock
-    cannot be acquired. Raises ExperimentNotFound or ExperimentAccessDenied.
-    """
-    # TODO rework the whole update to run in a pool to not block the loop / not hold the lock for too long
+def _delete_schedule_sync(auth_context: AuthContext, experiment_id: ExperimentDefinitionId) -> None:
+    """Locked part of `delete_schedule`. Runs on a pool worker and calls the jobs-DB helpers directly."""
     with timed_acquire(scheduler_lock, timeout_acquire_request) as acquired:
         if not acquired:
             raise SchedulerBusy("Scheduler is busy, please retry.")
-        await execution_manager.await_jobs_db(
-            "experiment.definition.delete",
-            partial(experiment_db.soft_delete_experiment_definition, experiment_id, auth_context=auth_context),
-        )
-        await execution_manager.await_jobs_db(
-            "experiment.next.delete",
-            partial(scheduling_db.delete_experiment_next, experiment_id),
-        )
+        experiment_db.soft_delete_experiment_definition(experiment_id, auth_context=auth_context)
+        scheduling_db.delete_experiment_next(experiment_id)
     prod_scheduler()
+
+
+async def delete_schedule(auth_context: AuthContext, experiment_id: ExperimentDefinitionId) -> None:
+    """Soft-delete a cron schedule experiment and clear its next run.
+
+    Acquires scheduler_lock for the duration, on a General pool worker. Raises SchedulerBusy if lock
+    cannot be acquired. Raises ExperimentNotFound or ExperimentAccessDenied.
+    """
+    await execution_manager.awaitable_submit(
+        ConcurrentPools.General,
+        TaskName("experiment.schedule.delete"),
+        partial(_delete_schedule_sync, auth_context, experiment_id),
+    )
 
 
 async def get_next_run(auth_context: AuthContext, experiment_id: ExperimentDefinitionId) -> str:

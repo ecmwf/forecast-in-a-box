@@ -35,7 +35,10 @@ class StatusResponse:
     api: str
     cascade: str
     ecmwf: str
-    # TODO deprecated field, migrate clients to directly query the managed thread status, then remove this
+    # TODO remove, superseded by concurrency.threads.scheduler. Must be done in sync with the frontend
+    # (frontend/src/types/status.types.ts, frontend/src/components/common/StatusDetailsPopover.tsx)
+    # and backend/tests/integration/test_schedule.py; when scheduling is disabled the thread entry is
+    # absent, which clients must treat as "off".
     scheduler: str
     version: str
     plugins: str

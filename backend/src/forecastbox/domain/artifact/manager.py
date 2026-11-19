@@ -13,12 +13,12 @@ Shared state (artifact catalog, per-artifact status) is held in ArtifactManager 
 values; writes are published under one short lock, reads are lock-free. The per-artifact status is a single map, so
 the transition from downloading to available is one assignment.
 
-Catalog refresh and downloads run on `ConcurrentPools.ArtifactIo`, which has exactly one worker, for two reasons:
+Catalog refresh, downloads, and model deletion run on `ConcurrentPools.ArtifactIo`, which has exactly one
+worker, for two reasons:
 - catalog refresh publishes `artifact_status` from a storage listing taken earlier in the same task, so a
   download completing in between would be overwritten unless refresh and downloads are serialized,
-- downloads share one lazily created SSH command handle for `ssh://` data paths.
-
-Model deletion currently runs on the caller's thread.
+- downloads and deletions share one lazily created SSH command handle for `ssh://` data paths, whose lock
+  only protects handle creation/reconnection, not the commands executed with it.
 """
 
 import logging
@@ -38,9 +38,9 @@ from forecastbox.domain.artifact.catalog import get_artifacts_catalog
 from forecastbox.domain.artifact.events import ArtifactDownloadFinishedEvent
 from forecastbox.domain.artifact.io import delete_artifact, download_artifact, list_storage
 from forecastbox.utility import tunnel
-from forecastbox.utility.concurrency.manager import ConcurrentPools, SubmissionRejected, TaskName, execution_manager
+from forecastbox.utility.concurrency.manager import SubmissionRejected, TaskName, execution_manager
 from forecastbox.utility.concurrency.synchronization import timed_acquire
-from forecastbox.utility.config import config
+from forecastbox.utility.config import ConcurrentPools, config
 from forecastbox.utility.dispatcher import Event, EventName, submit_event
 from forecastbox.utility.tunnel import CommandHandle
 
@@ -262,64 +262,67 @@ def report_artifact_download_progress(composite_id: CompositeArtifactId, progres
             logger.warning(f"Attempted to report {progress=}, {failure=}, but {composite_id=} not found")
 
 
-def list_models() -> list[MlModelOverview]:
-    """List all available models with overview information. Raises TimeoutError if fails to acquire"""
+def _capture_catalog_and_status() -> tuple[ArtifactCatalog, PMap[CompositeArtifactId, ArtifactStatus]]:
+    """Capture a consistent snapshot of the catalog and the artifact status, which refresh_catalog
+    publishes together under the lock. Raises TimeoutError if fails to acquire."""
     with timed_acquire(ArtifactManager.lock, timeout_acquire_request) as result:
         if not result:
             raise TimeoutError
+        return ArtifactManager.catalog, ArtifactManager.artifact_status
 
-        overviews = []
-        for composite_id, artifact in ArtifactManager.catalog.items():
-            if artifact.artifact_type != "AnemoiCheckpoint":
-                continue
-            common = artifact.common
-            overview = MlModelOverview(
-                composite_id=composite_id,
-                display_name=common.display_name,
-                display_author=common.display_author,
-                disk_size_bytes=common.disk_size_bytes,
-                supported_platforms=common.supported_platforms,
-                tags=common.tags,
-                is_available=isinstance(ArtifactManager.artifact_status.get(composite_id), ArtifactAvailable),
-                is_locally_compatible=artifact.is_locally_compatible,
-                local_compatibility_detail=artifact.local_compatibility_detail,
-            )
-            overviews.append(overview)
 
-        return overviews
+def list_models() -> list[MlModelOverview]:
+    """List all available models with overview information. Raises TimeoutError if fails to acquire"""
+    catalog, artifact_status = _capture_catalog_and_status()
+
+    overviews = []
+    for composite_id, artifact in catalog.items():
+        if artifact.artifact_type != "AnemoiCheckpoint":
+            continue
+        common = artifact.common
+        overview = MlModelOverview(
+            composite_id=composite_id,
+            display_name=common.display_name,
+            display_author=common.display_author,
+            disk_size_bytes=common.disk_size_bytes,
+            supported_platforms=common.supported_platforms,
+            tags=common.tags,
+            is_available=isinstance(artifact_status.get(composite_id), ArtifactAvailable),
+            is_locally_compatible=artifact.is_locally_compatible,
+            local_compatibility_detail=artifact.local_compatibility_detail,
+        )
+        overviews.append(overview)
+
+    return overviews
 
 
 def get_model_details(composite_id: CompositeArtifactId) -> MlModelDetail:
     """Get detailed information for a specific model. Raises KeyErorr if not present, TimeoutError if fails to acquire"""
-    with timed_acquire(ArtifactManager.lock, timeout_acquire_request) as result:
-        if not result:
-            raise TimeoutError
+    catalog, artifact_status = _capture_catalog_and_status()
 
-        artifact = ArtifactManager.catalog[composite_id]
-        if artifact.artifact_type != "AnemoiCheckpoint":
-            raise KeyError(f"Artifact {composite_id} is not an AnemoiCheckpoint")
-        checkpoint = artifact.specific
-        common = artifact.common
+    artifact = catalog[composite_id]
+    if artifact.artifact_type != "AnemoiCheckpoint":
+        raise KeyError(f"Artifact {composite_id} is not an AnemoiCheckpoint")
+    checkpoint = artifact.specific
+    common = artifact.common
 
-        detail = MlModelDetail(
-            composite_id=composite_id,
-            display_name=common.display_name,
-            display_author=common.display_author,
-            display_description=common.display_description,
-            url=common.url,
-            disk_size_bytes=common.disk_size_bytes,
-            pip_package_constraints=checkpoint.pip_package_constraints,
-            supported_platforms=common.supported_platforms,
-            tags=common.tags,
-            input_qube=checkpoint.input_qube,
-            output_qube=checkpoint.output_qube,
-            input_characteristics=checkpoint.input_characteristics,
-            is_available=isinstance(ArtifactManager.artifact_status.get(composite_id), ArtifactAvailable),
-            is_locally_compatible=artifact.is_locally_compatible,
-            local_compatibility_detail=artifact.local_compatibility_detail,
-        )
-
-        return detail
+    return MlModelDetail(
+        composite_id=composite_id,
+        display_name=common.display_name,
+        display_author=common.display_author,
+        display_description=common.display_description,
+        url=common.url,
+        disk_size_bytes=common.disk_size_bytes,
+        pip_package_constraints=checkpoint.pip_package_constraints,
+        supported_platforms=common.supported_platforms,
+        tags=common.tags,
+        input_qube=checkpoint.input_qube,
+        output_qube=checkpoint.output_qube,
+        input_characteristics=checkpoint.input_characteristics,
+        is_available=isinstance(artifact_status.get(composite_id), ArtifactAvailable),
+        is_locally_compatible=artifact.is_locally_compatible,
+        local_compatibility_detail=artifact.local_compatibility_detail,
+    )
 
 
 def delete_model(composite_id: CompositeArtifactId) -> Either[str, str]:  # ty: ignore[invalid-type-arguments]
@@ -340,9 +343,11 @@ def delete_model(composite_id: CompositeArtifactId) -> Either[str, str]:  # ty: 
         ArtifactManager.artifact_status = ArtifactManager.artifact_status.remove(composite_id)
 
     # TODO race condition possibility 1/ pop in one thread 2/ another request triggers a download
-    # 3/ unlink happens while download is ongoing -> fix by making the delete two-step
-    # TODO delete is now blocking operation, possibly taking some time -- we may want to switch
-    # to a submit-based one. Do not forget to emit a notification after completion/failure then
+    # 3/ unlink happens while download is ongoing -> fix by making the delete two-step. Narrowed
+    # since delete and download both run on the single ArtifactIo worker, so the download only starts
+    # after the unlink finished -- but its reservation can still be made in between.
+    # TODO a delete queued behind a long download holds the HTTP request; consider fire-and-forget
+    # with a notification event.
     handle = _ssh_handle_if_needed()
     try:
         delete_artifact(composite_id, config.backend.data_path, handle=handle)

@@ -74,7 +74,10 @@ class ConcurrencySettings(FiabBaseModel):
     startup_timeout_seconds: float = Field(default=10, gt=0)
     shutdown_timeout_seconds: float = Field(default=10, gt=0)
 
-    # TODO this actually can be default pydantic validator, not needed to be runtime-only
+    # NOTE dont migrate this to a pydantic validator -- config = FIABConfig() is constructed at import
+    # of this module, so a validation failure would crash every importer (backend, cli, warmup, tests)
+    # at import time, before logging is set up and without the aggregated error report that
+    # validate_runtime provides.
     def validate_runtime(self) -> list[str]:
         errors: list[str] = []
         required_pools = set(ConcurrentPools)

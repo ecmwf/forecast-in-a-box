@@ -7,10 +7,11 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Unit tests for NotificationBroadcaster: uninitialized-publish failure, and register/broadcast/prune."""
+"""Unit tests for NotificationBroadcaster: uninitialized-publish failure, register/broadcast/prune, and stop."""
 
 import asyncio
 import threading
+import time
 from collections.abc import Generator
 from typing import cast
 
@@ -21,8 +22,10 @@ from forecastbox.domain.notification.models import ClientNotification
 from forecastbox.domain.notification.service import (
     NotificationBroadcaster,
     NotificationBroadcasterNotInitialized,
+    init_broadcaster,
     publish,
     register_client,
+    stop_broadcaster,
     unregister_client,
 )
 
@@ -52,14 +55,17 @@ class _FakeClient:
 @pytest.fixture(autouse=True)
 def _reset_broadcaster() -> Generator[None, None, None]:
     original_loop = NotificationBroadcaster._loop
+    original_stopped = NotificationBroadcaster._stopped
     original_clients = NotificationBroadcaster._clients
     yield
     NotificationBroadcaster._loop = original_loop
+    NotificationBroadcaster._stopped = original_stopped
     NotificationBroadcaster._clients = original_clients
 
 
 def test_publish_before_init_raises_and_does_not_hang() -> None:
     NotificationBroadcaster._loop = None
+    NotificationBroadcaster._stopped = False
     with pytest.raises(NotificationBroadcasterNotInitialized):
         publish(_notification("x"))
 
@@ -69,13 +75,16 @@ def test_publish_broadcasts_to_registered_clients_and_prunes_dead() -> None:
     thread = threading.Thread(target=loop.run_forever, daemon=True)
     thread.start()
     try:
-        NotificationBroadcaster._loop = loop
+        init_broadcaster(loop)
         good = _FakeClient()
         bad = _FakeClient(fail=True)
         register_client(cast(WebSocket, good))
         register_client(cast(WebSocket, bad))
 
         publish(_notification("abc"))
+        deadline = time.monotonic() + 2
+        while (not good.received or bad in NotificationBroadcaster._clients) and time.monotonic() < deadline:
+            time.sleep(0.01)
 
         assert len(good.received) == 1
         assert "abc" in good.received[0]
@@ -87,4 +96,15 @@ def test_publish_broadcasts_to_registered_clients_and_prunes_dead() -> None:
     finally:
         loop.call_soon_threadsafe(loop.stop)
         thread.join(timeout=2)
+        loop.close()
+
+
+def test_publish_after_stop_is_dropped() -> None:
+    loop = asyncio.new_event_loop()
+    try:
+        init_broadcaster(loop)
+        stop_broadcaster()
+        assert NotificationBroadcaster._loop is None
+        publish(_notification("dropped"))  # must neither raise nor block
+    finally:
         loop.close()

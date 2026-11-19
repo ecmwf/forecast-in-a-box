@@ -18,11 +18,11 @@ SQLAlchemy resolves those string-based references against the referencing table'
 ``MetaData`` registry -- so all of them must share this single ``Base``.
 
 Exposes ``create_db_and_tables`` so the entrypoint can discover and run it via automatic
-schemata iteration. See ``entrypoint/app.py`` for why it defers calling any discovered
+schemata iteration. See ``entrypoint/initializers.py::start_db_schema`` for why it defers calling any discovered
 ``create_db_and_tables`` until *all* schemata submodules have been imported: only then is
 it guaranteed that every ORM class in this package has registered its table on this
 module's ``Base.metadata``.
-# TODO for later: implement garbage collection
+# TODO for later: implement garbage collection, see the proof of concept in ``domain/maintenance``
 """
 
 from sqlalchemy import create_engine

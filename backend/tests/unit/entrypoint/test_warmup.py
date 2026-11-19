@@ -65,7 +65,7 @@ def warmup_mocks() -> Iterator[dict[str, MagicMock]]:
         patch.object(warmup_module, "setup_process", parent.setup_process),
         patch.object(warmup_module, "validate_runtime", parent.validate_runtime),
         patch.object(warmup_module, "start_db_schema", parent.start_db_schema),
-        patch.object(warmup_module, "register_fiabcore_providers", parent.register_fiabcore_providers),
+        patch.object(warmup_module, "register_providers", parent.register_providers),
         patch.object(warmup_module, "start_http_pools", parent.start_http_pools),
         patch.object(warmup_module, "stop_http_pools", parent.stop_http_pools),
         patch.object(warmup_module, "refresh_catalog", parent.refresh_catalog),
@@ -108,7 +108,7 @@ def test_preparation_precedes_installation(warmup_mocks: dict[str, MagicMock]) -
         warmup_module.warmup()
     ordering = [call[0] for call in parent.mock_calls]
     assert ordering.index("start_db_schema") < ordering.index("update_single")
-    assert ordering.index("register_fiabcore_providers") < ordering.index("update_single")
+    assert ordering.index("register_providers") < ordering.index("update_single")
     assert ordering.index("initialize_stores") < ordering.index("update_single")
     assert ordering.index("refresh_catalog") < ordering.index("update_single")
 

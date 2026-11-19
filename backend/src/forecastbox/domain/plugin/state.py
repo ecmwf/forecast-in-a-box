@@ -14,9 +14,9 @@
 ``pyrsistent`` immutable maps so that reads never need to lock. ``PluginManager.lock``
 protects only the short field transitions in this module -- reserving/releasing the
 single plugin-management operation slot and swapping the map pointers. It must never
-be held across pip, import/reload, waiting for template event dispatch, database access, or a wait on
+be held across pip, import/reload, template ingestion hooks, database access, or a wait on
 a future; those all run on the ``ConcurrentPools.PluginManagement`` worker without
-this lock, see ``domain.plugin.loading`` and ``domain.plugin.manager``.
+this lock, see ``domain.plugin.loading`` and ``domain.plugin.submit``.
 
 ``operation_in_progress`` is to guarantee we don't have concurrently running/submitted
 operations -- it exists to increase the PluginManagement single-worker guarantee.

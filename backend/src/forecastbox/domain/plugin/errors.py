@@ -22,7 +22,7 @@ Lifecycle sources:
 - ``load`` -- importlib / Plugin() instantiation phase; failure here means the
   package is installed but the plugin object cannot be constructed.
 - ``template_ingest`` -- blueprint template validation and DB upsert phase, performed by
-  the blueprint domain in reaction to plugin template events; errors here are per-template
+  the blueprint domain via the template hooks injected by the entrypoint; errors here are per-template
   and do not prevent the plugin from being used for other templates.
 
 Severities:

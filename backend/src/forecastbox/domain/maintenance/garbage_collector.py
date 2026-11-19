@@ -69,6 +69,9 @@ def _run_once() -> None:
 
 
 def garbage_collector_entrypoint(stop_event: threading.Event) -> None:
+    # NOTE discard a stale wake from a previous run's stop request; the loop condition below checks
+    # stop_event after the clear, since a stop request sets stop_event before wake
+    GarbageCollectorRuntime.wake.clear()
     try:
         while not stop_event.is_set():
             _publish(

@@ -52,7 +52,8 @@ from forecastbox.domain.plugin.loading import uninstall_plugin_sync, unload_sing
 from forecastbox.domain.plugin.notifications import notify_failure, notify_success
 from forecastbox.domain.plugin.settings import PluginSettings
 from forecastbox.domain.plugin.state import PluginManager, finish_ok, finish_with_error, release_reservation, reserve_operation
-from forecastbox.utility.concurrency.manager import ConcurrentPools, SubmissionRejected, TaskName, execution_manager
+from forecastbox.utility.concurrency.manager import SubmissionRejected, TaskName, execution_manager
+from forecastbox.utility.config import ConcurrentPools
 
 logger = logging.getLogger(__name__)
 
