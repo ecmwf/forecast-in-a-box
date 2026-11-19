@@ -10,11 +10,8 @@
 """Entrypoints of the backend: the FastAPI app and its lifespan (`app.py`, `initializers.py`),
 the launchers (`main.py`, `bootstrap/`), and the plugin warmup (`warmup.py`).
 
-*NOTE* when making changes here, make sure warmup (`entrypoint/warmup.py`, invoked by
-`scripts/fiab.sh warmup`) is unaffected. Warmup reuses selected startup steps (schema creation,
-provider and hook registration via `register_providers`, catalog and store initialization) but
-deliberately runs without the execution runtime: no pools, no event dispatcher, no managed
-threads, no FastAPI loop. Any wiring that domain code needs during plugin install/load must
-therefore be registered in `register_providers`, which both call, and must not rely on the
-dispatcher or pools. Warmup has been broken this way before.
+*NOTE* when making changes here, make sure both launchers (`main.py` and `warmup.py`)
+are synchronised -- for example, if anything in the backend setup starts relying on
+async loop or dispatcher, you need to take appropriate measures in the warmup as it currently
+does not (and should not) spin up the loops and pools. This is a notorious source of errors.
 """
