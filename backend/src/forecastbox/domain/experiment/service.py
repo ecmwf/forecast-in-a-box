@@ -329,7 +329,7 @@ async def get_next_run(auth_context: AuthContext, experiment_id: ExperimentDefin
 
     Raises ExperimentNotFound if the schedule does not exist or is not visible to ``auth_context``.
     """
-    await get_schedule(auth_context, experiment_id)
+    _is_found_authorized = await get_schedule(auth_context, experiment_id)
     next_entry = cast(
         scheduling_db.ExperimentNextRecord | None,
         await execution_manager.await_jobs_db(
@@ -352,7 +352,7 @@ async def get_schedule_runs(
     Raises ExperimentNotFound if the schedule does not exist or is not visible to ``auth_context``.
     Raises ValueError if page is out of range.
     """
-    await get_schedule(auth_context, experiment_id)
+    _is_found_authorized = await get_schedule(auth_context, experiment_id)
 
     total = cast(
         int,
