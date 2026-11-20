@@ -1,13 +1,10 @@
 # Overall Architecture Review: Results
 
-Review of `backend/src/forecastbox` against `backend/development.md` (and the `routes/__init__.py`
-docstring it delegates to), at commit `a797ab8e`.
+Review of `backend/src/forecastbox` against `backend/development.md`, at commit `a797ab8e`.
 
 Scope notes:
 * items already listed as ruled-out in `overallReviewState.md` are not repeated here,
-* the leaking of domain/external types into route contracts is tracked separately in
-  `backend-leaking_entities.md`, and the validation v2 leftovers in `backend-validationV2-leftovers.md`
-  -- neither is duplicated here,
+* the leaking of domain/external types into route contracts is tracked separately in `backend-leaking_entities.md`.
 * `backend/packages/*`, `frontend/`, and `cli/` were only consulted where needed for a particular issue.
 
 Each section below is meant to be a self-contained task. Sections are roughly ordered by priority
@@ -27,8 +24,8 @@ Both only need the name of the env var under which the entrypoint exported the l
 (`entrypoint/bootstrap/config.py::init_logging_base`).
 
 **Fix options**:
-* move `BACKEND_LOG_DIRECTORY_ENV` (and ideally a small `get_backend_log_directory() -> str` accessor) into
-  `utility/` -- eg `utility/config.py` next to the other process-wide settings, or a new `utility/logs.py`;
+* move `BACKEND_LOG_DIRECTORY_ENV` and ideally a small `get_backend_log_directory() -> str` accessor into
+  `utility/config.py` next to the other process-wide settings;
   `entrypoint/bootstrap/config.py` then imports it from there,
 * verify with `rg "forecastbox\.entrypoint" backend/src/forecastbox/domain` returning nothing.
 
@@ -52,12 +49,9 @@ consult the docstring to see if you need to make a change in the docstring itsel
     `domain.glyphs` (the glyph use is indirect, via Run). Either drop the line or rephrase as indirect.
 
 **Fix options**:
-* for the cycle: (a) move all entity id NewTypes (`BlueprintId`, `RunId`, `ExperimentDefinitionId`, `GlobalGlyphId`)
-  into one low-level module such as `utility/ids.py` (they are pure `NewType`s, not domain logic), or (b) let the Run
-  domain hold the experiment reference as its own opaque type (eg `RunExperimentRef = NewType(..., str)`) and convert at
-  the Experiment side. Option (a) is simpler and also removes the need for most `*/types.py` cross-imports.
+* for the cycle: (a) move the `ExperimentDefinitionId` to `domain/run/types.py`, and explain there it is needed due to the Run database entity requiring a knowledge of experiments.
 * update `domain/run/__init__.py`, `domain/blueprint/__init__.py`, `domain/artifact/__init__.py`,
-  `domain/experiment/__init__.py` docstrings to match the actual imports.
+  `domain/experiment/__init__.py` docstrings to match the actual imports. Indirect/transitive dependencies need not be mentioned.
 
 ---
 
@@ -80,13 +74,10 @@ one at all.
   "admin-provided default/template"; the analogous glyph route (`routes/blueprint.py::post_global_glyph`) rejects
   non-admins with 403. Apply the same check.
 * `routes/lens.py` -- `/start/skinnyWMS`, `/status`, `/stop`, `/list` take no `auth_context` at all, ie they do not
-  even require an authenticated user in a non-passthrough deployment; `/start/skinnyWMS` serves an arbitrary
-  `local_path` of the backend host. At minimum add `Depends(get_auth_context)` (the proxy route already has a TODO
-  for the user-lens matrix); consider restricting `local_path` to configured data directories.
+  even require an authenticated user in a non-passthrough deployment.
 * `routes/admin.py::patch_user` (`PATCH /admin/users/{user_id}`) -- takes a raw `update_dict: dict` and writes it into
   `UserTable` via `domain/auth/db.py::patch_user_by_id`, ie an admin request can set any column (`hashed_password`,
-  `id`, ...). Replace with a dedicated request contract (eg reuse `UserUpdate` as in the `PUT` variant, or a narrower
-  route-local class) -- this also fixes the "contract is a dedicated pydantic class" rule from `routes/__init__.py`.
+  `id`, ...). Replace with a dedicated request contract (ideally to reuse `UserUpdate` as in the `PUT` variant).
 
 ---
 
@@ -104,18 +95,16 @@ are limited to in-memory reads and short lock sections".
   as a single task to `ConcurrentPools.General` via `awaitable_submit` -- it calls the jobs-DB helper directly, which is
   allowed from a pool worker.
 * `routes/blueprint.py::resolve_display` calls `domain/blueprint/display.py::configOption2display` directly; it opens and
-  queries the thread-local Metkit `ParamDB` (`utility/metkit.py`) on the loop thread. Submit to `General`.
-* `routes/lens.py::get_lens_status` / `list_lenses` call `domain/lens/manager.py::_compute_status`, which performs a
-  blocking TCP connect probe (`check_server_ready`, 0.1s timeout per port, per instance) on the loop -- the in-code TODO
-  acknowledges this. It also mutates `instance.bound` lock-free on a value stored in the pyrsistent map (benign but
-  outside the documented lock). Fix: either submit the status computation to `General`, or move the probing to the
-  lens manager (eg mark `bound` from a background check under the lock) so that the routes only read state.
+  queries the thread-local Metkit `ParamDB` (`utility/metkit.py`) on the loop thread. Fix: in the `if paramdb is None`
+  branch in the `utility/metkit.py`, in case the caller is in the asyncio loop, do the `ParamDB()` call in the General pool.
+  The dependency on concurrency manager here is fine. But extract the return value from the Future and set it to the thread's
+  local, so that the next call in the loop thread needs not submit anything.
 * `domain/plugin/compatibility.py::get_fiabcore_version` (an `importlib.metadata.version` lookup, ie a filesystem scan)
   is called per request from `routes/blueprint.py::get_blueprint` and `list_blueprints`, and inside the jobs-DB lock in
-  `domain/blueprint/db.py::upsert_blueprint`. Compute it once at startup (fiab-core cannot change without a restart --
-  verify against the plugin install flow) or cache it, and compute it outside the locked callable.
+  `domain/blueprint/db.py::upsert_blueprint`. Handle similarly to the metkit param db -- store the `raw` to thread local,
+  and in case it is missing, compute it, in the asyncio case via the General pool.
 * lower priority: `routes/admin.py` performs small synchronous file IO on the loop (`get_local_release`, `save_pylock`,
-  `mark_release`, `config.save_to_file`).
+  `mark_release`, `config.save_to_file`) -- run each via the IO pool.
 
 ---
 
@@ -133,14 +122,17 @@ the session closes."
   It works today only because `expire_on_commit=False` and the tables have no lazy relationships.
   Fix: give `querySingle` a converter parameter (`querySingle(query, session_maker, convert: Callable[[Row], T]) -> T | None`)
   applied inside the session, or inline the session block in each helper as the list helpers already do.
+    (note to the architect: have look at some examples prior to prompt -- I dont like the convert)
 * `domain/auth/db.py` returns `UserTable` ORM objects (`list_users`, `get_user_by_id`, `update_user_by_id`) which
   `routes/admin.py` returns directly as `UserRead` with `# type: ignore[invalid-return-type]`. Convert to `UserRead`
   (or a plain dataclass) inside the db helper. The users database is a separate concern for locking, but the
   no-ORM-crossing rule applies to all `db.py` modules.
+    (note to the architect: check prior to prompt, but probably agreed)
 * `domain/experiment/scheduling/db.py::upsert_experiment_next` does a read and a write in two separate lock
   acquisitions (`querySingle`, then `executeAndCommit`/`addAndCommit`), with no business logic in between, so the
   split brings no benefit and opens a race (the `experiment_id` column is unique, so a concurrent insert fails with an
   `IntegrityError`). Make it one locked callable.
+    (note to the architect: check prior to prompt, but probably agreed)
 
 ---
 

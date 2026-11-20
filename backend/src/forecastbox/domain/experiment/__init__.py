@@ -15,4 +15,8 @@ Depends on the Blueprint domain (each Experiment has one associated Blueprint).
 Depends on the Run domain (Experiments spawn the associated Runs which then persist the association).
 Depends on the Glyph domain (Experiments need to utilize Glyphs for scheduling).
 Depended on no other domain.
+
+Note: the relationship with Run is rather tight, and we already need to make oddities like
+ExperimentDefinitionId living in the Run domain. If they continue piling up, consider making
+this a subdomain of Run.
 """

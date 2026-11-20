@@ -83,7 +83,8 @@ def check_server_ready(host: str = "127.0.0.1", port: int = 8000, timeout: float
 
     Returns True if the port is open and accepting connections, False otherwise.
     """
-    # TODO add warning if lens not local, we are blocking async loop
+    # TODO add warning if lens not local, we are blocking async loop. For now the async loop
+    # block acceptable, no need to flag during review
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.settimeout(timeout)
         try:
@@ -104,6 +105,8 @@ def _compute_status(instance: LensInstance) -> LensInstanceDetail:
         elif instance.bound or all(check_server_ready(port=port) for port in instance.ports):
             # process alive and its port(s) are bound -- guvicorn/gunicorn finished starting
             # Probe once: a busy lens's queue holds each probe connection
+            # TODO we are modifying the pyrsistent-owned structure outside of lock, ugly! No
+            # need to flag during review, this whole section is planned for a big rewrite anyway
             instance.bound = True
             status = "running"
         else:
