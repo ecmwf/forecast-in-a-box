@@ -493,3 +493,11 @@ def validate_runtime(config: FIABConfig) -> None:
 
 
 config = FIABConfig()
+
+
+BACKEND_LOG_DIRECTORY_ENV = "FIAB_BACKEND_LOG_DIRECTORY"
+
+
+def get_backend_log_directory() -> str:
+    """Returns the log directory exported by the entrypoint at process start. Raises KeyError if not set."""
+    return os.environ[BACKEND_LOG_DIRECTORY_ENV]

@@ -22,7 +22,7 @@ from fiab_core.fable import BlockFactoryId, BlockInstance, BlockInstanceId, Conf
 from forecastbox.domain.blueprint.service import BlueprintBuilder, RoutableBlock
 from forecastbox.domain.blueprint.service import BlueprintSaveCommand as BlueprintSaveRequest
 from forecastbox.domain.blueprint.types import BlueprintId
-from forecastbox.domain.experiment.types import ExperimentDefinitionId
+from forecastbox.domain.run.types import ExperimentDefinitionId
 from forecastbox.routes.experiment import ExperimentCreateRequest, ExperimentUpdateRequest
 from forecastbox.utility.time import current_time, value_dt2str
 

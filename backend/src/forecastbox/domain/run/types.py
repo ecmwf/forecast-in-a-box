@@ -10,3 +10,6 @@
 import typing
 
 RunId = typing.NewType("RunId", str)
+
+# Lives here, not in the Experiment domain, because the Run database entity records the Experiment it belongs to.
+ExperimentDefinitionId = typing.NewType("ExperimentDefinitionId", str)

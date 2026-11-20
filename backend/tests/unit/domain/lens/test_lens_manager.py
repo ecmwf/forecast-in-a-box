@@ -31,9 +31,8 @@ from forecastbox.domain.lens.manager import (
     start_skinny_wms,
     stop_instance,
 )
-from forecastbox.entrypoint.bootstrap.config import BACKEND_LOG_DIRECTORY_ENV
 from forecastbox.utility.concurrency.ports import FreePortsManager, NoFreePortsException
-from forecastbox.utility.config import LensSettings, config
+from forecastbox.utility.config import BACKEND_LOG_DIRECTORY_ENV, LensSettings, config
 
 
 @pytest.fixture(autouse=True)

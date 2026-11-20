@@ -15,8 +15,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from forecastbox.domain.experiment.scheduling.job_utils import RunnableExperiment, experiment2runnable
-from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.domain.run.db import CompilerRuntimeContext
+from forecastbox.domain.run.types import ExperimentDefinitionId
 from forecastbox.utility.time import current_time
 
 
