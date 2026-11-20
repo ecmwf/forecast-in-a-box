@@ -17,22 +17,20 @@
 > \[!IMPORTANT\]
 > This software is **Emerging** and subject to ECMWF's guidelines on [Software Maturity](https://github.com/ecmwf/codex/raw/refs/heads/main/Project%20Maturity).
 
-Forecast-In-A-Box is a prototype AI solution concept piloted by ECMWF, through an effort jointly funded by [Destination Earth](https://destination-earth.eu/) and ECMWF core activities. It showcases a way to containerize and package complete AI-based forecasting pipelines, bringing together ECMWF’s open-source software and AI models — such as ANEMOI, EarthKit, AIFS, PProc and other components of the ECMWF stack — to cover all stages of the forecasting process, from using data inputs from ECMWF’s analyses to the execution of AI models, post-processing, and visualization.
+## Overview
+Forecast-in-a-Box (FiaB) is a prototype piloted by ECMWF, through an effort jointly funded by [Destination Earth](https://destination-earth.eu/).
+It is an open-source software package for running AI-driven weather models end-to-end on a single machine.
+FiaB brings together ECMWF’s open-source software stack and AI models — such as Anemoi and EarthKit — from initial conditions, to the execution of AI-driven models, post-processing (products), and visualisation.
 
-It allows to run any model that subscribes to the Anemoi-Inference interface.
+For more information about the project, please read: [AI-driven solutions for the Digital Twin Engine](https://destine.ecmwf.int/news/forecast-in-a-box-portable-ai-forecasting-workflows-within-the-destine-digital-twin-engine/).
 
-For more information read: [AI-driven solutions for the Digital Twin Engine](https://destine.ecmwf.int/news/forecast-in-a-box-portable-ai-forecasting-workflows-within-the-destine-digital-twin-engine/).
-
-There are the following guides:
-* [User Guide](docs/userGuide.md) -- basic installation and usage on a personal laptop. Audience: Researcher
-* [Troubleshooting](docs/troubleshooting.md) -- general purpose troubleshooting and tuning. Audience: Operator, Developer
-* [Advanced Installation](docs/operator/installation.md) -- cluster, cloud, and docker deployments. Audience: Operator, Developer
-* [Frontend Development](frontend/README.md) -- specifics to the javascript frontend. Audience: Developer
-* [Backend Development](backend/development.md) -- specifics to the python backend. Audience: Developer
+## Quick start
+The [User guide](docs/userGuide.md) constains basic instructions for installation.
+Different user personas are signposted to further configurations and troubleshooting.
 
 ## Contributions and Support
-Due to the maturity and status of the project, there is no support provided -- unless the usage of this project happens within some higher-status initiative that ECMWF participates at.
-For external contributions, see [CONTRIBUTING.md](./CONTRIBUTING.md).
+Forecast-in-a-Box is provided by ECMWF as an open source software, without support.
+For external contributions, please read the [Guidelines](./CONTRIBUTING.md).
 
 ## License
-See [license](./LICENSE).
+Please consult Forecast-in-a-Box [License Terms](./LICENSE).
