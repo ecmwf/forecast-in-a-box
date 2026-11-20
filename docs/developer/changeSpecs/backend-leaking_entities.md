@@ -12,6 +12,10 @@ which ones are marked.
 Since the previous version of this document, `GET /plugin/status` (`PluginsStatus`), `GET /run/outputAvailability`
 and `GET /blueprint/get`'s `BlueprintGetResponse` no longer exist; the items below reflect the current routes.
 
+Note to the Architect: maybe we should ease the restriction and allow `fiab-core` entities in route usage, or at least the simple/Id types,
+otherwise we would have too much mirrorrings? Because the `fiab-core` types are already shared among independent components and thus
+facing quite a scrutiny, unlike the internal-to-the-backend types.
+
 ---
 
 ## routes/plugins.py
