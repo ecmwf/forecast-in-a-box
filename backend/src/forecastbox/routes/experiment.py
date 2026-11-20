@@ -37,8 +37,7 @@ from forecastbox.domain.experiment.exceptions import (
     SchedulerRestartRefused,
 )
 from forecastbox.domain.experiment.scheduling.runtime import restart_scheduler as restart_scheduler_sync
-from forecastbox.domain.experiment.types import ExperimentDefinitionId
-from forecastbox.domain.run.types import RunId
+from forecastbox.domain.run.types import ExperimentDefinitionId, RunId
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.concurrency.manager import TaskName, execution_manager
 from forecastbox.utility.config import ROUTE_PREFIX, ConcurrentPools

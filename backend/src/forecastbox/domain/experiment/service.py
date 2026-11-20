@@ -34,8 +34,8 @@ from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.experiment.exceptions import ExperimentNotFound, SchedulerBusy
 from forecastbox.domain.experiment.scheduling.dt_utils import calculate_next_run, parse_crontab
 from forecastbox.domain.experiment.scheduling.runtime import prod_scheduler, scheduler_lock, timeout_acquire_request
-from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.domain.run.db import RunRecord
+from forecastbox.domain.run.types import ExperimentDefinitionId
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.concurrency.manager import TaskName, execution_manager
 from forecastbox.utility.concurrency.synchronization import timed_acquire

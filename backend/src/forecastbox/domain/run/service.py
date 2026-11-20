@@ -39,7 +39,6 @@ import forecastbox.domain.blueprint.db as blueprint_db
 import forecastbox.domain.run.db as run_db
 from forecastbox.domain.blueprint.db import BlueprintRecord
 from forecastbox.domain.blueprint.types import BlueprintId
-from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.domain.gateway.exceptions import GatewayExited, GatewayNotStarted
 from forecastbox.domain.gateway.service import get_current_cascade_proc, get_gateway_url
 from forecastbox.domain.run.background import execute_background
@@ -48,7 +47,7 @@ from forecastbox.domain.run.db import CompilerRuntimeContext, RunRecord
 from forecastbox.domain.run.detail import retrieve_compilation_detail
 from forecastbox.domain.run.exceptions import CompilationDetailCorrupted, CompilationDetailNotFound, RunConcurrencyIssue, RunNotFound
 from forecastbox.domain.run.stop import submit_stop_cascade
-from forecastbox.domain.run.types import RunId
+from forecastbox.domain.run.types import ExperimentDefinitionId, RunId
 from forecastbox.schemata.run import RunStatus
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.concurrency.manager import SubmissionRejected, TaskName, execution_manager

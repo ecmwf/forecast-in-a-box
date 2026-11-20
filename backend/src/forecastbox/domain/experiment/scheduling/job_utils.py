@@ -19,8 +19,8 @@ import forecastbox.domain.experiment.db as experiment_db
 from forecastbox.domain.blueprint.db import BlueprintRecord
 from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.experiment.scheduling.dt_utils import calculate_next_run
-from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.domain.run.db import CompilerRuntimeContext
+from forecastbox.domain.run.types import ExperimentDefinitionId
 from forecastbox.utility.time import value_dt2str
 
 

@@ -12,11 +12,9 @@ from typing import cast
 import pydantic
 from cascade.executor.config import logging_config
 
-from forecastbox.utility.config import FIABConfig
+from forecastbox.utility.config import BACKEND_LOG_DIRECTORY_ENV, FIABConfig
 
 logger = logging.getLogger(__name__)
-
-BACKEND_LOG_DIRECTORY_ENV = "FIAB_BACKEND_LOG_DIRECTORY"
 
 
 def init_logging_base(config: FIABConfig) -> str:

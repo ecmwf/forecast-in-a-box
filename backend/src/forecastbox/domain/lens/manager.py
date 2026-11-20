@@ -31,11 +31,10 @@ from pyrsistent import pmap
 from pyrsistent.typing import PMap
 
 from forecastbox.domain.lens.exceptions import NoLensFound
-from forecastbox.entrypoint.bootstrap.config import BACKEND_LOG_DIRECTORY_ENV
 from forecastbox.utility.concurrency.ports import FreePortsManager, NoFreePortsException
 from forecastbox.utility.concurrency.shutdown import shutdown_popen
 from forecastbox.utility.concurrency.synchronization import timed_acquire
-from forecastbox.utility.config import config
+from forecastbox.utility.config import config, get_backend_log_directory
 from forecastbox.utility.pydantic import FiabBaseModel
 from forecastbox.utility.time import default_tz_fallback
 
@@ -183,7 +182,7 @@ def start_skinny_wms(local_path: str) -> LensInstanceId:
             # macOS kills forked workers drawing text after the preloaded master
             **({"OBJC_DISABLE_INITIALIZE_FORK_SAFETY": "YES"} if sys.platform == "darwin" else {}),
         }
-        log_directory = os.environ[BACKEND_LOG_DIRECTORY_ENV]
+        log_directory = get_backend_log_directory()
         stdout_path = os.path.join(log_directory, f"lens.{instance_id}.stdout.txt")
         stderr_path = os.path.join(log_directory, f"lens.{instance_id}.stderr.txt")
         with open(stdout_path, "ab") as stdout_file, open(stderr_path, "ab") as stderr_file:

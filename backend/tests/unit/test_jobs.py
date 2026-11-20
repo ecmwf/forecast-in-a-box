@@ -34,10 +34,9 @@ import forecastbox.domain.run.stop as stop
 from forecastbox.domain.blueprint.exceptions import BlueprintAccessDenied, BlueprintNotFound
 from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.experiment.exceptions import ExperimentAccessDenied, ExperimentNotFound
-from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.domain.run.db import CompilerRuntimeContext
 from forecastbox.domain.run.exceptions import RunAccessDenied, RunNotDeletable, RunNotFound, RunNotStoppable
-from forecastbox.domain.run.types import RunId
+from forecastbox.domain.run.types import ExperimentDefinitionId, RunId
 from forecastbox.schemata.jobs import Base
 from forecastbox.utility.auth import PASSTHROUGH_USER_ID, AuthContext
 

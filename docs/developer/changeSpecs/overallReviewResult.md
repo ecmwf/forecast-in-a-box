@@ -12,49 +12,6 @@ Each section below is meant to be a self-contained task. Sections are roughly or
 
 ---
 
-## 1. Domain modules import from `entrypoint`
-
-**Guideline**: "Make sure you don't break importing hierarchies: utility < schemata < domain < routes < entrypoint."
-
-**Breach**:
-* `domain/gateway/service.py:37` -- `from forecastbox.entrypoint.bootstrap.config import BACKEND_LOG_DIRECTORY_ENV`
-* `domain/lens/manager.py:34` -- same import
-
-Both only need the name of the env var under which the entrypoint exported the log directory
-(`entrypoint/bootstrap/config.py::init_logging_base`).
-
-**Fix options**:
-* move `BACKEND_LOG_DIRECTORY_ENV` and ideally a small `get_backend_log_directory() -> str` accessor into
-  `utility/config.py` next to the other process-wide settings;
-  `entrypoint/bootstrap/config.py` then imports it from there,
-* verify with `rg "forecastbox\.entrypoint" backend/src/forecastbox/domain` returning nothing.
-
----
-
-## 2. Domain dependency cycle Run <-> Experiment, and stale domain docstrings
-
-**Guideline**: "the hierarchy within domains must stay acyclic" and "When making any change to a code in a domain,
-consult the docstring to see if you need to make a change in the docstring itself."
-
-**Breach**:
-* Experiment depends on Run (`domain/experiment/service.py`, `domain/experiment/scheduling/*` import `domain.run.db`,
-  `domain.run.service`), as documented in both docstrings.
-* Run also imports Experiment: `domain/run/db.py:33` and `domain/run/service.py:42` import
-  `ExperimentDefinitionId` from `domain/experiment/types.py`. This is a (type-only) cycle, and the Run docstring
-  (`domain/run/__init__.py`) does not mention it.
-* Other docstring/import mismatches:
-  * `domain/blueprint/display.py:21` imports `domain.artifact.manager.ArtifactManager`, but `domain/blueprint/__init__.py`
-    does not list Artifact as a dependency (and `domain/artifact/__init__.py` says "Depended on by Run domain" only).
-  * `domain/experiment/__init__.py` states "Depends on the Glyph domain", but no module in `domain/experiment` imports
-    `domain.glyphs` (the glyph use is indirect, via Run). Either drop the line or rephrase as indirect.
-
-**Fix options**:
-* for the cycle: (a) move the `ExperimentDefinitionId` to `domain/run/types.py`, and explain there it is needed due to the Run database entity requiring a knowledge of experiments.
-* update `domain/run/__init__.py`, `domain/blueprint/__init__.py`, `domain/artifact/__init__.py`,
-  `domain/experiment/__init__.py` docstrings to match the actual imports. Indirect/transitive dependencies need not be mentioned.
-
----
-
 ## 3. Missing authorization checks
 
 **Guideline**: `db.py` "is always expected to ... enforce authorization"; routes and services pass `AuthContext`

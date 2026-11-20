@@ -14,4 +14,7 @@ execution engine, based on a Blueprint.
 Depends on Artifact, Blueprint, Glyph, Plugin and Gateway domains -- all are
 used when compiling and submitting a Run.
 Depended on by Experiment domain (which spawns Runs).
+
+Run records the Experiment they belong to; the `ExperimentDefinitionId` type is therefore declared in
+`domain/run/types.py`, and Run does not import anything else from the Experiment domain.
 """

@@ -34,10 +34,9 @@ from forecastbox.domain.gateway.exceptions import (
     GatewayNotStarted,
     GatewayStopInProgress,
 )
-from forecastbox.entrypoint.bootstrap.config import BACKEND_LOG_DIRECTORY_ENV
 from forecastbox.utility import tunnel
 from forecastbox.utility.concurrency.manager import TaskName, execution_manager
-from forecastbox.utility.config import ConcurrentPools, LocalGateway, RemoteGateway, UnmanagedGateway, config
+from forecastbox.utility.config import ConcurrentPools, LocalGateway, RemoteGateway, UnmanagedGateway, config, get_backend_log_directory
 from forecastbox.utility.dispatcher import Event, EventName, submit_event
 
 logger = logging.getLogger(__name__)
@@ -129,7 +128,7 @@ def launch_gateway() -> None:
             # NOTE we dont use gateway.startup_params logging base, because backend already derived
             # the directory. And we must not modify config with it live as we dont want to persist
             # that value in case the config gets modified by the user using the admin api
-            logs_directory = LogDirectory(os.environ[BACKEND_LOG_DIRECTORY_ENV])
+            logs_directory = LogDirectory(get_backend_log_directory())
             logs_base = None if os.getenv("FIAB_LOGSTDOUT", "nay") == "yea" else logs_directory.name + os.sep
             gateway_url = f"tcp://localhost:{tunnel.claim_free_port()}"
             # NOTE similarly to cascade, we always spawn on MacOS because xpc_connection_invalid tends

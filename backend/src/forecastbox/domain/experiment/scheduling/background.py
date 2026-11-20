@@ -17,8 +17,8 @@ import threading
 
 from forecastbox.domain.experiment.scheduling import db
 from forecastbox.domain.experiment.scheduling.job_utils import experiment2runnable
-from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.domain.run.service import submit_run_sync
+from forecastbox.domain.run.types import ExperimentDefinitionId
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.time import current_time, get_sleepable_difference
 
