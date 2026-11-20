@@ -368,8 +368,9 @@ async def get_compilation_detail(
 
     If ``block_id`` is provided, only tasks belonging to that block are returned.
     Returns 404 if no compilation detail is available (e.g. run not yet submitted,
-    or cache entry expired).
+    or cache entry expired), 403/404 if the run is not accessible to the caller.
     """
+    await _resolve_run_record(spec, auth_context)
     try:
         detail = retrieve_compilation_detail(spec.run_id)
     except CompilationDetailNotFound:

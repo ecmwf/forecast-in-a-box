@@ -179,9 +179,13 @@ async def update_user(user_id: UUID4, user_data: UserUpdate, admin: UserRead | N
 
 
 @router.patch("/users/{user_id}", response_class=HTMLResponse)
-async def patch_user(user_id: UUID4, update_dict: dict, admin: UserRead = Depends(get_admin_user)) -> HTMLResponse:
-    """Patch a user by ID"""
-    await patch_user_by_id(user_id, update_dict)
+async def patch_user(user_id: UUID4, user_data: UserUpdate, admin: UserRead = Depends(get_admin_user)) -> HTMLResponse:
+    """Patch a user by ID. Only the fields of `UserUpdate` that are set are applied."""
+    update_dict = user_data.model_dump(exclude_unset=True, exclude_none=True)
+    if "password" in update_dict:
+        raise HTTPException(status_code=404, detail="Password update not supported")
+    if update_dict:
+        await patch_user_by_id(user_id, update_dict)
     return HTMLResponse(content="User updated successfully", status_code=200)
 
 

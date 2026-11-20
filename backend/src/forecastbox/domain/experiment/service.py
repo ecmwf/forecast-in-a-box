@@ -327,17 +327,9 @@ async def delete_schedule(auth_context: AuthContext, experiment_id: ExperimentDe
 async def get_next_run(auth_context: AuthContext, experiment_id: ExperimentDefinitionId) -> str:
     """Return the next scheduled run time for a cron schedule, or a 'not scheduled' message.
 
-    Raises ExperimentNotFound if the schedule does not exist.
+    Raises ExperimentNotFound if the schedule does not exist or is not visible to ``auth_context``.
     """
-    exp_def = cast(
-        experiment_db.ExperimentDefinitionRecord | None,
-        await execution_manager.await_jobs_db(
-            "experiment.definition.get",
-            partial(experiment_db.get_experiment_definition, experiment_id),
-        ),
-    )
-    if exp_def is None or exp_def.experiment_type != "cron_schedule":
-        raise ExperimentNotFound(f"Schedule {experiment_id} not found")
+    _is_found_authorized = await get_schedule(auth_context, experiment_id)
     next_entry = cast(
         scheduling_db.ExperimentNextRecord | None,
         await execution_manager.await_jobs_db(
@@ -357,19 +349,10 @@ async def get_schedule_runs(
 ) -> tuple[Iterable[RunRecord], int, int]:
     """Return (executions, total, total_pages) for runs linked to a cron schedule experiment.
 
-    Raises ExperimentNotFound if the schedule does not exist.
+    Raises ExperimentNotFound if the schedule does not exist or is not visible to ``auth_context``.
     Raises ValueError if page is out of range.
-    Will return empty if the user is not authenticated to see the resource.
     """
-    exp_def = cast(
-        experiment_db.ExperimentDefinitionRecord | None,
-        await execution_manager.await_jobs_db(
-            "experiment.definition.get",
-            partial(experiment_db.get_experiment_definition, experiment_id),
-        ),
-    )
-    if exp_def is None or exp_def.experiment_type != "cron_schedule":
-        raise ExperimentNotFound(f"Schedule {experiment_id} not found")
+    _is_found_authorized = await get_schedule(auth_context, experiment_id)
 
     total = cast(
         int,
