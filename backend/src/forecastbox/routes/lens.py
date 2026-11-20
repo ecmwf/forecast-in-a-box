@@ -19,8 +19,6 @@ by `lens_id`; only the set of currently supported lensIds is validated at reques
 time.
 """
 
-# TODO currently no authentication here. Add auth and propagate into the manager itself
-
 import json
 import logging
 import pathlib
@@ -114,7 +112,7 @@ def _start_skinny_wms_checked(local_path: str) -> LensInstanceId:
 
 
 @router.post("/start/skinnyWMS")
-async def start_skinny_wms_endpoint(local_path: str) -> LensInstanceId:
+async def start_skinny_wms_endpoint(local_path: str, auth_context: AuthContext = Depends(get_auth_context)) -> LensInstanceId:
     """Start a skinnyWMS lens instance serving data from the given local path."""
     if not is_skinny_available:
         raise HTTPException(status_code=400, detail="SkinnyWMS installation not found")
@@ -131,7 +129,9 @@ async def start_skinny_wms_endpoint(local_path: str) -> LensInstanceId:
 
 
 @router.get("/status")
-async def get_lens_status(lens_instance_id: LensInstanceId) -> LensInstanceDetailResponse:
+async def get_lens_status(
+    lens_instance_id: LensInstanceId, auth_context: AuthContext = Depends(get_auth_context)
+) -> LensInstanceDetailResponse:
     """Get the status of a lens instance."""
     try:
         return LensInstanceDetailResponse.from_detail(lens_instance_id, get_status(lens_instance_id))
@@ -140,7 +140,7 @@ async def get_lens_status(lens_instance_id: LensInstanceId) -> LensInstanceDetai
 
 
 @router.delete("/stop")
-async def stop_lens(lens_instance_id: LensInstanceId) -> str:
+async def stop_lens(lens_instance_id: LensInstanceId, auth_context: AuthContext = Depends(get_auth_context)) -> str:
     """Stop and remove a lens instance."""
     try:
         await execution_manager.awaitable_submit(ConcurrentPools.General, TaskName("lens.stop"), partial(stop_instance, lens_instance_id))
@@ -152,7 +152,7 @@ async def stop_lens(lens_instance_id: LensInstanceId) -> str:
 
 
 @router.get("/list")
-async def list_lenses() -> list[LensInstanceDetailResponse]:
+async def list_lenses(auth_context: AuthContext = Depends(get_auth_context)) -> list[LensInstanceDetailResponse]:
     """List all active lens instances with their current status."""
     return [LensInstanceDetailResponse.from_detail(iid, detail) for iid, detail in list_instances()]
 
@@ -334,9 +334,11 @@ async def post_lens_metadata(
 
     Always writes the caller's own row -- there is no way to write another
     user's row, admin or not. Returns 413 if the serialized ``metadata_content``
-    exceeds ``MAX_LENS_METADATA_CONTENT_BYTES``.
+    exceeds ``MAX_LENS_METADATA_CONTENT_BYTES``, and 403 if a non-admin requests ``public=True``.
     """
     _validate_lens_id(request.lens_id)
+    if request.public and not auth_context.has_admin():
+        raise HTTPException(status_code=403, detail="Only admins may create or update public lens metadata.")
     content_size = len(json.dumps(request.metadata_content).encode("utf-8"))
     if content_size > MAX_LENS_METADATA_CONTENT_BYTES:
         raise HTTPException(

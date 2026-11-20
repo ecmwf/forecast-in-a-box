@@ -13,6 +13,9 @@ import pytest
 from fastapi.exceptions import HTTPException
 
 from forecastbox.routes import lens as lens_routes
+from forecastbox.utility.auth import AuthContext
+
+_AUTH = AuthContext(user_id="u", is_admin=False)
 
 
 def test_validate_lens_id_accepts_supported() -> None:
@@ -34,7 +37,7 @@ async def test_stop_lens_maps_unknown_instance_to_404() -> None:
     from forecastbox.domain.lens.manager import LensInstanceId
 
     with pytest.raises(HTTPException) as exc_info:
-        await lens_routes.stop_lens(LensInstanceId("ghost"))
+        await lens_routes.stop_lens(LensInstanceId("ghost"), _AUTH)
     assert exc_info.value.status_code == 404
 
 
@@ -51,7 +54,7 @@ async def test_start_lens_routes_to_general_pool_as_lens_start(monkeypatch: pyte
 
     monkeypatch.setattr(lens_routes, "is_skinny_available", True)
     monkeypatch.setattr(execution_manager, "awaitable_submit", _recording)
-    assert await lens_routes.start_skinny_wms_endpoint("/x") == "iid"
+    assert await lens_routes.start_skinny_wms_endpoint("/x", _AUTH) == "iid"
     assert calls == [(ConcurrentPools.General, "lens.start")]
 
 
@@ -59,5 +62,13 @@ async def test_start_lens_routes_to_general_pool_as_lens_start(monkeypatch: pyte
 async def test_start_lens_missing_path_is_400(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(lens_routes, "is_skinny_available", True)
     with pytest.raises(HTTPException) as exc_info:
-        await lens_routes.start_skinny_wms_endpoint("/definitely/not/here")
+        await lens_routes.start_skinny_wms_endpoint("/definitely/not/here", _AUTH)
     assert exc_info.value.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_post_public_lens_metadata_requires_admin() -> None:
+    request = lens_routes.LensMetadataPostRequest(lens_id="skinnyWMS", lens_metadata_id="m", metadata_content={}, public=True)
+    with pytest.raises(HTTPException) as exc_info:
+        await lens_routes.post_lens_metadata(request, _AUTH)
+    assert exc_info.value.status_code == 403

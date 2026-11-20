@@ -12,32 +12,6 @@ Each section below is meant to be a self-contained task. Sections are roughly or
 
 ---
 
-## 3. Missing authorization checks
-
-**Guideline**: `db.py` "is always expected to ... enforce authorization"; routes and services pass `AuthContext`
-precisely so that ownership is enforced. Several entry points accept an `auth_context` but do not use it, or do not take
-one at all.
-
-**Breach**:
-* `routes/run.py::get_compilation_detail` (`/run/getCompilationDetail`) -- `auth_context` is unused; the detail is read
-  from the in-memory cache by `run_id` only, so any caller can read any Run's compilation detail. Fix: resolve the run
-  first via `_resolve_run_record(spec, auth_context)` (which maps `RunNotFound`/`RunAccessDenied`).
-* `domain/experiment/service.py::get_next_run` -- `auth_context` is unused; it uses the explicitly unauthenticated
-  `experiment_db.get_experiment_definition`. Fix: use `get_schedule(auth_context, experiment_id)` (the scoped lookup)
-  as the existence/ownership check. `get_schedule_runs` has the same unauthenticated existence check (it leaks
-  existence via 404 vs empty list).
-* `routes/lens.py::post_lens_metadata` -- any (non-admin) user can create a `public=True` row, which then becomes
-  visible to everyone. The module comment and `domain/lens/metadata_db.py` docstring describe public rows as
-  "admin-provided default/template"; the analogous glyph route (`routes/blueprint.py::post_global_glyph`) rejects
-  non-admins with 403. Apply the same check.
-* `routes/lens.py` -- `/start/skinnyWMS`, `/status`, `/stop`, `/list` take no `auth_context` at all, ie they do not
-  even require an authenticated user in a non-passthrough deployment.
-* `routes/admin.py::patch_user` (`PATCH /admin/users/{user_id}`) -- takes a raw `update_dict: dict` and writes it into
-  `UserTable` via `domain/auth/db.py::patch_user_by_id`, ie an admin request can set any column (`hashed_password`,
-  `id`, ...). Replace with a dedicated request contract (ideally to reuse `UserUpdate` as in the `PUT` variant).
-
----
-
 ## 4. Blocking work on the event loop
 
 **Guideline**: "we do not want to block the user-facing async loop for long" and, in `routes/__init__.py`,
