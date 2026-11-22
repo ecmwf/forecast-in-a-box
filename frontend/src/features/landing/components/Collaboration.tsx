@@ -100,16 +100,29 @@ export function Collaboration() {
               className="hidden h-6 w-auto min-w-0 object-contain dark:block"
             />
           </PartnerLink>
-          {/* ArcX has no logo of its own; its materials set the name in type. */}
+          {/* ArcX has no logo of its own: Global Gateway emblem, name in type. */}
           <PartnerLink
             href="https://africa-knowledge-platform.ec.europa.eu/arcx"
-            className="flex-col sm:col-span-2 lg:col-span-3"
+            className="flex-col gap-4 sm:col-span-2 sm:flex-row sm:gap-5 lg:col-span-3"
           >
-            <span className="text-3xl font-bold tracking-tight">
-              {t('brand.arcx')}
-            </span>
-            <span className="mt-1 text-center text-xs text-muted-foreground">
-              {t('brand.arcxFull')}
+            {/* h-15 puts the emblem's flag level with the EU flag (h-12). */}
+            <img
+              src="/logos/org/global-gateway.svg"
+              alt={t('brand.globalGateway')}
+              className="h-15 w-auto shrink-0 dark:hidden"
+            />
+            <img
+              src="/logos/org/global-gateway-dark.svg"
+              alt={t('brand.globalGateway')}
+              className="hidden h-15 w-auto shrink-0 dark:block"
+            />
+            <span className="flex flex-col items-center sm:items-start">
+              <span className="text-3xl font-bold tracking-tight">
+                {t('brand.arcx')}
+              </span>
+              <span className="mt-1 text-center text-xs text-muted-foreground sm:text-left">
+                {t('brand.arcxFull')}
+              </span>
             </span>
           </PartnerLink>
         </div>

@@ -187,16 +187,25 @@ export function AboutPage() {
               className="h-5 w-auto min-w-0"
             />
           </a>
-          {/* ArcX has no logo of its own; its materials set the name in type. */}
+          {/* ArcX has no logo of its own: Global Gateway emblem, name in type. */}
           <a
             href={ARCX_URL}
-            className="flex flex-col items-center justify-center bg-background px-6 py-5 text-center sm:col-span-2 lg:col-span-3"
+            className="flex flex-col items-center justify-center gap-3 bg-background px-6 py-5 sm:col-span-2 sm:flex-row sm:gap-4 lg:col-span-3"
           >
-            <span className="text-2xl font-bold tracking-tight">
-              {t('brand.arcx')}
-            </span>
-            <span className="text-xs text-balance text-muted-foreground">
-              {t('brand.arcxFull')}
+            {/* h-12.5 puts the emblem's flag level with the EU flag (h-10). */}
+            <LogoImage
+              src="/logos/org/global-gateway.svg"
+              darkSrc="/logos/org/global-gateway-dark.svg"
+              alt={t('brand.globalGateway')}
+              className="h-12.5 w-auto shrink-0"
+            />
+            <span className="flex flex-col items-center text-center sm:items-start sm:text-left">
+              <span className="text-2xl font-bold tracking-tight">
+                {t('brand.arcx')}
+              </span>
+              <span className="text-xs text-balance text-muted-foreground">
+                {t('brand.arcxFull')}
+              </span>
             </span>
           </a>
         </div>

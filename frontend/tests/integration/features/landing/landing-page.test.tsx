@@ -154,6 +154,7 @@ describe('Landing Page', () => {
         'FMI',
         'European Union',
         'DestinE',
+        'Global Gateway',
       ]) {
         await expect
           .element(screen.getByRole('img', { name, exact: true }).first())
