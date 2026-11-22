@@ -308,7 +308,7 @@ export const jobHandlers = [
       )
     }
 
-    const blob = mockBlobForMime(stored.mime_type, executionId)
+    const blob = mockBlobForMime(stored.mime_type, executionId, datasetId)
     return new HttpResponse(blob, {
       headers: {
         'Content-Type': stored.mime_type.split(';')[0].trim(),

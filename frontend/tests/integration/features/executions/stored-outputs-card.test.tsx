@@ -37,7 +37,12 @@ import {
   listMockLenses,
   resetLensState,
 } from '@tests/../mocks/data/lens.data'
-import { resetJobsState, setMockGribDir } from '@tests/../mocks/data/job.data'
+import {
+  getExecution,
+  injectMockExecution,
+  resetJobsState,
+  setMockGribDir,
+} from '@tests/../mocks/data/job.data'
 import type { JobStatus, RunOutputs } from '@/api/types/job.types'
 import type { LensInstanceDetailResponse } from '@/api/types/lens.types'
 import { StoredOutputsCard } from '@/features/executions/components/StoredOutputsCard'
@@ -156,9 +161,10 @@ describe('StoredOutputsCard', () => {
         is_available: true,
       },
     })
+    // The compare bar repeats the titles; the rows come first.
     const row = (title: string) =>
-      screen.getByText(title).element().closest('li')
-    await expect.element(screen.getByText('block_sink_2')).toBeVisible()
+      screen.getByText(title).first().element().closest('li')
+    await expect.element(screen.getByText('block_sink_2').first()).toBeVisible()
     for (const title of ['block_sink_1', 'block_sink_2']) {
       expect(row(title)?.className).not.toContain('opacity-40')
       expect(row(title)?.className).not.toContain('ring-2')
@@ -455,5 +461,186 @@ describe('StoredOutputsCard zip download', () => {
     const copied = writeText.mock.calls[0][0]
     expect(copied.startsWith('http')).toBe(true)
     expect(copied).toContain(ZIP_URL)
+  })
+})
+
+describe('StoredOutputsCard compare', () => {
+  const RUN = 'job-completed-001'
+  const marker = (block: string, available = true) => ({
+    mime_type: GRIB_DIR_MIME,
+    original_block: block,
+    is_available: available,
+  })
+  const twoSinks: RunOutputs = {
+    'task-out-grib': marker('block_sink_1'),
+    'task-out-grib-b': marker('block_sink_2'),
+  }
+
+  /** Give the seeded run two more GRIB sinks the result endpoint can serve. */
+  function seedMoreSinks() {
+    const exec = getExecution(RUN)
+    if (!exec) throw new Error('seed run missing')
+    injectMockExecution({
+      ...exec,
+      outputs: {
+        ...exec.outputs,
+        'task-out-grib-b': marker('block_sink_2'),
+        'task-out-grib-c': marker('block_sink_3'),
+      },
+    })
+  }
+
+  function separateFolders() {
+    setMockGribDir(RUN, `/data/output/${RUN}_1/AIFS`, 'task-out-grib')
+    setMockGribDir(RUN, `/data/output/${RUN}_1/IFS`, 'task-out-grib-b')
+  }
+
+  type Screen = Awaited<ReturnType<typeof renderCard>>['screen']
+  // An anchor with the button role once the pair is ready, so it opens in a new tab too.
+  const compareButton = (screen: Screen) =>
+    screen.getByRole('button', { name: 'Compare', exact: true })
+
+  beforeEach(seedMoreSinks)
+
+  it('offers no comparison for a single GRIB output', async () => {
+    const { screen } = await renderCard(outputsWithMarkers)
+    await expect.element(screen.getByText('job-completed-001_1')).toBeVisible()
+    expect(
+      screen.getByRole('group', { name: 'Compare on the map' }).elements(),
+    ).toHaveLength(0)
+  })
+
+  it('opens two outputs in separate folders side by side', async () => {
+    separateFolders()
+    const { screen, router } = await renderCard(twoSinks)
+    // Folder names label the sides once they differ, on the bar and the rows.
+    await expect.element(screen.getByLabelText('A: AIFS')).toBeVisible()
+    await expect.element(screen.getByLabelText('B: IFS')).toBeVisible()
+    const row = (side: string) =>
+      screen.getByLabelText(side, { exact: true }).element().closest('li')
+    expect(row('Side A')?.textContent).toContain('AIFSblock_sink_1')
+    expect(row('Side B')?.textContent).toContain('IFSblock_sink_2')
+    expect(
+      screen
+        .getByText('Folder shared with another output of this run')
+        .elements(),
+    ).toHaveLength(0)
+
+    // A real link: it can be opened in a new tab.
+    expect(compareButton(screen).element().getAttribute('href')).toContain(
+      '/visualise?',
+    )
+    await compareButton(screen).click()
+    await expect.poll(() => router.state.location.pathname).toBe('/visualise')
+    expect(router.state.location.search).toEqual({
+      a: `run:${RUN}~task-out-grib`,
+      b: `run:${RUN}~task-out-grib-b`,
+    })
+  })
+
+  it('swaps the sides', async () => {
+    separateFolders()
+    const { screen, router } = await renderCard(twoSinks)
+    await expect.element(screen.getByLabelText('A: AIFS')).toBeVisible()
+
+    await screen.getByRole('button', { name: 'Swap sides' }).click()
+    await expect.element(screen.getByLabelText('A: IFS')).toBeVisible()
+    await compareButton(screen).click()
+    await expect.poll(() => router.state.location.pathname).toBe('/visualise')
+    expect(router.state.location.search).toEqual({
+      a: `run:${RUN}~task-out-grib-b`,
+      b: `run:${RUN}~task-out-grib`,
+    })
+  })
+
+  it('tells the graph which sinks are on which side', async () => {
+    separateFolders()
+    const sides = () => useExecutionHoverStore.getState().compareSides
+    const { screen } = await renderCard(twoSinks)
+    await expect.poll(sides).toEqual({ a: 'block_sink_1', b: 'block_sink_2' })
+
+    await screen.getByRole('button', { name: 'Swap sides' }).click()
+    await expect.poll(sides).toEqual({ a: 'block_sink_2', b: 'block_sink_1' })
+
+    // Nothing to mark once the card is gone.
+    await screen.unmount()
+    expect(sides()).toBeNull()
+  })
+
+  it('marks no side on the graph for a single output', async () => {
+    const { screen } = await renderCard(outputsWithMarkers)
+    await expect.element(screen.getByText('job-completed-001_1')).toBeVisible()
+    expect(useExecutionHoverStore.getState().compareSides).toBeNull()
+  })
+
+  it('refuses two outputs in one folder and flags both rows', async () => {
+    const { screen } = await renderCard(twoSinks)
+    await expect
+      .element(screen.getByText('Both outputs are in the same folder'))
+      .toBeVisible()
+    await expect.element(compareButton(screen)).toBeDisabled()
+    await expect
+      .poll(
+        () =>
+          screen
+            .getByText('Folder shared with another output of this run')
+            .elements().length,
+      )
+      .toBe(2)
+  })
+
+  it('waits until both outputs are written', async () => {
+    separateFolders()
+    const { screen } = await renderCard(
+      { ...twoSinks, 'task-out-grib-b': marker('block_sink_2', false) },
+      undefined,
+      'running',
+    )
+    await expect
+      .element(screen.getByText('Available once both outputs are written.'))
+      .toBeVisible()
+    await expect.element(compareButton(screen)).toBeDisabled()
+  })
+
+  it('reports an output the finished run never wrote', async () => {
+    separateFolders()
+    const { screen } = await renderCard({
+      ...twoSinks,
+      'task-out-grib-b': marker('block_sink_2', false),
+    })
+    await expect
+      .element(screen.getByText('An output is no longer available.'))
+      .toBeVisible()
+    await expect.element(compareButton(screen)).toBeDisabled()
+  })
+
+  it('lets each row take a side when there are more than two outputs', async () => {
+    separateFolders()
+    setMockGribDir(RUN, `/data/output/${RUN}_1/BRIS`, 'task-out-grib-c')
+    const { screen, router } = await renderCard({
+      ...twoSinks,
+      'task-out-grib-c': marker('block_sink_3'),
+    })
+    await expect.element(screen.getByLabelText('A: AIFS')).toBeVisible()
+    await expect.element(screen.getByLabelText('B: IFS')).toBeVisible()
+
+    // Third row takes side B; the second row is off the pair.
+    await screen.getByRole('button', { name: 'Put on side B' }).nth(2).click()
+    await expect.element(screen.getByLabelText('B: BRIS')).toBeVisible()
+    await expect
+      .element(screen.getByRole('button', { name: 'Put on side B' }).nth(1))
+      .toHaveAttribute('aria-pressed', 'false')
+
+    // Taking the other side's output swaps the two.
+    await screen.getByRole('button', { name: 'Put on side A' }).nth(2).click()
+    await expect.element(screen.getByLabelText('A: BRIS')).toBeVisible()
+    await expect.element(screen.getByLabelText('B: AIFS')).toBeVisible()
+
+    await compareButton(screen).click()
+    await expect.poll(() => router.state.location.pathname).toBe('/visualise')
+    expect(router.state.location.search).toEqual({
+      a: `run:${RUN}~task-out-grib-c`,
+      b: `run:${RUN}~task-out-grib`,
+    })
   })
 })

@@ -24,9 +24,11 @@ import {
   useValueTypesFor,
 } from '@/features/executions/components/RunCanvas'
 import {
+  useBlockCompareSide,
   useIsBlockHovered,
   useIsBlockSelected,
 } from '@/features/executions/stores/executionHoverStore'
+import { CompareSideBadge } from '@/features/executions/components/CompareSideBadge'
 import {
   Tooltip,
   TooltipContent,
@@ -123,6 +125,8 @@ export const RunNode = memo(function ({ data, type }: NodeProps) {
     !isCompleted &&
     !isRunning
 
+  // Sinks being compared carry the side they have on the map.
+  const compareSide = useBlockCompareSide(nodeData.instanceId)
   const inputNames = Object.keys(nodeData.instance.input_ids)
   const resolved = useResolvedConfigFor(nodeData.instanceId)
   const valueTypes = useValueTypesFor(nodeData.instanceId)
@@ -205,6 +209,16 @@ export const RunNode = memo(function ({ data, type }: NodeProps) {
           )}
           {isRunning && (
             <Loader2 className="ml-auto h-3.5 w-3.5 shrink-0 animate-spin text-primary" />
+          )}
+          {compareSide && (
+            <CompareSideBadge
+              side={compareSide}
+              // Line-height tall, so the title row keeps its height.
+              className={cn(
+                'h-5 w-5 rounded',
+                !isCompleted && !isRunning && 'ml-auto',
+              )}
+            />
           )}
         </div>
         <span className="text-sm text-muted-foreground">{kindMeta.label}</span>

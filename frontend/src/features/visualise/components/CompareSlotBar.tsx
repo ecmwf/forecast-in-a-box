@@ -42,6 +42,7 @@ export function CompareSlotBar({
   entries,
   aRef,
   bRef,
+  folders,
   onAssign,
   onSwap,
   onClearSlot,
@@ -49,6 +50,8 @@ export function CompareSlotBar({
   entries: ReadonlyArray<ComparisonEntry>
   aRef: string | undefined
   bRef: string | undefined
+  /** Folder name per entry ref, set when both sides are outputs of one run. */
+  folders?: Record<string, string>
   /** Plain assignment — picking the other slot's source self-compares, never swaps. */
   onAssign: (slot: 'a' | 'b', ref: string) => void
   onSwap: () => void
@@ -69,6 +72,7 @@ export function CompareSlotBar({
           value={aRef}
           onChange={(ref) => onAssign('a', ref)}
           markRef={bRef}
+          folder={aRef ? folders?.[aRef] : undefined}
         />
         {bRef && <ClearSlotButton slot="a" onClear={() => onClearSlot('a')} />}
       </div>
@@ -90,6 +94,7 @@ export function CompareSlotBar({
           value={bRef}
           onChange={(ref) => onAssign('b', ref)}
           markRef={aRef}
+          folder={bRef ? folders?.[bRef] : undefined}
         />
         {bRef && <ClearSlotButton slot="b" onClear={() => onClearSlot('b')} />}
       </div>
@@ -129,6 +134,7 @@ function triggerMeta(
   entry: ComparisonEntry,
   timeZone: string,
   t: TFunction<'visualise'>,
+  folder?: string,
 ): string {
   const { detail } = entryDetail(entry)
   if (entry.kind !== 'output') return detail
@@ -136,6 +142,7 @@ function triggerMeta(
   const parts = [
     submittedAt ? t('slotTag.submitted', { time: submittedAt }) : null,
     entry.blockTitle && entry.blockTitle !== label ? entry.blockTitle : null,
+    folder ?? null,
   ]
   return parts.filter(Boolean).join(' · ')
 }
@@ -146,6 +153,7 @@ function SlotPicker({
   value,
   onChange,
   markRef,
+  folder,
 }: {
   slot: 'a' | 'b'
   entries: ReadonlyArray<ComparisonEntry>
@@ -153,6 +161,8 @@ function SlotPicker({
   onChange: (ref: string) => void
   /** The other slot's current ref — rows chip every slot they occupy. */
   markRef?: string
+  /** Output folder of the current source, when it tells the sides apart. */
+  folder?: string
 }) {
   const { t } = useTranslation('visualise')
   const timeZone = useAppTimeZone()
@@ -193,7 +203,7 @@ function SlotPicker({
                   )}
                 </span>
                 <span className="max-w-full min-w-0 truncate text-xs font-normal text-muted-foreground max-lg:hidden">
-                  {triggerMeta(current, timeZone, t)}
+                  {triggerMeta(current, timeZone, t, folder)}
                 </span>
               </span>
             ) : null}

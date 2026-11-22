@@ -17,6 +17,9 @@ interface ExecutionHoverState {
    * tabs (Outputs, Compilation, Graph). `null` = nothing selected. */
   selectedBlockId: string | null
   setSelectedBlockId: (id: string | null) => void
+  /** Sink blocks on sides A and B of the output comparison; null without one. */
+  compareSides: Record<'a' | 'b', string> | null
+  setCompareSides: (sides: Record<'a' | 'b', string> | null) => void
   /** Call on run change so a stale selection doesn't bleed across runs. */
   resetExecutionSelection: () => void
 }
@@ -33,8 +36,14 @@ export const useExecutionHoverStore = create<ExecutionHoverState>(
       if (get().selectedBlockId === id) return
       set({ selectedBlockId: id })
     },
+    compareSides: null,
+    setCompareSides: (sides) => {
+      const current = get().compareSides
+      if (current?.a === sides?.a && current?.b === sides?.b) return
+      set({ compareSides: sides })
+    },
     resetExecutionSelection: () => {
-      set({ hoveredBlockId: null, selectedBlockId: null })
+      set({ hoveredBlockId: null, selectedBlockId: null, compareSides: null })
     },
   }),
 )
@@ -45,6 +54,17 @@ export function useIsBlockHovered(blockId: string): boolean {
 }
 
 /** True when this block id is the currently-selected one. */
+/** Side of the output comparison a block is on, if any. */
+export function useBlockCompareSide(blockId: string): 'a' | 'b' | null {
+  return useExecutionHoverStore((state) =>
+    state.compareSides?.a === blockId
+      ? 'a'
+      : state.compareSides?.b === blockId
+        ? 'b'
+        : null,
+  )
+}
+
 export function useIsBlockSelected(blockId: string): boolean {
   return useExecutionHoverStore((state) => state.selectedBlockId === blockId)
 }

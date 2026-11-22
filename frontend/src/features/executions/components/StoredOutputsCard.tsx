@@ -29,13 +29,30 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from '@tanstack/react-router'
+import { useQueries } from '@tanstack/react-query'
 import type {
   BlockFactoryCatalogue,
   FableBuilderV1,
 } from '@/api/types/fable.types'
 import type { JobStatus, RunOutputs } from '@/api/types/job.types'
+import type {
+  ComparableOutput,
+  SlotPick,
+} from '@/features/executions/outputs/compare-outputs'
+import type { SourceSlot } from '@/features/viewer/geo/layer-pairing'
 import type { LostTaskIds } from '@/features/executions/outputs/availability'
+import { isTerminalStatus } from '@/api/types/job.types'
 import { classifyOutput } from '@/features/executions/outputs/availability'
+import {
+  outputLabels,
+  pickSlot,
+  sharedFolderBlockIds,
+} from '@/features/executions/outputs/compare-outputs'
+import { CompareOutputsBar } from '@/features/executions/components/CompareOutputsBar'
+import {
+  CompareSideBadge,
+  SLOT_FILL_CLASS,
+} from '@/features/executions/components/CompareSideBadge'
 import { blockDisplayNames } from '@/features/fable-builder/utils/block-names'
 import {
   useLensList,
@@ -47,6 +64,7 @@ import {
 import { buildAbsoluteWmsCapabilitiesUrl } from '@/api/endpoints/lens'
 import {
   isSinkComplete,
+  storedDirQueryOptions,
   useStoredDirPath,
 } from '@/features/executions/outputs/stored-dir'
 import { isGribDirMime } from '@/features/executions/outputs/adapters/grib'
@@ -170,6 +188,52 @@ export function StoredOutputsCard({
     return Array.from(byBlock.values())
   }, [outputs, lostTaskIds, fable, catalogue])
 
+  // Same queries as the rows: one request per sink, shared through the cache.
+  const dirQueries = useQueries({
+    queries: rows.map((row) => ({
+      ...storedDirQueryOptions(jobId, row.taskId),
+      enabled: row.isAvailable,
+    })),
+  })
+  const comparable = rows.map<ComparableOutput>((row, i) => ({
+    blockId: row.blockId,
+    taskId: row.taskId,
+    title: row.title,
+    written:
+      row.isAvailable &&
+      isSinkComplete({ written: row.written, total: row.count }, status),
+    // A run that has ended will not write a missing output any more.
+    lost:
+      !row.isAvailable &&
+      (row.lostReason !== undefined || isTerminalStatus(status)),
+    dirPath: dirQueries[i].data ?? null,
+  }))
+  const siblingShared = sharedFolderBlockIds(comparable)
+  const labels = outputLabels(comparable)
+
+  // Sides of the comparison; the first two outputs until the user picks.
+  const [picked, setPicked] = useState<SlotPick | null>(null)
+  const sideA =
+    comparable.find((o) => o.blockId === picked?.a) ?? comparable.at(0)
+  const sideB =
+    comparable.find((o) => o.blockId === picked?.b && o !== sideA) ??
+    comparable.find((o) => o !== sideA)
+  const pair = sideA && sideB ? { a: sideA, b: sideB } : null
+  const pick = (slot: SourceSlot, blockId: string) => {
+    if (!pair) return
+    setPicked(pickSlot({ a: pair.a.blockId, b: pair.b.blockId }, slot, blockId))
+  }
+  // The graph marks the same two sinks.
+  const setCompareSides = useExecutionHoverStore((s) => s.setCompareSides)
+  const sideABlock = pair?.a.blockId
+  const sideBBlock = pair?.b.blockId
+  useEffect(() => {
+    setCompareSides(
+      sideABlock && sideBBlock ? { a: sideABlock, b: sideBBlock } : null,
+    )
+    return () => setCompareSides(null)
+  }, [sideABlock, sideBBlock, setCompareSides])
+
   if (rows.length === 0) return null
 
   return (
@@ -190,9 +254,31 @@ export function StoredOutputsCard({
             )}
             owner={lensOwnerKey(jobId, attempt)}
             runName={runName}
+            siblingFolder={siblingShared.has(row.blockId)}
+            label={labels[row.blockId]}
+            side={
+              pair?.a.blockId === row.blockId
+                ? 'a'
+                : pair?.b.blockId === row.blockId
+                  ? 'b'
+                  : null
+            }
+            // With two outputs the sides are given; with more, each row picks.
+            onPickSide={pair && rows.length > 2 ? pick : undefined}
+            comparing={pair !== null}
           />
         ))}
       </ul>
+      {pair && (
+        <CompareOutputsBar
+          jobId={jobId}
+          runName={runName}
+          a={pair.a}
+          b={pair.b}
+          labels={labels}
+          onSwap={() => pick('a', pair.b.blockId)}
+        />
+      )}
     </Card>
   )
 }
@@ -203,6 +289,11 @@ function StoredOutputRowItem({
   complete,
   owner,
   runName,
+  siblingFolder,
+  label,
+  side,
+  onPickSide,
+  comparing,
 }: {
   jobId: string
   row: StoredOutputRow
@@ -211,6 +302,16 @@ function StoredOutputRowItem({
   /** Run attempt a started lens belongs to. */
   owner: string
   runName?: string
+  /** Another sink of this run writes into the same folder. */
+  siblingFolder: boolean
+  /** Row title: the folder name when it tells the outputs apart. */
+  label: string
+  /** Side of the comparison this output is on. */
+  side: SourceSlot | null
+  /** Set when the sides can be chosen on the rows. */
+  onPickSide?: (slot: SourceSlot, blockId: string) => void
+  /** The run has outputs to compare, so rows show their side. */
+  comparing: boolean
 }) {
   const { t } = useTranslation('executions')
   // Graph selection, shown like the output cards: ring on this sink, fade on others.
@@ -334,6 +435,14 @@ function StoredOutputRowItem({
         selection === 'other' && 'opacity-40',
       )}
     >
+      {comparing && (
+        <SideMarker
+          side={side}
+          onPick={
+            onPickSide ? (slot) => onPickSide(slot, row.blockId) : undefined
+          }
+        />
+      )}
       <span
         className={cn(
           'mt-0.5 shrink-0 rounded-md px-1.5 py-0.5 font-mono text-sm font-semibold',
@@ -345,7 +454,12 @@ function StoredOutputRowItem({
       {/* Actions wrap below 12rem of text. */}
       <div className="min-w-0 flex-1 basis-48">
         <div className="flex items-baseline gap-2">
-          <P className="truncate text-sm font-medium">{row.title}</P>
+          <P className="truncate text-sm font-medium">{label}</P>
+          {label !== row.title && (
+            <span className="shrink-0 text-sm text-muted-foreground">
+              {row.title}
+            </span>
+          )}
           {row.count > 1 && (
             <span className="shrink-0 text-sm text-muted-foreground">
               {complete
@@ -361,14 +475,16 @@ function StoredOutputRowItem({
           <button
             type="button"
             onClick={() => copyPath(dirPath)}
-            className="group/path flex w-full min-w-0 items-center gap-1 text-left font-mono text-sm text-muted-foreground transition-colors hover:text-foreground"
+            className="group/path flex w-full min-w-0 items-center text-left font-mono text-sm text-muted-foreground transition-colors hover:text-foreground"
             title={t('storedOutputs.copyPath')}
           >
-            <span className="truncate">
-              {dir}
-              <span className="text-foreground/80">{name}</span>
+            {/* The parent gives way first: the last segment names the output. */}
+            <span className="min-w-0 truncate">{dir.replace(/\/$/, '')}</span>
+            {dir && <span className="shrink-0">/</span>}
+            <span className="max-w-[70%] shrink-0 truncate text-foreground/80">
+              {name}
             </span>
-            <Copy className="h-3 w-3 shrink-0 opacity-0 transition-opacity group-hover/path:opacity-70" />
+            <Copy className="ml-1 h-3 w-3 shrink-0 opacity-0 transition-opacity group-hover/path:opacity-70" />
           </button>
         ) : row.isAvailable ? (
           <P className="font-mono text-sm text-muted-foreground">…</P>
@@ -393,6 +509,23 @@ function StoredOutputRowItem({
             <TooltipContent>
               <P className="max-w-xs text-sm text-inherit">
                 {t('storedOutputs.sharedFolderHint')}
+              </P>
+            </TooltipContent>
+          </Tooltip>
+        )}
+        {siblingFolder && (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <div className="flex w-fit items-center gap-1.5 text-sm text-muted-foreground" />
+              }
+            >
+              <AlertCircle className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+              {t('storedOutputs.siblingFolder')}
+            </TooltipTrigger>
+            <TooltipContent>
+              <P className="max-w-xs text-sm text-inherit">
+                {t('storedOutputs.siblingFolderHint')}
               </P>
             </TooltipContent>
           </Tooltip>
@@ -485,5 +618,44 @@ function StoredOutputRowItem({
         )}
       </div>
     </li>
+  )
+}
+
+const SIDE_BOX_CLASS =
+  'flex h-6 w-6 items-center justify-center rounded-md font-mono text-xs font-bold'
+
+/** The comparison side of a row; buttons when the sides can be chosen. */
+function SideMarker({
+  side,
+  onPick,
+}: {
+  side: SourceSlot | null
+  onPick?: (slot: SourceSlot) => void
+}) {
+  const { t } = useTranslation('executions')
+  if (!onPick) return side ? <CompareSideBadge side={side} /> : null
+  return (
+    <span className="flex shrink-0 gap-0.5">
+      {(['a', 'b'] as const).map((slot) => (
+        <button
+          key={slot}
+          type="button"
+          aria-pressed={side === slot}
+          aria-label={t('storedOutputs.compare.putOnSide', {
+            slot: slot.toUpperCase(),
+          })}
+          onClick={() => onPick(slot)}
+          className={cn(
+            SIDE_BOX_CLASS,
+            'transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+            side === slot
+              ? cn('text-white', SLOT_FILL_CLASS[slot])
+              : 'border border-border text-muted-foreground hover:text-foreground',
+          )}
+        >
+          {slot.toUpperCase()}
+        </button>
+      ))}
+    </span>
   )
 }
