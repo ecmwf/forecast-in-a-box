@@ -5,7 +5,7 @@
 Proposal (step 1 of the [changeSpecs workflow](README.md)), open for feedback.
 
 - Supersedes the *Release Scenario* of [ci-fiab_core.md](ci-fiab_core.md) (reversing its conclusion that the repository stays organized as-is) and revisits its *Install Scenario* with respect to `fiab-core` locking. The *Migration Scenario* in [ci-fiab_core.md](ci-fiab_core.md) (blueprint version warnings) is unaffected.
-- Supersedes the installer/launcher split originally proposed in [#169](https://github.com/ecmwf/forecast-in-a-box/issues/169); the explicit `upgrade`/`reinstall` commands delivered in [#757](https://github.com/ecmwf/forecast-in-a-box/pull/757) remain valid until the Phase 4 transition.
+- Supersedes the installer/launcher split originally proposed in [#169](https://github.com/ecmwf/forecast-in-a-box/issues/169); the explicit `upgrade`/`reinstall` commands delivered in [#757](https://github.com/ecmwf/forecast-in-a-box/pull/757) remain valid until the Phase 5 transition.
 - Companion to [deployment-runtimeAndDockerV3-design.md](deployment-runtimeAndDockerV3-design.md), which covers the Python runtime bootstrap, `FIAB_HOME`/storage classes, and the initial Docker v3 image and can proceed in parallel.
 - Organized into work packages with explicit dependencies rather than a strict linear chain (see [Dependencies and ordering](#dependencies-and-ordering)).
 
@@ -54,14 +54,15 @@ The repository is structured as a single `uv` workspace rooted at `backend/`, wi
 
 ## Dependencies and ordering
 
-The work packages form a small DAG rather than a strict linear sequence:
+The five phases form a small DAG in topological order:
 
 - **Phase 1 (repo layout)** goes first. Making packages standalone removes `UV_NO_PROJECT=1` workarounds and avoids rework in every downstream phase.
-- **Phase 2 (CD + `fiab-core` locking)** and **Phase 3a (local wheelhouse for CI/pre-releases)** can be developed together or in either order after Phase 1; Phase 2's `cd-major` and pre-tag Docker gating directly consume Phase 3a's wheelhouse.
-- **Phase 3b (`just dev` + cluster submits via wheelhouse)** is independent of Phases 2 and 4 and can run anytime after Phase 1 (or earlier if minor path updates during Phase 1 are acceptable).
-- **Phase 4 (`scripts/fiab.sh` distribution)** depends on Phases 2 and 3a (final lock/asset and wheelhouse/pre-release format), and is independent of Phase 3b.
+- **Phase 2 (local wheelhouse & pre-release testing)** builds on Phase 1 and provides the wheelhouse tooling consumed by both Phase 3 and Phase 4.
+- **Phase 3 (`just dev` & cluster submits via wheelhouse)** depends on Phase 2 (reusing its wheelhouse tooling) and is independent of Phases 4 and 5.
+- **Phase 4 (CD workflows, `fiab-core` locking, & pre-tag Docker v3 gating)** depends on Phase 2 (`cd-major` and pre-tag Docker gating consume the wheelhouse) and is independent of Phase 3.
+- **Phase 5 (`scripts/fiab.sh` replacement & standalone distribution)** depends on Phase 4 (published lock/assets) and Phase 2 (wheelhouse/pre-release format), and is independent of Phase 3.
 
-Summary: `1 -> (2 + 3a) -> 4`, with `3b` independent after `1`.
+Summary: `1 -> 2 -> 4 -> 5`, with `1 -> 2 -> 3` as an independent branch after Phase 2.
 
 ## Phase 1: Repository layout restructure
 
@@ -79,7 +80,25 @@ This is the prerequisite for every subsequent phase because CI/CD complexity ste
 - Prototype and validate the new layout in a disposable branch first (verifying editable workspace tests, isolated package builds, and `just dev`).
 - Because moving package paths invalidates open pull requests, coordinate a short freeze/drain window with the team and land the layout move in a single coordinated PR.
 
-## Phase 2: CD workflow redesign and `fiab-core` locking
+## Phase 2: Local wheelhouse and pre-release testing
+
+Depends on Phase 1; provides the wheelhouse tooling consumed by Phase 3 (`just dev` / cluster submits) and Phase 4 (`cd-major` and pre-tag Docker v3 verification).
+
+- Build candidate wheels (and lock) into a local wheelhouse directory from any branch in CI or locally.
+- Prefer a local wheelhouse over `pip install git+...` because it exercises actual built wheels, entry points, and package data, and works identically for CI tests, Docker v3 builds, and local testing.
+- Rehearse the thin publish-only steps using PEP 440 pre-releases (PyPI or TestPyPI), GitHub pre-releases (excluded from `/releases/latest`), and scratch Docker tags.
+- **Keeps air-gapped / restricted-network installs open:** a local wheelhouse (`uv pip install --find-links`), combined with Cascade's `custom_pip_indices` for task execution environments, provides the building block for restricted HPC or air-gapped hosts if required later.
+
+## Phase 3: `just dev` and cluster submits via local wheelhouse
+
+Depends on Phase 2; independent of Phases 4 and 5.
+
+- Evaluate replacing editable installs in `just dev` with populating a local wheelhouse and running from installed wheels (while keeping editable workspace installs for unit tests via the Phase 1 metapackage).
+- **Benefit:** The same wheelhouse tooling serves pre-release testing, `just dev`, and cluster submits (avoiding editable-install divergence on remote workers). Because the backend does not rely on hot reloads or `importlib` reloads, the small startup rebuild cost is acceptable if wheel builds are fast and cached.
+
+## Phase 4: CD workflow redesign and `fiab-core` locking
+
+Depends on Phases 1 and 2; independent of Phase 3.
 
 ### Prerequisite decision: `fiab-core` locking policy
 
@@ -95,7 +114,7 @@ Before finalizing the CD workflow interplay, the team must decide how `fiab-core
 
 **Lockfile and constraints mechanics (to verify before implementation):**
 1. **Local wheelhouse vs. PyPI lock:** When a release publishes both a new `fiab-core` and a new `forecast-in-a-box`, a PEP 751 `pylock.toml` exported against a local wheelhouse before publishing will reference local paths rather than PyPI URLs. The pipeline must account for how the published lock references PyPI without re-introducing untested release-only drift.
-2. **Constraints for plugins:** `uv pip install` currently treats `pylock.toml` as a standalone install input rather than a `-c constraints.txt` file combinable with extra plugin requirements (as noted in `cd-backend.yml`). If plugin installation or [plugins-candidate_venvs.md](plugins-candidate_venvs.md) needs backend constraints, CD will need to export a constraints file alongside `pylock.toml` or use a verified `uv` resolution command.
+2. **Constraints for plugins:** `uv pip install` currently treats `pylock.toml` as a standalone install input rather than a `-c constraints.txt` file combinable with extra plugin requirements (as noted in `cd-backend.yml`). If plugins continue sharing the backend venv (or generations per [plugins-candidate_venvs.md](plugins-candidate_venvs.md)), CD will need to export a constraints file alongside `pylock.toml` or use a verified `uv` resolution command. If plugins instead run in isolated per-plugin processes with their own venvs, backend-vs-plugin dependency conflicts largely disappear and the backend can pin `fiab-core` strictly while plugins resolve compatible `fiab-core` minors across a major-versioned IPC boundary.
 
 ### Redesigned CD workflows
 
@@ -106,8 +125,8 @@ Replace `cd-core`, `cd-plugins`, and `cd-backend` with:
   - Builds all wheels into a local wheelhouse, runs the verification suite (including Docker v3 build and smoke test), and only then publishes all wheels to PyPI, creates the GitHub release, and pushes the Docker v3 image.
   - Eliminates the broken-repo window between `cd-core` and `cd-backend`.
 - **`cd-minor-{core,plugins,backend}`** (non-breaking single-component release):
-  - Releases a single component (minor or patch bump) without assuming breaking changes.
-  - Tests the candidate wheel cleanly against the published PyPI versions of the other components (matching what users install). If it fails despite CI passing, that signals a breaking cross-package change requiring `cd-major` instead.
+  - Releases a single component group (minor or patch bump) without assuming breaking changes: `core` (`fiab-core` and `fiab-plugin-test`), `plugins` (`fiab-plugin-ecmwf`, `fiab-plugin-demo`), `backend` (`forecast-in-a-box` with frontend; release group for `fiab-mcp-server` to be confirmed).
+  - Tests the candidate wheel cleanly against the published PyPI versions of the other components (matching what users install). If it fails despite CI passing, that signals either a breaking cross-package change (requiring `cd-major`) or an unreleased non-breaking dependency change (for example, `cd-minor-core` must be released before `cd-minor-backend`).
   - Backend releases (whether via `cd-major` or `cd-minor-backend`) create the GitHub release and publish the Docker v3 image.
 
 ### Pre-tag Docker v3 gating
@@ -120,22 +139,9 @@ Replace `cd-core`, `cd-plugins`, and `cd-backend` with:
 - **Tag scheme:** Evaluate whether the `{v,c,p}<version>` tag prefixes are still needed to coordinate components once `cd-major` is atomic and each package is standalone.
 - **CI/CD scripting:** Replace brittle bash logic in `scripts/cicd/` with simpler, testable tooling (for example Python scripts) where practical.
 
-## Phase 3a: Local wheelhouse and pre-release testing
+## Phase 5: `scripts/fiab.sh` replacement and standalone distribution
 
-Can be built alongside or ahead of Phase 2; directly supports `cd-major` and pre-tag Docker v3 verification.
-
-- Build candidate wheels (and lock) into a local wheelhouse directory from any branch in CI or locally.
-- Prefer a local wheelhouse over `pip install git+...` because it exercises actual built wheels, entry points, and package data, and works identically for CI tests, Docker v3 builds, and local testing.
-- Rehearse the thin publish-only steps using PEP 440 pre-releases (PyPI or TestPyPI), GitHub pre-releases (excluded from `/releases/latest`), and scratch Docker tags.
-
-## Phase 3b: `just dev` and cluster submits via local wheelhouse
-
-Independent of Phases 2 and 4; can run anytime after Phase 1.
-
-- Evaluate replacing editable installs in `just dev` with populating a local wheelhouse and running from installed wheels (while keeping editable workspace installs for unit tests via the Phase 1 metapackage).
-- **Benefit:** The same wheelhouse tooling serves pre-release testing, `just dev`, and cluster submits (avoiding editable-install divergence on remote workers). Because the backend does not rely on hot reloads or `importlib` reloads, the small startup rebuild cost is acceptable if wheel builds are fast and cached.
-
-## Phase 4: `scripts/fiab.sh` replacement and standalone distribution
+Depends on Phases 2 and 4; independent of Phase 3.
 
 ### Product requirements
 
@@ -151,24 +157,25 @@ With runtime bootstrap moved into the Python `fiab` entrypoint ([deployment-runt
 
 - **Fresh install:** `curl -fsSL <stable_latest_url>/install.sh | bash` (or downloaded and executed via `bash install.sh`).
 - **Pinned / pre-release install:** `curl -fsSL <stable_version_url>/install.sh | bash`.
-- **Forge-agnostic hosting:** Because the installer is just a plain static HTTP download (no GitHub API calls), it can be hosted on GitHub Releases, GitLab Releases / Generic Package Registry (for example on DestinE), a project-owned redirect/static URL (such as an ECMWF domain), object storage, or a local wheelhouse. Making the installer base URL configurable in `fiab upgrade` avoids hardcoding GitHub.
+- **Forge-agnostic hosting:** Because the installer is just a plain static HTTP download (no GitHub API calls), it can be hosted on GitHub/GitLab Releases, Generic Package Registry, a project-owned redirect/static URL (such as an ECMWF domain), object storage, or a local wheelhouse. Making the installer base URL configurable in `fiab upgrade` avoids hardcoding GitHub.
 - **Embedded version (and optionally lock):** The source script in git carries a sentinel value (for example `FIAB_VERSION="dev"`, interpreted locally as installing from a local wheelhouse or checkout). At release time, CD stamps the exact release or pre-release version into the published `install.sh` artifact. If `pylock.toml` is either embedded in `install.sh` (or fetched relative to the same base URL / local wheelhouse), `install.sh` becomes a single self-contained artifact with zero forge-specific API or path assumptions.
 - **Upgrades:** `fiab upgrade [version]` (implemented in Python) resolves the target version (for example from PyPI JSON metadata or a configured mirror) and executes that version's `install.sh`. Each version's `install.sh` only needs to know how to install itself (its own pinned Python, `uv` requirement, and lock).
-- **Safe swap & pipe safety:** `install.sh` installs into a staging venv outside `FIAB_HOME`, atomically flips a `current` symlink (with `~/.local/bin/fiab -> .../current/bin/fiab`), never reads interactive prompts from stdin, is idempotent on re-run, and prints a `PATH` hint if `~/.local/bin` is not yet on `PATH`.
+- **Safe swap:** `install.sh` installs into a versioned venv under the code install directory outside `FIAB_HOME` (default `~/.local/share/fiab/app/vX.Y.Z/`, overridable via env var) and atomically flips a `current -> vX.Y.Z` symlink there, with `~/.local/bin/fiab` pointing to `~/.local/share/fiab/app/current/bin/fiab`. Initially `current` can be a single directory (or a symlink with old versions pruned after swap); keeping versioned directories naturally enables a `previous <-> current <-> next` rollout/rollback flow (or side-by-side versions) later without changing the executable path. 
+- **Piping and re-run:** `install.sh` should never read interactive prompts from stdin, is idempotent on re-run, and prints a `PATH` hint if `~/.local/bin` is not yet on `PATH`.
 - **Runtime and restart:** `fiab` handles `run`, `service`, `warmup`, and post-upgrade restart coordination. `install.sh` never touches `FIAB_HOME`; state migration or compatibility checks remain TBD in a separate state-evolution spec.
 
 ### Minimal cross-version contract
 
 Under this pattern, the entire permanent cross-version surface for standalone installs reduces to:
 
-1. **Stable URLs:** a stable latest-release `install.sh` URL and a per-version `install.sh` URL template (configurable for mirrors/GitLab, or backed by a project-owned domain).
+1. **Stable URLs:** a stable latest-release `install.sh` URL and a per-version `install.sh` URL template (configurable for mirrors/GitLab, or backed by a project-owned domain). If the single-bootstrap-from-PyPI option in Open Question 6(b) is chosen instead, this simplifies further to a single stable `install.sh` URL plus PyPI (or a configured PyPI mirror).
 2. **CLI interface:** the `fiab` command on `PATH` (`run`, `service`, `warmup`, `upgrade [version]`).
-3. **Code location layout:** a stable default install directory (for example `~/.local/share/fiab`, overridable via env var) and `current` symlink convention so a newer `install.sh` can atomically replace an older installation.
+3. **Code location layout:** a stable default code install directory (matching [deployment-runtimeAndDockerV3-design.md](deployment-runtimeAndDockerV3-design.md), for example `~/.local/share/fiab/app`, overridable via env var) with a `current` entry (`current -> vX.Y.Z` symlink, or initially a single directory) so a newer `install.sh` can atomically replace an older installation and future side-by-side versions remain possible.
 4. **State boundary:** `FIAB_HOME` ([deployment-runtimeAndDockerV3-design.md](deployment-runtimeAndDockerV3-design.md)) is never modified by `install.sh`.
 
 ### Optional transition from `scripts/fiab.sh`
 
-Whether to support a seamless in-place migration from existing `scripts/fiab.sh` installations or make a clean cutover (with manual migration instructions) can be decided when Phase 4 is scheduled. If an automated in-place transition is desired, timed after [deployment-runtimeAndDockerV3-design.md](deployment-runtimeAndDockerV3-design.md), Phase 2, and Phase 3a are proven:
+Whether to support a seamless in-place migration from existing `scripts/fiab.sh` installations or make a clean cutover (with manual migration instructions) can be decided when Phase 5 is scheduled. If an automated in-place transition is desired, timed after [deployment-runtimeAndDockerV3-design.md](deployment-runtimeAndDockerV3-design.md), Phase 2, and Phase 4 are proven:
 
 - **Minor-release sequencing constraint:** The transition release must ship as a minor release so existing `scripts/fiab.sh` installations can reach it via `fiab.sh upgrade` (which only upgrades within the same major version, whereas `reinstall` deletes state).
 - **Stub launcher:** In the transition release, `scripts/fiab.sh` becomes a stub. On an existing installation it migrates once: installs the same release through `install.sh`, removes the old venv, `uv`, lock, timestamp, and marker from `~/.fiab` while leaving user state (`user.db`, `job.db`, `config.toml`, `data_dir`) in place, and prints the new `fiab` command. If invoked on a machine with no existing `~/.fiab` (for example from an old bookmark to `main`), it delegates to the latest `install.sh` or prints the new install command.
@@ -179,7 +186,7 @@ Whether to support a seamless in-place migration from existing `scripts/fiab.sh`
 1. **Top-level package directory layout:** Should standalone packages live directly at the repo root (`backend/`, `fiab-core/`, ...) or under a `python/` subdirectory (`python/backend/`, `python/fiab-core/`, ...) alongside `frontend/` and `cli/`?
 2. **`fiab-core` locking policy:** Option A (exact pin in `pylock.toml`, coupling `fiab-core` minor updates to backend releases) or Option B (major-range resolution)?
 3. **Wheelhouse-to-PyPI `pylock.toml` generation:** What is the cleanest way to test a local wheelhouse containing an unpublished `fiab-core` while publishing a `pylock.toml` that resolves cleanly from PyPI?
-4. **Constraints file for plugins:** Should CD publish an exported constraints file alongside `pylock.toml` for plugin installs and [plugins-candidate_venvs.md](plugins-candidate_venvs.md)?
+4. **Constraints file for plugins:** Should CD publish an exported constraints file alongside `pylock.toml` for plugin installs and [plugins-candidate_venvs.md](plugins-candidate_venvs.md), or will per-plugin isolated venvs/processes make backend-vs-plugin constraints unnecessary?
 5. **Component tags (`{v,c,p}<version>`):** Can component tags be simplified or removed under `cd-major` / `cd-minor-{component}`?
-6. **Hosting of `install.sh` and `pylock.toml`:** How to avoid mirroring per-version release assets across forges (for example GitHub and a DestinE GitLab mirror)? Options to evaluate: (a) keep one canonical host (GitHub Releases or an ECMWF/project-owned static URL/redirect) for workstation `install.sh`, while DestinE uses Docker v3 / local wheelhouses; (b) bundle `pylock.toml` (and pinned Python version) inside the `forecast-in-a-box` wheel so PyPI (or any PyPI mirror / wheelhouse) is the single source of truth and only one tiny, version-agnostic bootstrap `install.sh` needs to be hosted; or (c) embed `pylock.toml` inside per-version `install.sh` assets on a neutral host.
+6. **Hosting of `install.sh` and `pylock.toml`:** How to avoid mirroring per-version release assets across forges (for example GitHub and a DestinE GitLab mirror)? Options to evaluate: (a) keep one canonical host (GitHub Releases or an ECMWF/project-owned static URL/redirect) for workstation `install.sh`, while DestinE uses Docker v3 / local wheelhouses; (b) bundle `pylock.toml` (and pinned Python version) inside the `forecast-in-a-box` wheel so PyPI (or any PyPI mirror / wheelhouse) is the single source of truth and only one tiny, version-agnostic bootstrap `install.sh` needs to be hosted (`uv pip install --no-deps --target <tmpdir> forecast-in-a-box==<ver>` populates `uv`'s global cache and extracts the lock/metadata in one step, so the subsequent venv install reuses the cached wheel without redownloading); or (c) embed `pylock.toml` inside per-version `install.sh` assets on a neutral host.
 7. **`just dev` wheelhouse startup cost:** Is the local wheelhouse build time fast enough for everyday `just dev` iteration, or should editable `just dev` remain an option alongside a wheelhouse mode?

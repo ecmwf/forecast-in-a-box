@@ -6,9 +6,9 @@ Proposal (step 1 of the [changeSpecs workflow](README.md)), open for feedback.
 
 - Covers the runtime, storage, and container deployment architecture so it can proceed immediately without waiting on repository restructuring or CI/CD changes.
 - Companion to [ci-repoLayoutAndRelease-design.md](ci-repoLayoutAndRelease-design.md), which covers repository layout, `cd-major`/`cd-minor-*` workflows, `fiab-core` locking, pre-release testing, and replacing `scripts/fiab.sh`.
-- Relates to the in-app upgrade UI of [#187](https://github.com/ecmwf/forecast-in-a-box/issues/187): disables (or gates off) the legacy in-place `POST /admin/release` mutation path rather than removing the endpoint, so it can later delegate to the `fiab upgrade` / `install.sh` mechanism in [ci-repoLayoutAndRelease-design.md](ci-repoLayoutAndRelease-design.md) for standalone installs while staying disabled in container/managed deployments.
-- Leaves `scripts/fiab.sh` untouched and backwards-compatible for existing workstation users (the explicit `upgrade`/`reinstall` commands from [#757](https://github.com/ecmwf/forecast-in-a-box/pull/757) remain valid until the Phase 4 transition in [ci-repoLayoutAndRelease-design.md](ci-repoLayoutAndRelease-design.md)).
-- Explicitly defers database migrations ([backend-db_migrations.md](backend-db_migrations.md)), plugin environment generations ([plugins-candidate_venvs.md](plugins-candidate_venvs.md)), state/version lifecycle policies (upgrade, rollback, side-by-side versions), and Kubernetes operator support (Docker v4).
+- Relates to the in-app upgrade UI of [#187](https://github.com/ecmwf/forecast-in-a-box/issues/187): disables (or gates off) the in-place `POST /admin/release` mutation path rather than removing the endpoint, so it can later delegate to the `fiab upgrade` / `install.sh` mechanism in [ci-repoLayoutAndRelease-design.md](ci-repoLayoutAndRelease-design.md) for standalone installs while staying disabled in container/managed deployments.
+- Leaves `scripts/fiab.sh` untouched and backwards-compatible for existing workstation users (the explicit `upgrade`/`reinstall` commands from [#757](https://github.com/ecmwf/forecast-in-a-box/pull/757) remain valid until the Phase 5 transition in [ci-repoLayoutAndRelease-design.md](ci-repoLayoutAndRelease-design.md)).
+- Explicitly defers database migrations ([backend-db_migrations.md](backend-db_migrations.md)), plugin environment generations ([plugins-candidate_venvs.md](plugins-candidate_venvs.md)), state/version lifecycle policies (upgrade, rollback, side-by-side versions), and Kubernetes operator support (Docker v4). Note: [plugins-candidate_venvs.md](plugins-candidate_venvs.md) needs reconciling so Forecastbox version changes remain owned by the deployer/image rather than plugin generations.
 
 ## Context
 
@@ -27,7 +27,7 @@ Forecast-in-a-Box is started in four different ways today, each reimplementing p
 2. **Ambiguous `FIAB_ROOT` naming.** `scripts/fiab.sh` documents `FIAB_ROOT` as the installation directory (containing `venv/` and `uvdir/`), while `backend/src/forecastbox/utility/config.py` assigns it to `fiab_home` and uses it exclusively for state, config, and data (`user.db`, `job.db`, `config.toml`, `data_dir`).
 3. **Runtime bootstrap is duplicated four times.** Directory creation, config seeding, first-run detection, release identity, and earthkit cache defaults are split across shell scripts, the root `justfile`, and Dockerfiles.
 4. **Storage classes are conflated.** Immutable model artifacts (weights, checkpoints) and mutable job inputs/outputs share a single `data_path`. Caches and scratch space are only partly configurable.
-5. **Fragmented container setups.** `deployment/ewc`, `deployment/v2`, metno/fnmi Docker setups, and manual Spark deployments have diverged and need to be unified into a single maintainable Docker v3 setup.
+5. **Fragmented container setups.** `deployment/ewc`, `deployment/v2`, metno/fnmi Docker setups, and manual Spark deployments have diverged and would benefit from unification into a single maintainable setup.
 6. **Implicit backend couplings to `fiab.sh`.** The backend reads `FIAB_RELEASE_MARKER` and `FIAB_FIRSTRUN`, parses `pylock.toml.timestamp`, and references `refs/tags/${TAG}/install/artifacts.json` in `utility/config.py`.
 
 ## Goals
@@ -35,7 +35,7 @@ Forecast-in-a-Box is started in four different ways today, each reimplementing p
 - **G1** Self-sufficient runtime: once installed in a venv, the backend runs directly via its `fiab` console script without an external launcher script.
 - **G2** Unified runtime behaviour across Docker v3, `just dev`, standalone venvs, and legacy `scripts/fiab.sh`.
 - **G3** Strict separation of installed Code from persistent State (`FIAB_HOME`), with separately configurable storage classes (State, Model Artifacts, Job Data, Caches, Scratch).
-- **G4** A Docker v3 deployment unifying Spark, Destin/EWC, metno/fnmi, and standard Linux x86 + NVIDIA GPU hosts, retiring both `deployment/ewc` and `deployment/v2`.
+- **G4** A Docker v3 deployment unifying Spark, EWC, DestinE, and standard Linux x86 + NVIDIA GPU hosts, retiring both `deployment/ewc` and `deployment/v2`.
 - **G5** Keep future directions open -- multi-user shared servers and hubs, side-by-side versions, DB migrations or export/import, plugin generations, and Kubernetes (v4) -- without committing to them prematurely.
 
 ## Non-goals
@@ -107,7 +107,7 @@ Therefore, this design separates these concerns cleanly:
 | **State** | `user.db`, `job.db`, user `config.toml`, desired plugin list | Small, mutable, schema-bearing; needs reliable persistent storage | `FIAB_HOME` |
 | **Bulk data: Model artifacts** | Model weights, checkpoints | Large, immutable; shareable read-only across users and side-by-side versions | `FIAB_HOME/data_dir/artifacts` (or current `data_dir` layout during transition) |
 | **Bulk data: Job data** | Job inputs and outputs | Large, grows with use | `FIAB_HOME/data_dir/jobs` (or current `data_dir` layout during transition) |
-| **Caches & task environments** | uv cache, earthkit-data cache, cascade task venvs (`CASCADE_VENV_ROOT`) | Rebuildable; may be cleared. Task venvs require a local exec-mountable filesystem | Platform cache defaults / `FIAB_HOME/cache` |
+| **Caches & task environments** | uv cache, earthkit-data cache, cascade task venvs (`CASCADE_VENV_ROOT`), and (if plugins run out-of-process) per-plugin venvs | Rebuildable; may be cleared. Task and plugin venvs require a local exec-mountable filesystem | Platform cache defaults / `FIAB_HOME/cache` |
 | **Scratch** | Temporary cascade logs (`cascade_logging_base`), per-run temp files | Short-lived; local filesystem | System temp / `FIAB_HOME/tmp` |
 
 Requirements:
@@ -118,14 +118,14 @@ Requirements:
 
 ### Optional alignment with the XDG Base Directory Specification
 
-Both a self-contained `~/.fiab` layout and an XDG-compliant layout can be supported on top of the storage classes above. Starting with `~/.fiab` as the default avoids disrupting existing installations while keeping XDG available as a standard alternative; however, choosing the long-term default early is preferable to avoid default-change friction later (see [Open questions](#open-questions)).
+Both a self-contained `~/.fiab` layout and an XDG-compliant layout can be supported on top of the storage classes above. Starting with `~/.fiab` as the default avoids disrupting existing installations while keeping XDG available as a standard alternative; however, choosing the long-term default early is preferable to avoid the friction of later change of the default (see [Open questions](#open-questions)).
 
 **How storage classes would map to XDG:**
 
 | Storage class | XDG default | Notes |
 |---|---|---|
 | Executable shim ([ci-repoLayoutAndRelease-design.md](ci-repoLayoutAndRelease-design.md)) | `~/.local/bin/fiab` | Same directory `uv` installs into |
-| Code (venv, plugin generations) | `${XDG_DATA_HOME:-~/.local/share}/fiab` | Overridable (e.g. `/opt/fiab` in containers) |
+| Code (venv, plugin generations) | `${XDG_DATA_HOME:-~/.local/share}/fiab/app` | Distinct subdirectory from bulk data; overridable (e.g. `/opt/fiab` in containers) |
 | User config (`config.toml`) | `${XDG_CONFIG_HOME:-~/.config}/fiab/config.toml` | Site config can follow `$XDG_CONFIG_DIRS` or `/etc/fiab/config.toml` |
 | State (`user.db`, `job.db`, desired plugins) | `${XDG_STATE_HOME:-~/.local/state}/fiab` | Small, persistent, backed up |
 | Bulk data (artifacts, job data) | `${XDG_DATA_HOME:-~/.local/share}/fiab/{artifacts,jobs}` | Separately overridable |
@@ -144,12 +144,12 @@ Both a self-contained `~/.fiab` layout and an XDG-compliant layout can be suppor
 
 Docker v3 replaces both `deployment/ewc` and `deployment/v2` (both are deleted once v3 is validated). Breaking changes from v2/ewc are acceptable to establish a clean, stable v3 layout; full Kubernetes operator support is deferred to v4.
 
-**Target environments:** Spark, Destin/EWC, metno/fnmi deployments, and standard Linux x86 hosts with NVIDIA GPUs.
+**Target environments:** Spark, EWC, DestinE deployments, and standard Linux x86 hosts with NVIDIA GPUs.
 
 **Image structure (single multi-stage `Dockerfile`):**
 - **`base` stage:** OS dependencies, GPU/CUDA runtime (or base/GPU variant; see [Open questions](#open-questions)), `uv`, pinned Python via `uv python install`, non-root user, default `FIAB_HOME` (for example `/var/lib/fiab`).
-- **`release` stage:** Installs locked dependencies and the `forecast-in-a-box` wheel into `/opt/fiab/.venv` (strictly outside `FIAB_HOME`). Accepts either a PyPI release version or a local wheelhouse directory (`COPY wheelhouse/ ...`) so unreleased branches and CI builds test the exact same image structure as releases. Sets `ENTRYPOINT ["/opt/fiab/.venv/bin/fiab"]` and `CMD ["service"]` (or `["run"]`).
-- **`dev` stage (optional):** Extends `release` by keeping `/opt/fiab/.venv` inside the container (matching the container's Linux ABI and Python) and installing local packages in editable mode (`uv pip install --no-deps -e ...`) against a bind-mounted host source tree. Host `.venv` directories are never bind-mounted into the container.
+- **`release` stage:** Installs locked dependencies (`pylock.toml`) and the `forecast-in-a-box` wheel into `/opt/fiab/.venv` (strictly outside `FIAB_HOME`). Accepts either a PyPI release version or a local wheelhouse directory (`COPY wheelhouse/ ...`, including its lock) so unreleased branches and CI builds test the exact same image structure as releases. If default plugins are baked into the image (see [Open questions](#open-questions)), `fiab warmup --plugins` runs here against `/opt/fiab/.venv` without touching `FIAB_HOME`. Sets `ENTRYPOINT ["/opt/fiab/.venv/bin/fiab"]` and `CMD ["service"]` (or `["run"]`).
+- **`dev` stage (optional):** Extends `release` by keeping `/opt/fiab/.venv` inside the container (matching the container's Linux ABI and Python) and installing local packages in editable mode (`uv pip install --no-deps -e ...`) against a bind-mounted host source tree. Host `.venv` directories are never bind-mounted into the container to avoid associated compatibility issues.
 
 **Container runtime layout:**
 - Code lives in `/opt/fiab/.venv` (immutable in `release`).
@@ -186,8 +186,8 @@ Multi-user deployments -- both **shared multi-user servers** (one Docker v3 inst
 1. **Fate of `install/artifacts.json` and `install/plugins.json`:** `utility/config.py` currently references `refs/tags/${TAG}/install/artifacts.json`, and `cd-artifacts_update.yml` updates it. Should `artifacts.json` and `plugins.json` move into package data alongside default config, or stay at a stable external URL?
 2. **Site-level config location:** Fixed path (e.g. `/etc/fiab/config.toml`), an env var (e.g. `FIAB_SITE_CONFIG`), or both?
 3. **Storage class config keys and env vars:** Exact naming for model artifacts, job data, caches, and scratch paths, and whether existing `data_path` stays as a fallback when the split keys are unset.
-4. **Docker v3 image matrix:** Can a single image cover Spark, Destin/EWC, metno/fnmi, and Linux x86 + NVIDIA GPU, or should there be a CPU base image and an NVIDIA/CUDA variant?
-5. **Plugins in Docker v3:** Baked into the image (or derived `FROM` image) with runtime plugin installs disabled, installed into a mounted volume, or both as a deployment option? (To be coordinated with [plugins-candidate_venvs.md](plugins-candidate_venvs.md).)
+4. **Docker v3 image matrix:** Can a single image cover Spark, EWC, DestinE, and Linux x86 + NVIDIA GPU, or should there be a CPU base image and an NVIDIA/CUDA variant?
+5. **Plugins in Docker v3:** Baked into the image (or derived `FROM` image) with runtime plugin installs disabled, installed into a mounted volume, or both as a deployment option? Note: if plugins move to isolated per-plugin processes with their own venvs (an alternative to [plugins-candidate_venvs.md](plugins-candidate_venvs.md)), `/opt/fiab/.venv` stays completely immutable and plugin venvs can be either pre-baked or mounted on a volume without restarting the backend.
 6. **Exact `fiab` subcommand flags and defaults:** Confirm parity with existing `entrypoint/main.py`, `entrypoint/warmup.py`, and `entrypoint/bootstrap/service.py` CLI options.
 7. **Default workstation layout (`~/.fiab` vs. XDG):** Keep self-contained `~/.fiab` as the long-term default (with XDG as an opt-in alternative), or switch fresh installs to XDG defaults early while keeping `~/.fiab` as a self-contained option / fallback? Better decided early to avoid changing defaults later.
 
