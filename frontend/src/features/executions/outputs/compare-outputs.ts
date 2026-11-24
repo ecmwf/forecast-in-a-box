@@ -40,19 +40,26 @@ export function outputReady(output: ComparableOutput): boolean {
   return output.written && !output.lost && output.dirPath !== null
 }
 
+function sameFolder(a: ComparableOutput, b: ComparableOutput): boolean {
+  return (
+    a.dirPath !== null &&
+    b.dirPath !== null &&
+    normalizeDir(a.dirPath) === normalizeDir(b.dirPath)
+  )
+}
+
 export function comparePairState(
   a: ComparableOutput,
   b: ComparableOutput,
 ): ComparePairState {
   if (a.lost || b.lost) return 'lost'
-  if (
-    a.dirPath !== null &&
-    b.dirPath !== null &&
-    normalizeDir(a.dirPath) === normalizeDir(b.dirPath)
-  ) {
-    return 'sharedFolder'
-  }
+  if (sameFolder(a, b)) return 'sharedFolder'
   return outputReady(a) && outputReady(b) ? 'ready' : 'writing'
+}
+
+/** Whether a pair can be opened now or once it is written. */
+export function pairUsable(state: ComparePairState): boolean {
+  return state === 'ready' || state === 'writing'
 }
 
 /** Sinks whose folder is also another sink's folder. */
@@ -72,17 +79,19 @@ export function sharedFolderBlockIds(
   return shared
 }
 
-/** Folder names once they tell several outputs apart, sink titles otherwise. */
+/** Folder name where it is unique among the outputs, sink title otherwise; titles only while a folder is unresolved. */
 export function outputLabels(
   outputs: ReadonlyArray<ComparableOutput>,
 ): Record<string, string> {
   const names = outputs.map((o) => (o.dirPath ? folderName(o.dirPath) : null))
-  const distinct =
-    outputs.length > 1 &&
-    names.every((name) => name !== null) &&
-    new Set(names).size === outputs.length
+  const pending = outputs.some((o) => o.dirPath === null && !o.lost)
+  const named = outputs.length > 1 && !pending
   return Object.fromEntries(
-    outputs.map((o, i) => [o.blockId, distinct ? (names[i] ?? '') : o.title]),
+    outputs.map((o, i) => {
+      const name = names[i]
+      const unique = names.filter((other) => other === name).length === 1
+      return [o.blockId, named && name !== null && unique ? name : o.title]
+    }),
   )
 }
 
@@ -97,4 +106,32 @@ export function pickSlot(
   const other = slot === 'a' ? 'b' : 'a'
   if (picked[other] === blockId) return { a: picked.b, b: picked.a }
   return { ...picked, [slot]: blockId }
+}
+
+/** First pair that can be compared; the first two outputs when none can. */
+export function defaultPair(
+  outputs: ReadonlyArray<ComparableOutput>,
+): SlotPick | null {
+  if (outputs.length < 2) return null
+  for (let i = 0; i < outputs.length; i++) {
+    for (let j = i + 1; j < outputs.length; j++) {
+      if (pairUsable(comparePairState(outputs[i], outputs[j]))) {
+        return { a: outputs[i].blockId, b: outputs[j].blockId }
+      }
+    }
+  }
+  return { a: outputs[0].blockId, b: outputs[1].blockId }
+}
+
+/** Why an output cannot take a side next to the other side's output. */
+export function pickBlocker(
+  candidate: ComparableOutput,
+  other: ComparableOutput,
+): 'lost' | 'sharedFolder' | null {
+  if (candidate.lost) return 'lost'
+  // The other side's own output is a swap.
+  if (candidate.blockId !== other.blockId && sameFolder(candidate, other)) {
+    return 'sharedFolder'
+  }
+  return null
 }

@@ -10,6 +10,7 @@
 
 /** Opens two GRIB outputs of one run side by side on /visualise; fills in as the sinks finish. */
 
+import { useEffect, useState } from 'react'
 import { AlertCircle, ArrowLeftRight, Columns2, Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
@@ -21,11 +22,24 @@ import type { SourceSlot } from '@/features/viewer/geo/layer-pairing'
 import {
   comparePairState,
   outputReady,
+  pairUsable,
+  pickBlocker,
 } from '@/features/executions/outputs/compare-outputs'
-import { SLOT_FILL_CLASS } from '@/features/executions/components/CompareSideBadge'
+import {
+  CompareSideMark,
+  SLOT_FILL_CLASS,
+} from '@/features/executions/components/CompareSideBadge'
+import { useExecutionHoverStore } from '@/features/executions/stores/executionHoverStore'
 import { entryRef } from '@/features/visualise/entry-ref'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Tooltip,
   TooltipContent,
@@ -62,8 +76,8 @@ function SplitMapGlyph({ a, b }: { a: boolean; b: boolean }) {
   )
 }
 
-/** One side of the pair: its colour, letter and the output's name. */
-function SidePill({
+/** A side's readiness, letter and output name. */
+function SideLabel({
   slot,
   output,
   name,
@@ -72,6 +86,29 @@ function SidePill({
   output: ComparableOutput
   name: string
 }) {
+  return (
+    <>
+      {outputReady(output) ? (
+        <span
+          className={cn('h-2 w-2 shrink-0 rounded-full', SLOT_FILL_CLASS[slot])}
+        />
+      ) : (
+        <Loader2 className="h-3 w-3 shrink-0 animate-spin text-muted-foreground" />
+      )}
+      <span className="font-mono font-bold">{slot.toUpperCase()}</span>
+      <span className="min-w-0 truncate">{name}</span>
+    </>
+  )
+}
+
+interface SideProps {
+  slot: SourceSlot
+  output: ComparableOutput
+  name: string
+}
+
+/** One side of a run with exactly two outputs. */
+function SidePill({ slot, output, name }: SideProps) {
   const { t } = useTranslation('executions')
   return (
     <span
@@ -81,16 +118,100 @@ function SidePill({
       })}
       className="flex h-8 w-40 min-w-0 items-center gap-1.5 rounded-md border border-border bg-background px-2 text-sm"
     >
-      {outputReady(output) ? (
-        <span
-          className={cn('h-2 w-2 shrink-0 rounded-full', SLOT_FILL_CLASS[slot])}
-        />
-      ) : (
-        <Loader2 className="h-3 w-3 shrink-0 animate-spin text-muted-foreground" />
-      )}
-      <span className="font-mono font-bold">{slot.toUpperCase()}</span>
-      <span className="truncate">{name}</span>
+      <SideLabel slot={slot} output={output} name={name} />
     </span>
+  )
+}
+
+/** One side of a run with more outputs: picks which output is on it. */
+function SidePicker({
+  slot,
+  output,
+  name,
+  other,
+  outputs,
+  labels,
+  onPick,
+  onOpenChange,
+}: SideProps & {
+  /** Output on the other side. */
+  other: ComparableOutput
+  outputs: ReadonlyArray<ComparableOutput>
+  labels: Record<string, string>
+  onPick: (blockId: string) => void
+  onOpenChange: (open: boolean) => void
+}) {
+  const { t } = useTranslation('executions')
+  const otherSlot = slot === 'a' ? 'b' : 'a'
+  return (
+    <Select
+      value={output.blockId}
+      onValueChange={(blockId) => {
+        if (typeof blockId === 'string' && blockId !== output.blockId) {
+          onPick(blockId)
+        }
+      }}
+      onOpenChange={onOpenChange}
+    >
+      <SelectTrigger
+        size="sm"
+        aria-label={t('storedOutputs.compare.pickSide', {
+          slot: slot.toUpperCase(),
+        })}
+        className="w-44 min-w-0 bg-background px-2 *:data-[slot=select-value]:min-w-0 *:data-[slot=select-value]:flex-1"
+      >
+        {/* Base UI would show the raw block id. */}
+        <SelectValue>
+          <SideLabel slot={slot} output={output} name={name} />
+        </SelectValue>
+      </SelectTrigger>
+      {/* Below the trigger, so the side being picked stays in view. */}
+      <SelectContent
+        className="min-w-64"
+        align="start"
+        alignItemWithTrigger={false}
+      >
+        {outputs.map((candidate) => {
+          const blocker = pickBlocker(candidate, other)
+          const label = labels[candidate.blockId]
+          return (
+            <SelectItem
+              key={candidate.blockId}
+              value={candidate.blockId}
+              disabled={blocker !== null}
+              className="py-2 pr-2 [&_svg]:hidden"
+            >
+              {/* divs: the item styles its last SPAN child as a flex row. */}
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="min-w-0 truncate">{label}</span>
+                  {label !== candidate.title && (
+                    <span className="min-w-0 truncate text-muted-foreground">
+                      {candidate.title}
+                    </span>
+                  )}
+                  {candidate.blockId === output.blockId && (
+                    <CompareSideMark side={slot} className="ml-auto" />
+                  )}
+                  {candidate.blockId === other.blockId && (
+                    <CompareSideMark side={otherSlot} className="ml-auto" />
+                  )}
+                </div>
+                {blocker && (
+                  <div className="text-xs text-muted-foreground">
+                    {blocker === 'lost'
+                      ? t('storedOutputs.compare.pickLost')
+                      : t('storedOutputs.compare.pickSharedFolder', {
+                          slot: otherSlot.toUpperCase(),
+                        })}
+                  </div>
+                )}
+              </div>
+            </SelectItem>
+          )
+        })}
+      </SelectContent>
+    </Select>
   )
 }
 
@@ -99,21 +220,60 @@ export function CompareOutputsBar({
   runName,
   a,
   b,
+  outputs,
   labels,
-  onSwap,
+  onPick,
 }: {
   jobId: string
   runName?: string
   a: ComparableOutput
   b: ComparableOutput
+  /** Every GRIB output of the run; more than two make the sides pickers. */
+  outputs: ReadonlyArray<ComparableOutput>
   /** Display name per sink block, as shown on the rows. */
   labels: Record<string, string>
-  onSwap: () => void
+  /** Put an output on a side; the other side's output swaps the two. */
+  onPick: (slot: SourceSlot, blockId: string) => void
 }) {
   const { t } = useTranslation('executions')
   const state = comparePairState(a, b)
   // A blocked pair stays grey even when both outputs are written.
-  const usable = state === 'ready' || state === 'writing'
+  const usable = pairUsable(state)
+
+  // The graph shows the sides while the row is in use.
+  const [hovered, setHovered] = useState(false)
+  const [focused, setFocused] = useState(false)
+  const [openPicker, setOpenPicker] = useState<SourceSlot | null>(null)
+  const inUse = hovered || focused || openPicker !== null
+  const setSidesShown = useExecutionHoverStore((s) => s.setCompareSidesShown)
+  useEffect(() => {
+    setSidesShown(inUse)
+    return () => setSidesShown(false)
+  }, [inUse, setSidesShown])
+
+  const side = (slot: SourceSlot) => {
+    const output = slot === 'a' ? a : b
+    const name = labels[output.blockId]
+    if (outputs.length <= 2) {
+      return <SidePill slot={slot} output={output} name={name} />
+    }
+    return (
+      <SidePicker
+        slot={slot}
+        output={output}
+        name={name}
+        other={slot === 'a' ? b : a}
+        outputs={outputs}
+        labels={labels}
+        onPick={(blockId) => onPick(slot, blockId)}
+        onOpenChange={(open) =>
+          setOpenPicker((current) =>
+            open ? slot : current === slot ? null : current,
+          )
+        }
+      />
+    )
+  }
 
   const ref = (output: ComparableOutput) =>
     entryRef({
@@ -131,6 +291,11 @@ export function CompareOutputsBar({
       role="group"
       aria-label={t('storedOutputs.compare.title')}
       className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-border pt-3"
+      onPointerEnter={() => setHovered(true)}
+      onPointerLeave={() => setHovered(false)}
+      // Keyboard focus only: a clicked button keeps focus after the pointer left.
+      onFocus={(e) => setFocused(e.target.matches(':focus-visible'))}
+      onBlur={() => setFocused(false)}
     >
       <SplitMapGlyph
         a={usable && outputReady(a)}
@@ -163,14 +328,14 @@ export function CompareOutputsBar({
         )}
       </div>
       <div className="ml-auto flex flex-wrap items-center justify-end gap-1.5">
-        <SidePill slot="a" output={a} name={labels[a.blockId]} />
+        {side('a')}
         <Tooltip>
           <TooltipTrigger
             render={
               <Button
                 size="icon-sm"
                 variant="ghost"
-                onClick={onSwap}
+                onClick={() => onPick('a', b.blockId)}
                 aria-label={t('storedOutputs.compare.swap')}
               />
             }
@@ -179,7 +344,7 @@ export function CompareOutputsBar({
           </TooltipTrigger>
           <TooltipContent>{t('storedOutputs.compare.swap')}</TooltipContent>
         </Tooltip>
-        <SidePill slot="b" output={b} name={labels[b.blockId]} />
+        {side('b')}
         {state === 'ready' ? (
           // A link, so the map can open in a new tab.
           <Button

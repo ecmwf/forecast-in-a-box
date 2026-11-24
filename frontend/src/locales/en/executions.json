@@ -320,7 +320,9 @@
       "swap": "Swap sides",
       "slot": "{{slot}}: {{name}}",
       "side": "Side {{slot}}",
-      "putOnSide": "Put on side {{slot}}"
+      "pickSide": "Output on side {{slot}}",
+      "pickLost": "No longer available",
+      "pickSharedFolder": "Same folder as side {{slot}}"
     }
   },
   "zipDownload": {

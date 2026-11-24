@@ -21,6 +21,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { userEvent } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { I18nextProvider } from 'react-i18next'
@@ -614,33 +615,110 @@ describe('StoredOutputsCard compare', () => {
     await expect.element(compareButton(screen)).toBeDisabled()
   })
 
-  it('lets each row take a side when there are more than two outputs', async () => {
+  it('keeps the sides fixed for two outputs', async () => {
     separateFolders()
-    setMockGribDir(RUN, `/data/output/${RUN}_1/BRIS`, 'task-out-grib-c')
-    const { screen, router } = await renderCard({
+    const { screen } = await renderCard(twoSinks)
+    await expect.element(screen.getByLabelText('A: AIFS')).toBeVisible()
+    expect(screen.getByRole('combobox').elements()).toHaveLength(0)
+  })
+
+  describe('with more than two outputs', () => {
+    const threeSinks: RunOutputs = {
       ...twoSinks,
       'task-out-grib-c': marker('block_sink_3'),
+    }
+    const picker = (screen: Screen, slot: 'A' | 'B') =>
+      screen.getByRole('combobox', { name: `Output on side ${slot}` })
+    // Read the text: toHaveTextContent never matches a combobox.
+    const expectSide = (screen: Screen, slot: 'A' | 'B', name: string) =>
+      expect
+        .poll(() => picker(screen, slot).element().textContent)
+        .toContain(`${slot}${name}`)
+    // Scoped to the rows: an open picker marks the sides as well.
+    const sideRow = (screen: Screen, side: 'A' | 'B') =>
+      screen
+        .getByRole('listitem')
+        .getByLabelText(`Side ${side}`, { exact: true })
+        .element()
+        .closest('li')
+
+    it('picks the sides on the compare row', async () => {
+      separateFolders()
+      setMockGribDir(RUN, `/data/output/${RUN}_1/BRIS`, 'task-out-grib-c')
+      const { screen, router } = await renderCard(threeSinks)
+      await expectSide(screen, 'A', 'AIFS')
+      await expectSide(screen, 'B', 'IFS')
+      // Rows carry no controls: the two chosen ones are marked, the third is not.
+      expect(screen.getByRole('listitem').elements()).toHaveLength(3)
+      expect(
+        screen.getByRole('img', { name: /^Side/ }).elements(),
+      ).toHaveLength(2)
+
+      await picker(screen, 'B').click()
+      await screen.getByRole('option', { name: /BRIS/ }).click()
+      await expectSide(screen, 'B', 'BRIS')
+      expect(sideRow(screen, 'B')?.textContent).toContain('BRIS')
+
+      // Taking the other side's output swaps the two.
+      await picker(screen, 'A').click()
+      await screen.getByRole('option', { name: /BRIS/ }).click()
+      await expectSide(screen, 'A', 'BRIS')
+      await expectSide(screen, 'B', 'AIFS')
+
+      await compareButton(screen).click()
+      await expect.poll(() => router.state.location.pathname).toBe('/visualise')
+      expect(router.state.location.search).toEqual({
+        a: `run:${RUN}~task-out-grib-c`,
+        b: `run:${RUN}~task-out-grib`,
+      })
     })
+
+    it('starts on the first pair that can be compared', async () => {
+      // The first two outputs share the run folder.
+      setMockGribDir(RUN, `/data/output/${RUN}_1/BRIS`, 'task-out-grib-c')
+      const { screen } = await renderCard(threeSinks)
+      await expectSide(screen, 'B', 'BRIS')
+      await expectSide(screen, 'A', 'block_sink_1')
+      await expect.element(compareButton(screen)).toBeEnabled()
+    })
+
+    it('refuses an output in the other side folder', async () => {
+      setMockGribDir(RUN, `/data/output/${RUN}_1/BRIS`, 'task-out-grib-c')
+      const { screen } = await renderCard(threeSinks)
+      await expectSide(screen, 'B', 'BRIS')
+
+      await picker(screen, 'B').click()
+      const shared = screen.getByRole('option', { name: /block_sink_2/ })
+      await expect
+        .element(shared.getByText('Same folder as side A'))
+        .toBeInTheDocument()
+      await expect.element(shared).toHaveAttribute('aria-disabled', 'true')
+    })
+  })
+
+  it('shows the sides on the graph only while the row is in use', async () => {
+    separateFolders()
+    const shown = () => useExecutionHoverStore.getState().compareSidesShown
+    const { screen } = await renderCard(twoSinks)
     await expect.element(screen.getByLabelText('A: AIFS')).toBeVisible()
-    await expect.element(screen.getByLabelText('B: IFS')).toBeVisible()
+    // The pointer may still rest where an earlier test left it.
+    await screen.getByText('Stored outputs').hover()
+    await expect.poll(shown).toBe(false)
 
-    // Third row takes side B; the second row is off the pair.
-    await screen.getByRole('button', { name: 'Put on side B' }).nth(2).click()
-    await expect.element(screen.getByLabelText('B: BRIS')).toBeVisible()
+    await screen.getByRole('group', { name: 'Compare on the map' }).hover()
+    await expect.poll(shown).toBe(true)
+    await screen.getByText('Stored outputs').hover()
+    await expect.poll(shown).toBe(false)
+
+    // Keyboard focus counts too; focus left behind by a click does not.
+    compareButton(screen).element().focus()
+    expect(shown()).toBe(false)
+    await userEvent.keyboard('{Shift>}{Tab}{/Shift}')
     await expect
-      .element(screen.getByRole('button', { name: 'Put on side B' }).nth(1))
-      .toHaveAttribute('aria-pressed', 'false')
-
-    // Taking the other side's output swaps the two.
-    await screen.getByRole('button', { name: 'Put on side A' }).nth(2).click()
-    await expect.element(screen.getByLabelText('A: BRIS')).toBeVisible()
-    await expect.element(screen.getByLabelText('B: AIFS')).toBeVisible()
-
-    await compareButton(screen).click()
-    await expect.poll(() => router.state.location.pathname).toBe('/visualise')
-    expect(router.state.location.search).toEqual({
-      a: `run:${RUN}~task-out-grib-c`,
-      b: `run:${RUN}~task-out-grib`,
-    })
+      .element(screen.getByRole('button', { name: 'Swap sides' }))
+      .toHaveFocus()
+    await expect.poll(shown).toBe(true)
+    await screen.unmount()
+    expect(shown()).toBe(false)
   })
 })

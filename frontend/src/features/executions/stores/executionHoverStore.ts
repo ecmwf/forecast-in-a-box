@@ -20,6 +20,9 @@ interface ExecutionHoverState {
   /** Sink blocks on sides A and B of the output comparison; null without one. */
   compareSides: Record<'a' | 'b', string> | null
   setCompareSides: (sides: Record<'a' | 'b', string> | null) => void
+  /** The compare row is in use, so the graph shows the sides. */
+  compareSidesShown: boolean
+  setCompareSidesShown: (shown: boolean) => void
   /** Call on run change so a stale selection doesn't bleed across runs. */
   resetExecutionSelection: () => void
 }
@@ -42,8 +45,18 @@ export const useExecutionHoverStore = create<ExecutionHoverState>(
       if (current?.a === sides?.a && current?.b === sides?.b) return
       set({ compareSides: sides })
     },
+    compareSidesShown: false,
+    setCompareSidesShown: (shown) => {
+      if (get().compareSidesShown === shown) return
+      set({ compareSidesShown: shown })
+    },
     resetExecutionSelection: () => {
-      set({ hoveredBlockId: null, selectedBlockId: null, compareSides: null })
+      set({
+        hoveredBlockId: null,
+        selectedBlockId: null,
+        compareSides: null,
+        compareSidesShown: false,
+      })
     },
   }),
 )
@@ -53,7 +66,6 @@ export function useIsBlockHovered(blockId: string): boolean {
   return useExecutionHoverStore((state) => state.hoveredBlockId === blockId)
 }
 
-/** True when this block id is the currently-selected one. */
 /** Side of the output comparison a block is on, if any. */
 export function useBlockCompareSide(blockId: string): 'a' | 'b' | null {
   return useExecutionHoverStore((state) =>
@@ -65,6 +77,12 @@ export function useBlockCompareSide(blockId: string): 'a' | 'b' | null {
   )
 }
 
+/** True while the compare row is in use. */
+export function useCompareSidesShown(): boolean {
+  return useExecutionHoverStore((state) => state.compareSidesShown)
+}
+
+/** True when this block id is the currently-selected one. */
 export function useIsBlockSelected(blockId: string): boolean {
   return useExecutionHoverStore((state) => state.selectedBlockId === blockId)
 }

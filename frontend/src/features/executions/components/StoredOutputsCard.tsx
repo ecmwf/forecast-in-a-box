@@ -44,15 +44,13 @@ import type { LostTaskIds } from '@/features/executions/outputs/availability'
 import { isTerminalStatus } from '@/api/types/job.types'
 import { classifyOutput } from '@/features/executions/outputs/availability'
 import {
+  defaultPair,
   outputLabels,
   pickSlot,
   sharedFolderBlockIds,
 } from '@/features/executions/outputs/compare-outputs'
 import { CompareOutputsBar } from '@/features/executions/components/CompareOutputsBar'
-import {
-  CompareSideBadge,
-  SLOT_FILL_CLASS,
-} from '@/features/executions/components/CompareSideBadge'
+import { CompareSideMark } from '@/features/executions/components/CompareSideBadge'
 import { blockDisplayNames } from '@/features/fable-builder/utils/block-names'
 import {
   useLensList,
@@ -211,13 +209,11 @@ export function StoredOutputsCard({
   const siblingShared = sharedFolderBlockIds(comparable)
   const labels = outputLabels(comparable)
 
-  // Sides of the comparison; the first two outputs until the user picks.
+  // Sides of the comparison; the first usable pair until the user picks.
   const [picked, setPicked] = useState<SlotPick | null>(null)
-  const sideA =
-    comparable.find((o) => o.blockId === picked?.a) ?? comparable.at(0)
-  const sideB =
-    comparable.find((o) => o.blockId === picked?.b && o !== sideA) ??
-    comparable.find((o) => o !== sideA)
+  const sides = picked ?? defaultPair(comparable)
+  const sideA = comparable.find((o) => o.blockId === sides?.a)
+  const sideB = comparable.find((o) => o.blockId === sides?.b)
   const pair = sideA && sideB ? { a: sideA, b: sideB } : null
   const pick = (slot: SourceSlot, blockId: string) => {
     if (!pair) return
@@ -263,8 +259,6 @@ export function StoredOutputsCard({
                   ? 'b'
                   : null
             }
-            // With two outputs the sides are given; with more, each row picks.
-            onPickSide={pair && rows.length > 2 ? pick : undefined}
             comparing={pair !== null}
           />
         ))}
@@ -275,8 +269,9 @@ export function StoredOutputsCard({
           runName={runName}
           a={pair.a}
           b={pair.b}
+          outputs={comparable}
           labels={labels}
-          onSwap={() => pick('a', pair.b.blockId)}
+          onPick={pick}
         />
       )}
     </Card>
@@ -292,7 +287,6 @@ function StoredOutputRowItem({
   siblingFolder,
   label,
   side,
-  onPickSide,
   comparing,
 }: {
   jobId: string
@@ -308,9 +302,7 @@ function StoredOutputRowItem({
   label: string
   /** Side of the comparison this output is on. */
   side: SourceSlot | null
-  /** Set when the sides can be chosen on the rows. */
-  onPickSide?: (slot: SourceSlot, blockId: string) => void
-  /** The run has outputs to compare, so rows show their side. */
+  /** The run has outputs to compare; every row keeps room for a side. */
   comparing: boolean
 }) {
   const { t } = useTranslation('executions')
@@ -436,12 +428,9 @@ function StoredOutputRowItem({
       )}
     >
       {comparing && (
-        <SideMarker
-          side={side}
-          onPick={
-            onPickSide ? (slot) => onPickSide(slot, row.blockId) : undefined
-          }
-        />
+        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center">
+          {side && <CompareSideMark side={side} />}
+        </span>
       )}
       <span
         className={cn(
@@ -618,44 +607,5 @@ function StoredOutputRowItem({
         )}
       </div>
     </li>
-  )
-}
-
-const SIDE_BOX_CLASS =
-  'flex h-6 w-6 items-center justify-center rounded-md font-mono text-xs font-bold'
-
-/** The comparison side of a row; buttons when the sides can be chosen. */
-function SideMarker({
-  side,
-  onPick,
-}: {
-  side: SourceSlot | null
-  onPick?: (slot: SourceSlot) => void
-}) {
-  const { t } = useTranslation('executions')
-  if (!onPick) return side ? <CompareSideBadge side={side} /> : null
-  return (
-    <span className="flex shrink-0 gap-0.5">
-      {(['a', 'b'] as const).map((slot) => (
-        <button
-          key={slot}
-          type="button"
-          aria-pressed={side === slot}
-          aria-label={t('storedOutputs.compare.putOnSide', {
-            slot: slot.toUpperCase(),
-          })}
-          onClick={() => onPick(slot)}
-          className={cn(
-            SIDE_BOX_CLASS,
-            'transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-            side === slot
-              ? cn('text-white', SLOT_FILL_CLASS[slot])
-              : 'border border-border text-muted-foreground hover:text-foreground',
-          )}
-        >
-          {slot.toUpperCase()}
-        </button>
-      ))}
-    </span>
   )
 }

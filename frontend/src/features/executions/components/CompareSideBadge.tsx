@@ -17,6 +17,27 @@ export const SLOT_FILL_CLASS: Record<SourceSlot, string> = {
   b: 'bg-slot-b',
 }
 
+/** Colour dot and letter of a side, as on the compare row. */
+export function CompareSideMark({
+  side,
+  className,
+}: {
+  side: SourceSlot
+  className?: string
+}) {
+  const { t } = useTranslation('executions')
+  return (
+    <span
+      role="img"
+      aria-label={t('storedOutputs.compare.side', { slot: side.toUpperCase() })}
+      className={cn('flex shrink-0 items-center gap-1.5 text-sm', className)}
+    >
+      <span className={cn('h-2 w-2 rounded-full', SLOT_FILL_CLASS[side])} />
+      <span className="font-mono font-bold">{side.toUpperCase()}</span>
+    </span>
+  )
+}
+
 /** Square A or B in the side's colour, as on the map's slot bar. */
 export function CompareSideBadge({
   side,
@@ -28,6 +49,7 @@ export function CompareSideBadge({
   const { t } = useTranslation('executions')
   return (
     <span
+      role="img"
       aria-label={t('storedOutputs.compare.side', { slot: side.toUpperCase() })}
       className={cn(
         'flex h-6 w-6 shrink-0 items-center justify-center rounded-md font-mono text-xs font-bold text-white',
