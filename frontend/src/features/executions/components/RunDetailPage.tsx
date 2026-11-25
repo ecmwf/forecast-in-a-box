@@ -437,7 +437,9 @@ export function RunDetailPage() {
                     'space-y-4 min-[1280px]:pr-2',
                   )}
                 >
+                  {/* Keyed: picked sides and started lenses belong to one run. */}
                   <StoredOutputsCard
+                    key={jobId}
                     jobId={jobId}
                     status={jobData.status}
                     attempt={jobData.attempt_count}

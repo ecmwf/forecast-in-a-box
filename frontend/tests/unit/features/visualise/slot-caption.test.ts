@@ -31,6 +31,13 @@ describe('slotCaption', () => {
     })
   })
 
+  it('names a side by its folder when both sides are one run', () => {
+    expect(slotCaption(output('IFS vs AIFS'), 'UTC', 'AIFS')).toEqual({
+      label: 'AIFS',
+      submittedAt: '14 Sep 06:23',
+    })
+  })
+
   it('drops the stamp a default job name already embeds', () => {
     expect(
       slotCaption(

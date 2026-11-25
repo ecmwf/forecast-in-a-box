@@ -20,8 +20,10 @@ const NAME_STAMP_PATTERN = 'yyyy-MM-dd HH:mm'
 export function slotCaption(
   entry: ComparisonEntry,
   timeZone: string,
+  /** Output folder that names this side when both sides are one run. */
+  folder?: string,
 ): { label: string; submittedAt: string | null } {
-  const name = entryDisplayName(entry)
+  const name = folder ?? entryDisplayName(entry)
   if (entry.kind !== 'output' || !entry.runCreatedAt) {
     return { label: name, submittedAt: null }
   }

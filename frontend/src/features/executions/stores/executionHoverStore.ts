@@ -17,7 +17,13 @@ interface ExecutionHoverState {
    * tabs (Outputs, Compilation, Graph). `null` = nothing selected. */
   selectedBlockId: string | null
   setSelectedBlockId: (id: string | null) => void
-  /** Call on run change so a stale selection doesn't bleed across runs. */
+  /** Sink blocks on sides A and B of the output comparison; null without one. */
+  compareSides: Record<'a' | 'b', string> | null
+  setCompareSides: (sides: Record<'a' | 'b', string> | null) => void
+  /** The compare row is in use, so the graph shows the sides. */
+  compareSidesShown: boolean
+  setCompareSidesShown: (shown: boolean) => void
+  /** Clears hover and selection on run change; the compare sides belong to the card that sets them. */
   resetExecutionSelection: () => void
 }
 
@@ -33,6 +39,17 @@ export const useExecutionHoverStore = create<ExecutionHoverState>(
       if (get().selectedBlockId === id) return
       set({ selectedBlockId: id })
     },
+    compareSides: null,
+    setCompareSides: (sides) => {
+      const current = get().compareSides
+      if (current?.a === sides?.a && current?.b === sides?.b) return
+      set({ compareSides: sides })
+    },
+    compareSidesShown: false,
+    setCompareSidesShown: (shown) => {
+      if (get().compareSidesShown === shown) return
+      set({ compareSidesShown: shown })
+    },
     resetExecutionSelection: () => {
       set({ hoveredBlockId: null, selectedBlockId: null })
     },
@@ -42,6 +59,22 @@ export const useExecutionHoverStore = create<ExecutionHoverState>(
 /** True when this block id is the currently-hovered one. */
 export function useIsBlockHovered(blockId: string): boolean {
   return useExecutionHoverStore((state) => state.hoveredBlockId === blockId)
+}
+
+/** Side of the output comparison a block is on, if any. */
+export function useBlockCompareSide(blockId: string): 'a' | 'b' | null {
+  return useExecutionHoverStore((state) =>
+    state.compareSides?.a === blockId
+      ? 'a'
+      : state.compareSides?.b === blockId
+        ? 'b'
+        : null,
+  )
+}
+
+/** True while the compare row is in use. */
+export function useCompareSidesShown(): boolean {
+  return useExecutionHoverStore((state) => state.compareSidesShown)
 }
 
 /** True when this block id is the currently-selected one. */

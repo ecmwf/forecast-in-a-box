@@ -39,6 +39,7 @@ import { useComparisonSource } from '../hooks/useComparisonSource'
 import { useStopOrphanedLenses } from '../hooks/useStopOrphanedLenses'
 import { useHydrateComparisonFromUrl } from '../hooks/useHydrateComparisonFromUrl'
 import { useEnrichComparisonEntry } from '../hooks/useEnrichComparisonEntry'
+import { useSiblingOutputFolders } from '../hooks/useSiblingOutputFolders'
 
 import { curatedBboxAxisOrder } from '../curated-wms'
 import { CompareSlotBar } from './CompareSlotBar'
@@ -332,6 +333,8 @@ export function VisualisePage() {
   const [GeoViewer, setGeoViewer] = useState(() => makeGeoViewer())
   const stateA = useComparisonSource(a, { autoStart: true })
   const stateB = useComparisonSource(b, { autoStart: true })
+  // Two outputs of one run share a name; their folders tell them apart.
+  const folders = useSiblingOutputFolders(a, b)
   // Lens on its way: the viewer's frame is already the right layout.
   const aPending =
     stateA.phase === 'resolvingDir' ||
@@ -363,6 +366,7 @@ export function VisualisePage() {
               entries={entries}
               aRef={a ? entryRef(a) : undefined}
               bRef={b ? entryRef(b) : undefined}
+              folders={folders}
               onAssign={assignSlot}
               onSwap={swapSlots}
               onClearSlot={(slot) =>
@@ -570,7 +574,7 @@ export function VisualisePage() {
                     a={{
                       id: entryRef(a),
                       baseUrl: stateA.baseUrl,
-                      ...slotCaption(a, timeZone),
+                      ...slotCaption(a, timeZone, folders[entryRef(a)]),
                       bboxAxisOrder: entryBboxAxisOrder(a),
                     }}
                     b={
@@ -578,7 +582,7 @@ export function VisualisePage() {
                         ? {
                             id: entryRef(b),
                             baseUrl: stateB.baseUrl,
-                            ...slotCaption(b, timeZone),
+                            ...slotCaption(b, timeZone, folders[entryRef(b)]),
                             bboxAxisOrder: entryBboxAxisOrder(b),
                           }
                         : null
