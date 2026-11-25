@@ -10,10 +10,12 @@ This plan implements [ci-repoLayoutAndRelease-design.md](ci-repoLayoutAndRelease
 4. **Phase 4:** Atomic CD workflows (`cd-major`, `cd-minor-{core,plugins,backend}`), explicit `fiab-core` lock-exclusion policy (Option B, structured for a 1-switch move to Option A), constraints export, and pre-tag Docker v3 gating.
 5. **Phase 5:** Replace `scripts/fiab.sh` with a single version-agnostic `install.sh` + wheel-bundled `pylock.toml` (OQ6 Option B, structured for easy rework to Option A/C) and `fiab upgrade`.
 
-Prerequisites / companion work:
-- Phases 1--3 are completely independent of [deployment-runtimeAndDockerV3-plan.md](deployment-runtimeAndDockerV3-plan.md).
-- Phase 4's pre-tag Docker v3 gate consumes `deployment/v3/` from [deployment-runtimeAndDockerV3-plan.md](deployment-runtimeAndDockerV3-plan.md) Phase 4.
-- Phase 5 consumes the `fiab` CLI and `FIAB_ROOT` runtime from [deployment-runtimeAndDockerV3-plan.md](deployment-runtimeAndDockerV3-plan.md) Phases 1--3.
+Prerequisites / companion work (see full cross-plan DAG in [deployment-runtimeAndDockerV3-plan.md](deployment-runtimeAndDockerV3-plan.md)):
+- **Phase 1 (B1)** lands first so [deployment-runtimeAndDockerV3-plan.md](deployment-runtimeAndDockerV3-plan.md) builds directly on `python/{...}` without rebasing across the move.
+- **Phase 2 (B2)** runs in parallel with A1--A3 (runtime bootstrap / `fiab` CLI).
+- **Phase 3 (B3)** depends on B2 (best done after A3 simplifies the `justfile` `dev` recipe) and is independent of A4, A5, B4, and B5.
+- **Phase 4 (B4)** depends on B2 and A4 (`deployment/v3/Dockerfile` for the pre-tag Docker v3 gate).
+- **Phase 5 (B5)** depends on A3 (`fiab` CLI + `FIAB_ROOT`) and B4 (wheel-bundled `pylock.toml` + `python-version`).
 
 ## Decisions and reversibility hooks
 
