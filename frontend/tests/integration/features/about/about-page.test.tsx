@@ -16,23 +16,22 @@ describe('AboutPage', () => {
   it('lists every partner', async () => {
     const screen = await renderWithRouter(<AboutPage />)
 
-    // FMI and the wordmark ship light and dark copies; CSS hides one.
-    for (const name of [
-      'ECMWF',
-      'MetNorway',
-      'FMI',
-      'European Union',
-      'DestinE',
-    ]) {
+    // FMI ships light and dark copies; CSS hides one.
+    for (const name of ['ECMWF', 'MetNorway', 'FMI']) {
       await expect
         .element(screen.getByRole('img', { name, exact: true }).first())
         .toBeInTheDocument()
     }
     await expect
-      .element(screen.getByRole('link', { name: /ArcX/ }))
+      .element(
+        screen.getByRole('link', {
+          name: 'ArcX',
+          exact: true,
+        }),
+      )
       .toHaveAttribute(
         'href',
-        'https://africa-knowledge-platform.ec.europa.eu/arcx',
+        'https://www.ecmwf.int/en/about/what-we-do/environmental-services-and-future-vision/eu-global-gateway-strategy/africa-regional-centres-excellence-arcx-climate-change-resilience',
       )
   })
 })

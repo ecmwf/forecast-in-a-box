@@ -134,8 +134,17 @@ describe('Landing Page', () => {
         </AuthContext.Provider>,
       )
 
-      // FiabStackSection should render content
-      expect(screen.container.innerHTML.length).toBeGreaterThan(0)
+      await expect
+        .element(
+          screen.getByRole('link', {
+            name: 'ArcX',
+            exact: true,
+          }),
+        )
+        .toHaveAttribute(
+          'href',
+          'https://www.ecmwf.int/en/about/what-we-do/environmental-services-and-future-vision/eu-global-gateway-strategy/africa-regional-centres-excellence-arcx-climate-change-resilience',
+        )
     })
   })
 
@@ -147,21 +156,12 @@ describe('Landing Page', () => {
         </AuthContext.Provider>,
       )
 
-      // FMI and the wordmark ship light and dark copies; CSS hides one.
-      for (const name of [
-        'ECMWF',
-        'MetNorway',
-        'FMI',
-        'European Union',
-        'DestinE',
-      ]) {
+      // FMI ships light and dark copies; CSS hides one.
+      for (const name of ['ECMWF', 'MetNorway', 'FMI']) {
         await expect
           .element(screen.getByRole('img', { name, exact: true }).first())
           .toBeInTheDocument()
       }
-      await expect
-        .element(screen.getByText('ArcX', { exact: true }))
-        .toBeInTheDocument()
     })
 
     it('links every partner without passing ranking', async () => {
@@ -172,15 +172,13 @@ describe('Landing Page', () => {
       )
 
       await expect
-        .element(screen.getByText('ArcX', { exact: true }))
+        .element(screen.getByRole('img', { name: 'ECMWF', exact: true }))
         .toBeInTheDocument()
       const links = screen.getByRole('link').elements()
       expect(links.map((a) => a.getAttribute('href'))).toEqual([
         'https://www.ecmwf.int',
         'https://www.met.no',
         'https://en.ilmatieteenlaitos.fi',
-        'https://destination-earth.eu',
-        'https://africa-knowledge-platform.ec.europa.eu/arcx',
       ])
       for (const a of links) {
         expect(a.getAttribute('rel')).toBe('nofollow noopener noreferrer')

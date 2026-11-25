@@ -40,6 +40,17 @@ const partnerLogos = [
       },
     ],
   },
+  {
+    href: 'https://international-partnerships.ec.europa.eu/policies/global-gateway_en',
+    images: [
+      // h-12.5 and the 5px shift align its flag with the EU flag.
+      {
+        src: '/logos/org/global-gateway-dark.svg',
+        altKey: 'footer.logoGlobalGateway',
+        className: 'h-12.5 shrink-0 translate-y-1.25',
+      },
+    ],
+  },
 ] as const
 
 const links = [

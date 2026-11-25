@@ -26,11 +26,12 @@
     "description": "Forecast-in-a-Box reimagines how forecasts are produced and delivered. Rather than relying on remote, data-intensive numerical weather prediction pipelines, Forecast-in-a-Box distributes a self-contained forecasting environment that users can install and run anywhere."
   },
   "stack": {
-    "paragraph": "Forecast-in-a-Box integrates data access, model execution, post-processing, and visualisation in one modular framework, providing the same functionality as large- scale operational systems at a fraction of the computational cost. Leveraging recent progress in data-driven AI models, Forecast-in-a-Box enables high-quality, local forecasts to be generated even on commodity hardware — from desktops to HPC clusters and cloud deployments. Developed within <destinE>Destination Earth</destinE> and powered by the <anemoi>Anemoi</anemoi> and <earthkit>Earthkit</earthkit> open-source libraries, Forecast-in-a-Box demonstrates a sustainable, scalable path toward user-centred digital forecasting services.",
+    "paragraph": "Forecast-in-a-Box integrates data access, model execution, post-processing, and visualisation in one modular framework, providing the same functionality as large-scale operational systems at a fraction of the computational cost. Leveraging recent progress in data-driven AI models, Forecast-in-a-Box enables high-quality, local forecasts to be generated even on commodity hardware — from desktops to HPC clusters and cloud deployments. Powered by the <anemoi>Anemoi</anemoi> and <earthkit>Earthkit</earthkit> open-source libraries, Forecast-in-a-Box demonstrates a sustainable, scalable path toward user-centred digital forecasting services.",
     "poweredBy": "Powered by",
     "anemoiDescription": "Open-source ML framework for developing, training, and deploying weather forecasting models",
     "earthkitDescription": "Open-source tools for seamless earth science workflows"
   },
+  "funding": "This project is funded by ECMWF and the European Commission through <destinE>Destination Earth</destinE>, and the Africa Regional Centres of Excellence (<arcx>ArcX</arcx>) programme on Climate Change Resilience which contributes to the EU's Global Gateway strategy.",
   "collaboration": {
     "title": "A Collaboration between"
   },
@@ -53,11 +54,7 @@
     "earthkit": "EarthKit",
     "ecmwf": "ECMWF",
     "metNorway": "MetNorway",
-    "fmi": "FMI",
-    "destinE": "DestinE",
-    "eu": "European Union",
-    "arcx": "ArcX",
-    "arcxFull": "Africa Regional Centres of Excellence"
+    "fmi": "FMI"
   },
   "about": {
     "eyebrow": "About Forecast-in-a-Box",

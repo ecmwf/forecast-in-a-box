@@ -18,6 +18,28 @@ import { cn } from '@/lib/utils'
 const CELL =
   'flex items-center justify-center bg-background p-6 outline-none sm:p-8 lg:p-12 transition-colors hover:bg-muted/40 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset [&_img]:mix-blend-multiply dark:[&_img]:mix-blend-normal'
 
+const CO_DEVELOPERS: ReadonlyArray<{
+  key: 'metNorway' | 'fmi'
+  href: string
+  src: string
+  darkSrc?: string
+  size: string
+}> = [
+  {
+    key: 'metNorway',
+    href: 'https://www.met.no',
+    src: '/logos/org/MetNorway.png',
+    size: 'w-44',
+  },
+  {
+    key: 'fmi',
+    href: 'https://en.ilmatieteenlaitos.fi',
+    src: '/logos/org/FMI.png',
+    darkSrc: '/logos/org/FMI-dark.png',
+    size: 'h-9 w-auto',
+  },
+]
+
 function PartnerLink({
   href,
   className,
@@ -47,71 +69,42 @@ export function Collaboration() {
         <div className="mx-auto mb-12 max-w-xl text-center text-balance md:mb-16">
           <H2 className="border-0 pb-0 text-4xl">{t('collaboration.title')}</H2>
         </div>
-        {/* Met institutes fill the first row, EU programmes the second. */}
-        <div className="mx-auto grid max-w-4xl auto-rows-fr gap-px border bg-border sm:grid-cols-2 lg:grid-cols-6">
-          <PartnerLink href="https://www.ecmwf.int" className="lg:col-span-2">
+        {/* Initiator on top, co-developers below at a smaller scale. */}
+        <div className="mx-auto grid max-w-4xl gap-px border bg-border">
+          <PartnerLink href="https://www.ecmwf.int" className="lg:p-8">
             <img
               src="/logos/org/ECMWF.png"
               alt={t('brand.ecmwf')}
-              className="w-50 object-contain"
+              className="w-64 object-contain"
             />
           </PartnerLink>
-          <PartnerLink href="https://www.met.no" className="lg:col-span-2">
-            <img
-              src="/logos/org/MetNorway.png"
-              alt={t('brand.metNorway')}
-              className="w-50 object-contain"
-            />
-          </PartnerLink>
-          <PartnerLink
-            href="https://en.ilmatieteenlaitos.fi"
-            className="lg:col-span-2"
-          >
-            {/* No taller than the EU flag (h-12 below). */}
-            <img
-              src="/logos/org/FMI.png"
-              alt={t('brand.fmi')}
-              className="h-11 w-auto dark:hidden"
-            />
-            <img
-              src="/logos/org/FMI-dark.png"
-              alt={t('brand.fmi')}
-              className="hidden h-11 w-auto dark:block"
-            />
-          </PartnerLink>
-          <PartnerLink
-            href="https://destination-earth.eu"
-            className="gap-3 lg:col-span-3"
-          >
-            {/* EU flag >= the other logos; only the wordmark shrinks. */}
-            <img
-              src="/logos/org/eu-flag.svg"
-              alt={t('brand.eu')}
-              className="h-12 w-auto shrink-0 object-contain"
-            />
-            <img
-              src="/logos/org/destine-wordmark.svg"
-              alt={t('brand.destinE')}
-              className="h-6 w-auto min-w-0 object-contain dark:hidden"
-            />
-            <img
-              src="/logos/org/destine-wordmark-dark.svg"
-              alt={t('brand.destinE')}
-              className="hidden h-6 w-auto min-w-0 object-contain dark:block"
-            />
-          </PartnerLink>
-          {/* ArcX has no logo of its own; its materials set the name in type. */}
-          <PartnerLink
-            href="https://africa-knowledge-platform.ec.europa.eu/arcx"
-            className="flex-col sm:col-span-2 lg:col-span-3"
-          >
-            <span className="text-3xl font-bold tracking-tight">
-              {t('brand.arcx')}
-            </span>
-            <span className="mt-1 text-center text-xs text-muted-foreground">
-              {t('brand.arcxFull')}
-            </span>
-          </PartnerLink>
+          {/* flex-wrap keeps the hairline grid hole-free as more join. */}
+          <div className="flex flex-wrap gap-px">
+            {CO_DEVELOPERS.map(({ key, href, src, darkSrc, size }) => (
+              <PartnerLink
+                key={key}
+                href={href}
+                className="flex-1 basis-56 lg:p-8"
+              >
+                <img
+                  src={src}
+                  alt={t(`brand.${key}`)}
+                  className={cn(
+                    'object-contain',
+                    size,
+                    darkSrc && 'dark:hidden',
+                  )}
+                />
+                {darkSrc && (
+                  <img
+                    src={darkSrc}
+                    alt={t(`brand.${key}`)}
+                    className={cn('hidden object-contain dark:block', size)}
+                  />
+                )}
+              </PartnerLink>
+            ))}
+          </div>
         </div>
       </div>
     </section>

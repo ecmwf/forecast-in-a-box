@@ -28,9 +28,18 @@ export function FiabStackSection() {
                   t={t}
                   i18nKey="stack.paragraph"
                   components={{
-                    destinE: <Link href="https://destination-earth.eu" />,
                     anemoi: <Link href="https://github.com/ecmwf/anemoi" />,
                     earthkit: <Link href="https://earthkit.ecmwf.int" />,
+                  }}
+                />{' '}
+                <Trans
+                  t={t}
+                  i18nKey="funding"
+                  components={{
+                    destinE: <Link href="https://destination-earth.eu" />,
+                    arcx: (
+                      <Link href="https://www.ecmwf.int/en/about/what-we-do/environmental-services-and-future-vision/eu-global-gateway-strategy/africa-regional-centres-excellence-arcx-climate-change-resilience" />
+                    ),
                   }}
                 />
                 <Button
