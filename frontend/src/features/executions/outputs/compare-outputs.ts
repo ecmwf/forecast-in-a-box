@@ -21,18 +21,15 @@ export interface ComparableOutput {
   lost: boolean
   /** Folder the sink wrote to; null until resolved. */
   dirPath: string | null
+  /** The folder lookup failed. */
+  dirFailed?: boolean
 }
 
-export type ComparePairState = 'ready' | 'writing' | 'sharedFolder' | 'lost'
+export type ComparePairState =
+  'ready' | 'writing' | 'sharedFolder' | 'lost' | 'unreadable'
 
 function normalizeDir(path: string): string {
   return path.replace(/\/+$/, '')
-}
-
-/** Last segment of a folder path. */
-export function folderName(path: string): string {
-  const trimmed = normalizeDir(path)
-  return trimmed.slice(trimmed.lastIndexOf('/') + 1)
 }
 
 /** Whether an output is ready to be opened on the map. */
@@ -53,6 +50,7 @@ export function comparePairState(
   b: ComparableOutput,
 ): ComparePairState {
   if (a.lost || b.lost) return 'lost'
+  if (a.dirFailed || b.dirFailed) return 'unreadable'
   if (sameFolder(a, b)) return 'sharedFolder'
   return outputReady(a) && outputReady(b) ? 'ready' : 'writing'
 }
@@ -79,19 +77,36 @@ export function sharedFolderBlockIds(
   return shared
 }
 
-/** Folder name where it is unique among the outputs, sink title otherwise; titles only while a folder is unresolved. */
+/** Shortest trailing segments of each folder that no other folder ends in; null for an unresolved or repeated folder. */
+export function distinctFolderNames(
+  paths: ReadonlyArray<string | null>,
+): Array<string | null> {
+  const dirs = paths.map((p) => (p === null ? null : normalizeDir(p)))
+  return dirs.map((dir, i) => {
+    if (dir === null) return null
+    const others = dirs.filter((d, j): d is string => j !== i && d !== null)
+    if (others.includes(dir)) return null
+    const segments = dir.split('/')
+    for (let k = 1; k < segments.length; k++) {
+      const suffix = segments.slice(-k).join('/')
+      const taken = others.some((o) => o === suffix || o.endsWith(`/${suffix}`))
+      if (!taken) return suffix
+    }
+    return dir
+  })
+}
+
+/** Folder name where it tells the outputs apart, sink title otherwise; titles only while a folder is unresolved. */
 export function outputLabels(
   outputs: ReadonlyArray<ComparableOutput>,
 ): Record<string, string> {
-  const names = outputs.map((o) => (o.dirPath ? folderName(o.dirPath) : null))
-  const pending = outputs.some((o) => o.dirPath === null && !o.lost)
+  const names = distinctFolderNames(outputs.map((o) => o.dirPath))
+  const pending = outputs.some(
+    (o) => o.dirPath === null && !o.lost && !o.dirFailed,
+  )
   const named = outputs.length > 1 && !pending
   return Object.fromEntries(
-    outputs.map((o, i) => {
-      const name = names[i]
-      const unique = names.filter((other) => other === name).length === 1
-      return [o.blockId, named && name !== null && unique ? name : o.title]
-    }),
+    outputs.map((o, i) => [o.blockId, (named && names[i]) || o.title]),
   )
 }
 
@@ -108,11 +123,9 @@ export function pickSlot(
   return { ...picked, [slot]: blockId }
 }
 
-/** First pair that can be compared; the first two outputs when none can. */
-export function defaultPair(
+function firstUsablePair(
   outputs: ReadonlyArray<ComparableOutput>,
 ): SlotPick | null {
-  if (outputs.length < 2) return null
   for (let i = 0; i < outputs.length; i++) {
     for (let j = i + 1; j < outputs.length; j++) {
       if (pairUsable(comparePairState(outputs[i], outputs[j]))) {
@@ -120,15 +133,27 @@ export function defaultPair(
       }
     }
   }
-  return { a: outputs[0].blockId, b: outputs[1].blockId }
+  return null
+}
+
+/** First usable pair of written outputs, else of all outputs; the first two outputs when none can be compared. */
+export function defaultPair(
+  outputs: ReadonlyArray<ComparableOutput>,
+): SlotPick | null {
+  if (outputs.length < 2) return null
+  return (
+    firstUsablePair(outputs.filter((o) => o.written)) ??
+    firstUsablePair(outputs) ?? { a: outputs[0].blockId, b: outputs[1].blockId }
+  )
 }
 
 /** Why an output cannot take a side next to the other side's output. */
 export function pickBlocker(
   candidate: ComparableOutput,
   other: ComparableOutput,
-): 'lost' | 'sharedFolder' | null {
+): 'lost' | 'unreadable' | 'sharedFolder' | null {
   if (candidate.lost) return 'lost'
+  if (candidate.dirFailed) return 'unreadable'
   // The other side's own output is a swap.
   if (candidate.blockId !== other.blockId && sameFolder(candidate, other)) {
     return 'sharedFolder'

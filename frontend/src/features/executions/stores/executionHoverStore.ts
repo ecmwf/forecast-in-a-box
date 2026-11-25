@@ -23,7 +23,7 @@ interface ExecutionHoverState {
   /** The compare row is in use, so the graph shows the sides. */
   compareSidesShown: boolean
   setCompareSidesShown: (shown: boolean) => void
-  /** Call on run change so a stale selection doesn't bleed across runs. */
+  /** Clears hover and selection on run change; the compare sides belong to the card that sets them. */
   resetExecutionSelection: () => void
 }
 
@@ -51,12 +51,7 @@ export const useExecutionHoverStore = create<ExecutionHoverState>(
       set({ compareSidesShown: shown })
     },
     resetExecutionSelection: () => {
-      set({
-        hoveredBlockId: null,
-        selectedBlockId: null,
-        compareSides: null,
-        compareSidesShown: false,
-      })
+      set({ hoveredBlockId: null, selectedBlockId: null })
     },
   }),
 )

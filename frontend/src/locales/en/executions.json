@@ -302,6 +302,7 @@
     "wmsUrlCopyFailed": "Could not copy WMS URL",
     "lensFailed": "Could not start SkinnyWMS",
     "fileMissing": "File not yet written by the run",
+    "folderUnreadable": "Folder could not be read",
     "sharedFolder": "Folder shared with other runs",
     "sharedFolderHint": "Other runs write here too, so the map viewer can show their fields, and a later run can overwrite these files.",
     "siblingFolder": "Folder shared with another output of this run",
@@ -316,12 +317,15 @@
       "sharedFolder": "Both outputs are in the same folder",
       "sharedFolderHint": "The map server reads every GRIB file in a folder, so it cannot tell these two outputs apart. Give each GRIB sink its own folder, for example .../AIFS/[shortName].grib and .../IFS/[shortName].grib, and run the workflow again.",
       "lost": "An output is no longer available.",
+      "unreadable": "The folder of an output could not be read.",
+      "noServer": "The map server (SkinnyWMS) is not installed.",
       "action": "Compare",
       "swap": "Swap sides",
       "slot": "{{slot}}: {{name}}",
       "side": "Side {{slot}}",
       "pickSide": "Output on side {{slot}}",
       "pickLost": "No longer available",
+      "pickUnreadable": "Folder could not be read",
       "pickSharedFolder": "Same folder as side {{slot}}"
     }
   },

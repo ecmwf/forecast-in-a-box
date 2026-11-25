@@ -20,6 +20,7 @@
  *   running → Copy + Stop controls appear → Stop tears it down
  */
 
+import { useEffect, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { userEvent } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
@@ -44,6 +45,7 @@ import {
   resetJobsState,
   setMockGribDir,
 } from '@tests/../mocks/data/job.data'
+import type { ReactNode } from 'react'
 import type { JobStatus, RunOutputs } from '@/api/types/job.types'
 import type { LensInstanceDetailResponse } from '@/api/types/lens.types'
 import { StoredOutputsCard } from '@/features/executions/components/StoredOutputsCard'
@@ -76,28 +78,45 @@ const outputsWithMarkers: RunOutputs = {
   },
 }
 
+/** Clears the run selection on mount, as the run page does. */
+function ResettingPage({ children }: { children: ReactNode }) {
+  const reset = useExecutionHoverStore((s) => s.resetExecutionSelection)
+  useEffect(() => reset(), [reset])
+  return children
+}
+
 async function renderCard(
   outputs: RunOutputs | null,
   runName?: string,
   status: JobStatus = 'completed',
+  { inRunPage = false }: { inRunPage?: boolean } = {},
 ) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
+  // Lets a test hand the mounted card new outputs, as a run poll does.
+  const live = { setOutputs: (_next: RunOutputs | null) => {} }
   // Memory router: the card renders at '/', Visualise navigates away.
   const rootRoute = createRootRoute({ component: () => <Outlet /> })
   const indexRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: '/',
-    component: () => (
-      <StoredOutputsCard
-        jobId="job-completed-001"
-        status={status}
-        attempt={1}
-        outputs={outputs}
-        runName={runName}
-      />
-    ),
+    component: () => {
+      const [current, setCurrent] = useState(outputs)
+      useEffect(() => {
+        live.setOutputs = setCurrent
+      }, [])
+      const card = (
+        <StoredOutputsCard
+          jobId="job-completed-001"
+          status={status}
+          attempt={1}
+          outputs={current}
+          runName={runName}
+        />
+      )
+      return inRunPage ? <ResettingPage>{card}</ResettingPage> : card
+    },
   })
   const visualiseRoute = createRoute({
     getParentRoute: () => rootRoute,
@@ -115,13 +134,21 @@ async function renderCard(
       </I18nextProvider>
     </QueryClientProvider>,
   )
-  return { screen, router }
+  return {
+    screen,
+    router,
+    setOutputs: (next: RunOutputs | null) => live.setOutputs(next),
+  }
 }
 
 beforeEach(() => {
   resetJobsState()
   resetLensState()
   useExecutionHoverStore.getState().resetExecutionSelection()
+  useExecutionHoverStore.setState({
+    compareSides: null,
+    compareSidesShown: false,
+  })
 })
 
 afterEach(() => {
@@ -284,6 +311,9 @@ describe('StoredOutputsCard', () => {
     await expect
       .element(startButton)
       .toHaveAttribute('title', expect.stringContaining('not available'))
+    await expect
+      .element(screen.getByRole('button', { name: /^visualise$/i }))
+      .toBeDisabled()
   })
 
   it('Start WMS server boots the lens; Copy/Stop appear; Stop tears it down', async () => {
@@ -568,6 +598,16 @@ describe('StoredOutputsCard compare', () => {
     expect(sides()).toBeNull()
   })
 
+  it('keeps the graph sides when the run page clears its selection on mount', async () => {
+    separateFolders()
+    const sides = () => useExecutionHoverStore.getState().compareSides
+    const { screen } = await renderCard(twoSinks, undefined, 'completed', {
+      inRunPage: true,
+    })
+    await expect.element(screen.getByLabelText('A: AIFS')).toBeVisible()
+    expect(sides()).toEqual({ a: 'block_sink_1', b: 'block_sink_2' })
+  })
+
   it('marks no side on the graph for a single output', async () => {
     const { screen } = await renderCard(outputsWithMarkers)
     await expect.element(screen.getByText('job-completed-001_1')).toBeVisible()
@@ -613,6 +653,42 @@ describe('StoredOutputsCard compare', () => {
       .element(screen.getByText('An output is no longer available.'))
       .toBeVisible()
     await expect.element(compareButton(screen)).toBeDisabled()
+  })
+
+  it('holds the comparison when SkinnyWMS is not installed', async () => {
+    resetLensState({ skinnyWmsInstalled: false })
+    separateFolders()
+    const { screen } = await renderCard(twoSinks)
+    await expect
+      .element(screen.getByText('The map server (SkinnyWMS) is not installed.'))
+      .toBeVisible()
+    await expect.element(compareButton(screen)).toBeDisabled()
+  })
+
+  it('reports a folder that could not be read', async () => {
+    setMockGribDir(RUN, `/data/output/${RUN}_1/AIFS`, 'task-out-grib')
+    // The run records no such output, so the folder lookup fails.
+    const { screen } = await renderCard({
+      'task-out-grib': marker('block_sink_1'),
+      'task-out-grib-gone': marker('block_sink_2'),
+    })
+    await expect
+      .element(screen.getByText('The folder of an output could not be read.'), {
+        timeout: 5000,
+      })
+      .toBeVisible()
+    await expect.element(compareButton(screen)).toBeDisabled()
+    await expect
+      .element(screen.getByText('Folder could not be read'))
+      .toBeVisible()
+  })
+
+  it('tells equally named folders apart by their parents', async () => {
+    setMockGribDir(RUN, `/data/output/${RUN}_1/aifs/grib`, 'task-out-grib')
+    setMockGribDir(RUN, `/data/output/${RUN}_1/ifs/grib`, 'task-out-grib-b')
+    const { screen } = await renderCard(twoSinks)
+    await expect.element(screen.getByLabelText('A: aifs/grib')).toBeVisible()
+    await expect.element(screen.getByLabelText('B: ifs/grib')).toBeVisible()
   })
 
   it('keeps the sides fixed for two outputs', async () => {
@@ -680,6 +756,26 @@ describe('StoredOutputsCard compare', () => {
       await expectSide(screen, 'B', 'BRIS')
       await expectSide(screen, 'A', 'block_sink_1')
       await expect.element(compareButton(screen)).toBeEnabled()
+    })
+
+    it('prefers two written outputs and keeps them once the earlier one is written', async () => {
+      setMockGribDir(RUN, `/data/output/${RUN}_1/AIFS`, 'task-out-grib')
+      setMockGribDir(RUN, `/data/output/${RUN}_1/IFS`, 'task-out-grib-b')
+      setMockGribDir(RUN, `/data/output/${RUN}_1/BRIS`, 'task-out-grib-c')
+      const { screen, setOutputs } = await renderCard(
+        { ...threeSinks, 'task-out-grib': marker('block_sink_1', false) },
+        undefined,
+        'running',
+      )
+      // Sink titles while a folder is unresolved.
+      await expectSide(screen, 'A', 'block_sink_2')
+      await expectSide(screen, 'B', 'block_sink_3')
+      await expect.element(compareButton(screen)).toBeEnabled()
+
+      // Folder names once every folder is known; the sides stay.
+      setOutputs(threeSinks)
+      await expectSide(screen, 'A', 'IFS')
+      await expectSide(screen, 'B', 'BRIS')
     })
 
     it('refuses an output in the other side folder', async () => {

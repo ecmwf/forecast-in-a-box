@@ -44,6 +44,7 @@ import type { LostTaskIds } from '@/features/executions/outputs/availability'
 import { isTerminalStatus } from '@/api/types/job.types'
 import { classifyOutput } from '@/features/executions/outputs/availability'
 import {
+  comparePairState,
   defaultPair,
   outputLabels,
   pickSlot,
@@ -205,6 +206,7 @@ export function StoredOutputsCard({
       !row.isAvailable &&
       (row.lostReason !== undefined || isTerminalStatus(status)),
     dirPath: dirQueries[i].data ?? null,
+    dirFailed: dirQueries[i].isError && !dirQueries[i].data,
   }))
   const siblingShared = sharedFolderBlockIds(comparable)
   const labels = outputLabels(comparable)
@@ -215,6 +217,10 @@ export function StoredOutputsCard({
   const sideA = comparable.find((o) => o.blockId === sides?.a)
   const sideB = comparable.find((o) => o.blockId === sides?.b)
   const pair = sideA && sideB ? { a: sideA, b: sideB } : null
+  // A ready default sticks: a sink finishing later does not move the sides.
+  if (!picked && pair && comparePairState(pair.a, pair.b) === 'ready') {
+    setPicked({ a: pair.a.blockId, b: pair.b.blockId })
+  }
   const pick = (slot: SourceSlot, blockId: string) => {
     if (!pair) return
     setPicked(pickSlot({ a: pair.a.blockId, b: pair.b.blockId }, slot, blockId))
@@ -475,6 +481,10 @@ function StoredOutputRowItem({
             </span>
             <Copy className="ml-1 h-3 w-3 shrink-0 opacity-0 transition-opacity group-hover/path:opacity-70" />
           </button>
+        ) : row.isAvailable && dirQuery.isError ? (
+          <P className="text-sm text-muted-foreground italic">
+            {t('storedOutputs.folderUnreadable')}
+          </P>
         ) : row.isAvailable ? (
           <P className="font-mono text-sm text-muted-foreground">…</P>
         ) : (
@@ -532,7 +542,7 @@ function StoredOutputRowItem({
             size="sm"
             variant="outline"
             onClick={visualise}
-            disabled={!complete}
+            disabled={!complete || wmsUnavailable}
             className="gap-1.5"
           >
             <Earth className="h-3.5 w-3.5" />

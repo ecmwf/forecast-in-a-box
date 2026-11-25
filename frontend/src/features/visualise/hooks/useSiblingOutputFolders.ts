@@ -11,7 +11,7 @@
 import { useQueries } from '@tanstack/react-query'
 import { entryRef } from '../entry-ref'
 import type { ComparisonEntry } from '../entry-ref'
-import { folderName } from '@/features/executions/outputs/compare-outputs'
+import { distinctFolderNames } from '@/features/executions/outputs/compare-outputs'
 import { storedDirQueryOptions } from '@/features/executions/outputs/stored-dir'
 
 /** Folder name per entry ref when both sides are outputs of one run in different folders; else empty. */
@@ -33,7 +33,7 @@ export function useSiblingOutputFolders(
     ),
   }).map((query) => query.data)
   if (pair.length < 2 || !dirA || !dirB) return {}
-  const [nameA, nameB] = [folderName(dirA), folderName(dirB)]
-  if (nameA === nameB) return {}
+  const [nameA, nameB] = distinctFolderNames([dirA, dirB])
+  if (!nameA || !nameB) return {}
   return { [entryRef(pair[0])]: nameA, [entryRef(pair[1])]: nameB }
 }

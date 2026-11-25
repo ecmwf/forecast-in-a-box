@@ -30,6 +30,7 @@ import {
   SLOT_FILL_CLASS,
 } from '@/features/executions/components/CompareSideBadge'
 import { useExecutionHoverStore } from '@/features/executions/stores/executionHoverStore'
+import { useSkinnyWmsAvailable } from '@/api/hooks/useLens'
 import { entryRef } from '@/features/visualise/entry-ref'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -52,7 +53,13 @@ const STATUS_KEY = {
   writing: 'storedOutputs.compare.writing',
   sharedFolder: 'storedOutputs.compare.sharedFolder',
   lost: 'storedOutputs.compare.lost',
+  unreadable: 'storedOutputs.compare.unreadable',
 } as const satisfies Record<ComparePairState, string>
+
+const PICK_BLOCKER_KEY = {
+  lost: 'storedOutputs.compare.pickLost',
+  unreadable: 'storedOutputs.compare.pickUnreadable',
+} as const
 
 /** Two map halves that take their slot colour as each output finishes. */
 function SplitMapGlyph({ a, b }: { a: boolean; b: boolean }) {
@@ -92,6 +99,8 @@ function SideLabel({
         <span
           className={cn('h-2 w-2 shrink-0 rounded-full', SLOT_FILL_CLASS[slot])}
         />
+      ) : output.dirFailed ? (
+        <AlertCircle className="h-3 w-3 shrink-0 text-amber-600 dark:text-amber-400" />
       ) : (
         <Loader2 className="h-3 w-3 shrink-0 animate-spin text-muted-foreground" />
       )}
@@ -199,11 +208,11 @@ function SidePicker({
                 </div>
                 {blocker && (
                   <div className="text-xs text-muted-foreground">
-                    {blocker === 'lost'
-                      ? t('storedOutputs.compare.pickLost')
-                      : t('storedOutputs.compare.pickSharedFolder', {
+                    {blocker === 'sharedFolder'
+                      ? t('storedOutputs.compare.pickSharedFolder', {
                           slot: otherSlot.toUpperCase(),
-                        })}
+                        })
+                      : t(PICK_BLOCKER_KEY[blocker])}
                   </div>
                 )}
               </div>
@@ -237,8 +246,10 @@ export function CompareOutputsBar({
 }) {
   const { t } = useTranslation('executions')
   const state = comparePairState(a, b)
+  // false only when the backend reports SkinnyWMS as not installed.
+  const wmsUnavailable = useSkinnyWmsAvailable() === false
   // A blocked pair stays grey even when both outputs are written.
-  const usable = pairUsable(state)
+  const usable = pairUsable(state) && !wmsUnavailable
 
   // The graph shows the sides while the row is in use.
   const [hovered, setHovered] = useState(false)
@@ -305,7 +316,7 @@ export function CompareOutputsBar({
         <P className="text-sm font-medium">
           {t('storedOutputs.compare.title')}
         </P>
-        {state === 'sharedFolder' ? (
+        {state === 'sharedFolder' && !wmsUnavailable ? (
           <Tooltip>
             <TooltipTrigger
               render={
@@ -323,7 +334,9 @@ export function CompareOutputsBar({
           </Tooltip>
         ) : (
           <P className="truncate text-sm text-muted-foreground">
-            {t(STATUS_KEY[state])}
+            {wmsUnavailable
+              ? t('storedOutputs.compare.noServer')
+              : t(STATUS_KEY[state])}
           </P>
         )}
       </div>
@@ -345,7 +358,7 @@ export function CompareOutputsBar({
           <TooltipContent>{t('storedOutputs.compare.swap')}</TooltipContent>
         </Tooltip>
         {side('b')}
-        {state === 'ready' ? (
+        {state === 'ready' && !wmsUnavailable ? (
           // A link, so the map can open in a new tab.
           <Button
             size="sm"
@@ -358,7 +371,7 @@ export function CompareOutputsBar({
           </Button>
         ) : (
           <Button size="sm" className="ml-1.5 gap-1.5" disabled>
-            {state === 'writing' ? (
+            {state === 'writing' && !wmsUnavailable ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
               <Columns2 className="h-3.5 w-3.5" />
