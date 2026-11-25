@@ -29,21 +29,18 @@ const STEPS: ReadonlyArray<{
   { key: 'dissemination', kind: 'sink' },
 ]
 
-const PARTNER_LOGOS: ReadonlyArray<{
-  key: 'ecmwf' | 'metNorway' | 'fmi'
+const ECMWF_URL = 'https://www.ecmwf.int'
+const ARCX_URL =
+  'https://www.ecmwf.int/en/about/what-we-do/environmental-services-and-future-vision/eu-global-gateway-strategy/africa-regional-centres-excellence-arcx-climate-change-resilience'
+
+// MET Norway's width compensates for the padding baked into its PNG.
+const CO_DEVELOPERS: ReadonlyArray<{
+  key: 'metNorway' | 'fmi'
   src: string
   darkSrc?: string
   href: string
   size: string
 }> = [
-  // Widths compensate for the padding baked into the ECMWF and MET Norway PNGs.
-  // None may be taller than the EU flag (h-10 below).
-  {
-    key: 'ecmwf',
-    src: '/logos/org/ECMWF.png',
-    href: 'https://www.ecmwf.int',
-    size: 'w-44',
-  },
   {
     key: 'metNorway',
     src: '/logos/org/MetNorway.png',
@@ -55,10 +52,9 @@ const PARTNER_LOGOS: ReadonlyArray<{
     src: '/logos/org/FMI.png',
     darkSrc: '/logos/org/FMI-dark.png',
     href: 'https://en.ilmatieteenlaitos.fi',
-    size: 'h-9 w-auto',
+    size: 'h-8 w-auto',
   },
 ]
-const ARCX_URL = 'https://africa-knowledge-platform.ec.europa.eu/arcx'
 
 const TOOL_LOGOS = [
   { key: 'anemoi', src: '/logos/packages/anemoi.webp', href: ANEMOI_URL },
@@ -84,6 +80,7 @@ const PROJECT_LINKS = {
   anemoi: <Link href={ANEMOI_URL} />,
   earthkit: <Link href={EARTHKIT_URL} />,
   destinE: <Link href={DESTINE_URL} />,
+  arcx: <Link href={ARCX_URL} />,
 }
 
 export function AboutPage() {
@@ -108,7 +105,8 @@ export function AboutPage() {
           </H1>
           {/* Two columns keep a readable measure across the full width. */}
           <P className="mt-8 text-lg leading-relaxed text-pretty md:columns-2 md:gap-12">
-            <Trans t={t} i18nKey="about.lead" components={PROJECT_LINKS} />
+            <Trans t={t} i18nKey="about.lead" components={PROJECT_LINKS} />{' '}
+            <Trans t={t} i18nKey="arcx" components={PROJECT_LINKS} />
           </P>
         </div>
       </section>
@@ -154,60 +152,35 @@ export function AboutPage() {
 
       <section className={`${SECTION} pt-20`}>
         <H2 className="border-0 pb-0 text-2xl">{t('collaboration.title')}</H2>
-        {/* Institutes, then EU programmes; 1px gaps draw the hairlines. */}
-        <div className="mt-10 grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-6">
-          {PARTNER_LOGOS.map(({ key, src, darkSrc, href, size }) => (
-            <a
-              key={key}
-              href={href}
-              className="flex items-center justify-center bg-background px-6 py-5 lg:col-span-2"
-            >
-              <LogoImage
-                src={src}
-                darkSrc={darkSrc}
-                alt={t(`brand.${key}`)}
-                className={size}
-              />
-            </a>
-          ))}
+        {/* Initiator on top, co-developers below at a smaller scale. */}
+        <div className="mt-10 grid gap-px bg-border">
           <a
-            href={DESTINE_URL}
-            className="flex items-center justify-center gap-3 bg-background px-6 py-5 lg:col-span-3"
+            href={ECMWF_URL}
+            className="flex items-center justify-center bg-background px-6 py-5"
           >
-            {/* One row; only the wordmark shrinks on narrow screens. */}
-            <LogoImage
-              src="/logos/org/eu-flag.svg"
-              alt={t('brand.eu')}
-              className="h-10 w-auto shrink-0"
-            />
-            <LogoImage
-              src="/logos/org/destine-wordmark.svg"
-              darkSrc="/logos/org/destine-wordmark-dark.svg"
-              alt={t('brand.destinE')}
-              className="h-5 w-auto min-w-0"
+            <img
+              src="/logos/org/ECMWF.png"
+              alt={t('brand.ecmwf')}
+              className="h-auto w-56 object-contain"
             />
           </a>
-          {/* ArcX has no logo of its own: Global Gateway emblem, name in type. */}
-          <a
-            href={ARCX_URL}
-            className="flex flex-col items-center justify-center gap-3 bg-background px-6 py-5 sm:col-span-2 sm:flex-row sm:gap-4 lg:col-span-3"
-          >
-            {/* h-12.5 puts the emblem's flag level with the EU flag (h-10). */}
-            <LogoImage
-              src="/logos/org/global-gateway.svg"
-              darkSrc="/logos/org/global-gateway-dark.svg"
-              alt={t('brand.globalGateway')}
-              className="h-12.5 w-auto shrink-0"
-            />
-            <span className="flex flex-col items-center text-center sm:items-start sm:text-left">
-              <span className="text-2xl font-bold tracking-tight">
-                {t('brand.arcx')}
-              </span>
-              <span className="text-xs text-balance text-muted-foreground">
-                {t('brand.arcxFull')}
-              </span>
-            </span>
-          </a>
+          {/* flex-wrap keeps the hairline grid hole-free as more join. */}
+          <div className="flex flex-wrap gap-px">
+            {CO_DEVELOPERS.map(({ key, src, darkSrc, href, size }) => (
+              <a
+                key={key}
+                href={href}
+                className="flex flex-1 basis-56 items-center justify-center bg-background px-6 py-5"
+              >
+                <LogoImage
+                  src={src}
+                  darkSrc={darkSrc}
+                  alt={t(`brand.${key}`)}
+                  className={size}
+                />
+              </a>
+            ))}
+          </div>
         </div>
         <P className="mt-10 mb-4 text-sm font-semibold tracking-wide text-foreground/70 uppercase">
           {t('about.people.builtWith')}

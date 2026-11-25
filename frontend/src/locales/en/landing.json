@@ -31,6 +31,7 @@
     "anemoiDescription": "Open-source ML framework for developing, training, and deploying weather forecasting models",
     "earthkitDescription": "Open-source tools for seamless earth science workflows"
   },
+  "arcx": "Within <arcx>ArcX</arcx> (Africa Regional Centres of Excellence), an EU Global Gateway programme, African and European partners co-develop Forecast-in-a-Box pilots for climate change resilience.",
   "collaboration": {
     "title": "A Collaboration between"
   },
@@ -53,12 +54,7 @@
     "earthkit": "EarthKit",
     "ecmwf": "ECMWF",
     "metNorway": "MetNorway",
-    "fmi": "FMI",
-    "destinE": "DestinE",
-    "eu": "European Union",
-    "globalGateway": "Global Gateway",
-    "arcx": "ArcX",
-    "arcxFull": "Africa Regional Centres of Excellence"
+    "fmi": "FMI"
   },
   "about": {
     "eyebrow": "About Forecast-in-a-Box",

@@ -72,6 +72,9 @@ describe('Layout', () => {
         .toBeVisible()
       await expect.element(screen.getByAltText('European Union')).toBeVisible()
       await expect
+        .element(screen.getByAltText('EU Global Gateway'))
+        .toBeVisible()
+      await expect
         .element(screen.getByAltText(/member and co-operating states/))
         .toBeVisible()
     })
