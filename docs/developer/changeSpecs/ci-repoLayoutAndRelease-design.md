@@ -6,7 +6,7 @@ Proposal (step 1 of the [changeSpecs workflow](README.md)), open for feedback.
 
 - Supersedes the *Release Scenario* of [ci-fiab_core.md](ci-fiab_core.md) (reversing its conclusion that the repository stays organized as-is) and revisits its *Install Scenario* with respect to `fiab-core` locking. The *Migration Scenario* in [ci-fiab_core.md](ci-fiab_core.md) (blueprint version warnings) is unaffected.
 - Supersedes the installer/launcher split originally proposed in [#169](https://github.com/ecmwf/forecast-in-a-box/issues/169); the explicit `upgrade`/`reinstall` commands delivered in [#757](https://github.com/ecmwf/forecast-in-a-box/pull/757) remain valid until the Phase 5 transition.
-- Companion to [deployment-runtimeAndDockerV3-design.md](deployment-runtimeAndDockerV3-design.md), which covers the Python runtime bootstrap, `FIAB_HOME`/storage classes, and the initial Docker v3 image and can proceed in parallel.
+- Companion to [deployment-runtimeAndDockerV3-design.md](deployment-runtimeAndDockerV3-design.md), which covers the Python runtime bootstrap, `FIAB_ROOT`/storage classes, and the initial Docker v3 image and can proceed in parallel.
 - Organized into work packages with explicit dependencies rather than a strict linear chain (see [Dependencies and ordering](#dependencies-and-ordering)).
 
 ## Context
@@ -48,7 +48,7 @@ The repository is structured as a single `uv` workspace rooted at `backend/`, wi
 
 ## Non-goals
 
-- Runtime bootstrap consolidation, `FIAB_HOME`/storage classes, and initial Docker v3 prototyping (covered in [deployment-runtimeAndDockerV3-design.md](deployment-runtimeAndDockerV3-design.md)).
+- Runtime bootstrap consolidation, `FIAB_ROOT`/storage classes, and initial Docker v3 prototyping (covered in [deployment-runtimeAndDockerV3-design.md](deployment-runtimeAndDockerV3-design.md)).
 - Task-level environment merging, plugin dependency constraint audits, and checkpoint compatibility matrices (separate parallel workstreams).
 - Multi-user version managers or side-by-side state lifecycle policies.
 
@@ -159,10 +159,10 @@ With runtime bootstrap moved into the Python `fiab` entrypoint ([deployment-runt
 - **Pinned / pre-release install:** `curl -fsSL <stable_version_url>/install.sh | bash`.
 - **Forge-agnostic hosting:** Because the installer is just a plain static HTTP download (no GitHub API calls), it can be hosted on GitHub/GitLab Releases, Generic Package Registry, a project-owned redirect/static URL (such as an ECMWF domain), object storage, or a local wheelhouse. Making the installer base URL configurable in `fiab upgrade` avoids hardcoding GitHub.
 - **Embedded version (and optionally lock):** The source script in git carries a sentinel value (for example `FIAB_VERSION="dev"`, interpreted locally as installing from a local wheelhouse or checkout). At release time, CD stamps the exact release or pre-release version into the published `install.sh` artifact. If `pylock.toml` is either embedded in `install.sh` (or fetched relative to the same base URL / local wheelhouse), `install.sh` becomes a single self-contained artifact with zero forge-specific API or path assumptions.
-- **Upgrades:** `fiab upgrade [version]` (implemented in Python) resolves the target version (for example from PyPI JSON metadata or a configured mirror) and executes that version's `install.sh`. Each version's `install.sh` only needs to know how to install itself (its own pinned Python, `uv` requirement, and lock).
-- **Safe swap:** `install.sh` installs into a versioned venv under the code install directory outside `FIAB_HOME` (default `~/.local/share/fiab/app/vX.Y.Z/`, overridable via env var) and atomically flips a `current -> vX.Y.Z` symlink there, with `~/.local/bin/fiab` pointing to `~/.local/share/fiab/app/current/bin/fiab`. Initially `current` can be a single directory (or a symlink with old versions pruned after swap); keeping versioned directories naturally enables a `previous <-> current <-> next` rollout/rollback flow (or side-by-side versions) later without changing the executable path. 
-- **Piping and re-run:** `install.sh` should never read interactive prompts from stdin, is idempotent on re-run, and prints a `PATH` hint if `~/.local/bin` is not yet on `PATH`.
-- **Runtime and restart:** `fiab` handles `run`, `service`, `warmup`, and post-upgrade restart coordination. `install.sh` never touches `FIAB_HOME`; state migration or compatibility checks remain TBD in a separate state-evolution spec.
+- **Upgrades:** `fiab upgrade [version]` (implemented in Python) resolves the target version (for example from PyPI JSON metadata or a configured mirror), derives its own `FIAB_INSTALL_DIR` from `sys.prefix`, and executes `install.sh --install-dir "$FIAB_INSTALL_DIR" --no-bin-link` (the existing bin symlink already points to `current/venv/bin/fiab`, so no installer state file is needed). Each version's `install.sh` remains completely throwaway and only needs to know how to install itself.
+- **Safe swap:** `install.sh` installs into a versioned venv under an overridable code install directory (`FIAB_INSTALL_DIR` / `--install-dir`, default TBD by the team -- for example `~/.fiab/app` or `~/.local/share/fiab/app`) and atomically flips a `current -> vX.Y.Z` symlink there, with an optional bin symlink at `FIAB_BIN_DIR/fiab` (`--bin-dir`, default `~/.local/bin`, or `--no-bin-link`) pointing to `$FIAB_INSTALL_DIR/current/venv/bin/fiab`. Initially `current` can be a single directory (or a symlink with old versions pruned after swap); keeping versioned directories naturally enables a `previous <-> current <-> next` rollout/rollback flow (or side-by-side versions) later without changing the executable path.
+- **Piping and re-run:** `install.sh` should never read interactive prompts from stdin, is idempotent on re-run, never clobbers an unrelated `fiab` binary in `FIAB_BIN_DIR`, and prints a `PATH` hint if `FIAB_BIN_DIR` is not yet on `PATH`.
+- **Runtime and restart:** `fiab` handles `run`, `service`, `warmup`, and post-upgrade restart coordination. `install.sh` never touches `FIAB_ROOT` runtime state/config/data; state migration or compatibility checks remain TBD in a separate state-evolution spec.
 
 ### Minimal cross-version contract
 
@@ -170,8 +170,8 @@ Under this pattern, the entire permanent cross-version surface for standalone in
 
 1. **Stable URLs:** a stable latest-release `install.sh` URL and a per-version `install.sh` URL template (configurable for mirrors/GitLab, or backed by a project-owned domain). If the single-bootstrap-from-PyPI option in Open Question 6(b) is chosen instead, this simplifies further to a single stable `install.sh` URL plus PyPI (or a configured PyPI mirror).
 2. **CLI interface:** the `fiab` command on `PATH` (`run`, `service`, `warmup`, `upgrade [version]`).
-3. **Code location layout:** a stable default code install directory (matching [deployment-runtimeAndDockerV3-design.md](deployment-runtimeAndDockerV3-design.md), for example `~/.local/share/fiab/app`, overridable via env var) with a `current` entry (`current -> vX.Y.Z` symlink, or initially a single directory) so a newer `install.sh` can atomically replace an older installation and future side-by-side versions remain possible.
-4. **State boundary:** `FIAB_HOME` ([deployment-runtimeAndDockerV3-design.md](deployment-runtimeAndDockerV3-design.md)) is never modified by `install.sh`.
+3. **Code location layout:** an overridable code install directory (`FIAB_INSTALL_DIR` / `--install-dir`, default TBD by the team) containing `v<version>/venv` and a `current -> v<version>` symlink so a newer `install.sh` can atomically replace an older installation without needing any installer metadata file.
+4. **State boundary:** `FIAB_ROOT` runtime subdirectories (`config/`, `state/`, `share/`, `cache/`, `tmp/`) ([deployment-runtimeAndDockerV3-design.md](deployment-runtimeAndDockerV3-design.md)) are never modified by `install.sh`.
 
 ### Optional transition from `scripts/fiab.sh`
 
