@@ -137,7 +137,7 @@ describe('Landing Page', () => {
       await expect
         .element(
           screen.getByRole('link', {
-            name: 'Africa Regional Centres of Excellence (ArcX)',
+            name: 'ArcX',
             exact: true,
           }),
         )

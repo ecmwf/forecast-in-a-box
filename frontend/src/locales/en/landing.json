@@ -31,7 +31,7 @@
     "anemoiDescription": "Open-source ML framework for developing, training, and deploying weather forecasting models",
     "earthkitDescription": "Open-source tools for seamless earth science workflows"
   },
-  "funding": "This project is funded by ECMWF and the European Commission through <destinE>Destination Earth</destinE>, and the <arcx>Africa Regional Centres of Excellence (ArcX)</arcx> programme on Climate Change Resilience which contributes to the EU's Global Gateway strategy.",
+  "funding": "This project is funded by ECMWF and the European Commission through <destinE>Destination Earth</destinE>, and the Africa Regional Centres of Excellence (<arcx>ArcX</arcx>) programme on Climate Change Resilience which contributes to the EU's Global Gateway strategy.",
   "collaboration": {
     "title": "A Collaboration between"
   },
