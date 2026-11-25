@@ -23,7 +23,12 @@ describe('AboutPage', () => {
         .toBeInTheDocument()
     }
     await expect
-      .element(screen.getByRole('link', { name: 'ArcX', exact: true }))
+      .element(
+        screen.getByRole('link', {
+          name: 'Africa Regional Centres of Excellence (ArcX)',
+          exact: true,
+        }),
+      )
       .toHaveAttribute(
         'href',
         'https://www.ecmwf.int/en/about/what-we-do/environmental-services-and-future-vision/eu-global-gateway-strategy/africa-regional-centres-excellence-arcx-climate-change-resilience',

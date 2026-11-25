@@ -106,7 +106,7 @@ export function AboutPage() {
           {/* Two columns keep a readable measure across the full width. */}
           <P className="mt-8 text-lg leading-relaxed text-pretty md:columns-2 md:gap-12">
             <Trans t={t} i18nKey="about.lead" components={PROJECT_LINKS} />{' '}
-            <Trans t={t} i18nKey="arcx" components={PROJECT_LINKS} />
+            <Trans t={t} i18nKey="funding" components={PROJECT_LINKS} />
           </P>
         </div>
       </section>
